@@ -1,0 +1,33 @@
+{
+  "mode": "local_ollama",
+  "model": "smollm2:135m",
+  "ok": true,
+  "rows": [
+    {
+      "ok": true,
+      "preset_id": "galaxy-creative",
+      "simulation_type": "creative_testing",
+      "sample_size": 200,
+      "run_id": "23fa0c94-e10a-4315-b61b-e34e216b19f8",
+      "status": "completed",
+      "total_responses": 200,
+      "parse_failed": 35,
+      "parse_success_rate": 82.5,
+      "quality": {
+        "overall_grade": "C",
+        "parse_success_rate": 82.5,
+        "sample_quality_grade": "A"
+      },
+      "provider": "ollama",
+      "provider_model": "smollm2:135m",
+      "llm_backend": "ollama",
+      "metric_keys": [
+        "choice_counts",
+        "choice_pct",
+        "creatives",
+        "reasons_by_choice"
+      ],
+      "result_url": "/results?run_id=23fa0c94-e10a-4315-b61b-e34e216b19f8"
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+.Python
+
+# 가상환경
+.venv/
+venv/
+env/
+
+# 환경변수 (시크릿 포함 가능)
+.env
+.env.local
+.env.*.local
+client_secret*.json
+*_client_secret*.json
+oauth_client*.json
+google-oauth*.json
+
+# 데이터셋 (GitHub 100MB 제한 + 1.98GB 큰 파일)
+data/*.parquet
+data/*.log
+data/runtime/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 로그·임시
+*.log
+*.tmp
+.cache/
+
+# 노트북 체크포인트
+.ipynb_checkpoints/
+
+# 테스트
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Claude·Wrangler
+.claude/
+.wrangler/

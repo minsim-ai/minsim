@@ -1,0 +1,74 @@
+{
+  "metadata": {
+    "created_at": "2026-05-04T06:11:34.213089+00:00",
+    "host": "kwintuseuui-MacStudio.local",
+    "git_commit": "fcbf4dd",
+    "output_dir": "/Users/qts/obsidian-org-knowledge/org/organization/product/waterfall.run/koresim/docs/verification/model-comparison-20260504T061134Z",
+    "sqlite_path": "/Users/qts/obsidian-org-knowledge/org/organization/product/waterfall.run/koresim/docs/verification/model-comparison-20260504T061134Z/experiment.sqlite3",
+    "providers": [
+      "gemini",
+      "ollama"
+    ],
+    "gemini_model": "gemini-3-flash-preview",
+    "ollama_model": "gemma3:27b",
+    "sample_sizes": [
+      200
+    ],
+    "preset_ids": [
+      "galaxy-creative"
+    ],
+    "notes": [
+      "Provider/model fields are the source of truth for model comparison.",
+      "Secrets and API keys are intentionally excluded from experiment artifacts."
+    ]
+  },
+  "ok": true,
+  "rows": [
+    {
+      "ok": true,
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "preset_id": "galaxy-creative",
+      "preset_title": "Galaxy 광고 크리에이티브 비교",
+      "simulation_type": "creative_testing",
+      "sample_size": 200,
+      "run_id": "3a4ccff2-9633-41fb-823d-3bc515b46e71",
+      "status": "completed",
+      "elapsed_seconds": 226.093,
+      "seconds_per_response": 1.13,
+      "responses_per_minute": 53.08,
+      "total_responses": 200,
+      "parse_failed": 0,
+      "parse_success_rate": 100.0,
+      "sample_quality_grade": "A",
+      "overall_grade": "A",
+      "metric_keys_json": "[\"choice_counts\", \"choice_pct\", \"creatives\", \"reasons_by_choice\"]",
+      "result_json_path": "docs/verification/model-comparison-20260504T061134Z/run-results/gemini-gemini-3-flash-preview-galaxy-creative-200-3a4ccff2-9633-41fb-823d-3bc515b46e71.json",
+      "sqlite_path": "/Users/qts/obsidian-org-knowledge/org/organization/product/waterfall.run/koresim/docs/verification/model-comparison-20260504T061134Z/experiment.sqlite3",
+      "error": ""
+    },
+    {
+      "ok": true,
+      "provider": "ollama",
+      "model": "gemma3:27b",
+      "preset_id": "galaxy-creative",
+      "preset_title": "Galaxy 광고 크리에이티브 비교",
+      "simulation_type": "creative_testing",
+      "sample_size": 200,
+      "run_id": "fd05ed1f-9c89-4f1f-a821-f568ca1776f1",
+      "status": "completed",
+      "elapsed_seconds": 760.333,
+      "seconds_per_response": 3.802,
+      "responses_per_minute": 15.78,
+      "total_responses": 200,
+      "parse_failed": 0,
+      "parse_success_rate": 100.0,
+      "sample_quality_grade": "A",
+      "overall_grade": "A",
+      "metric_keys_json": "[\"choice_counts\", \"choice_pct\", \"creatives\", \"reasons_by_choice\"]",
+      "result_json_path": "docs/verification/model-comparison-20260504T061134Z/run-results/ollama-gemma3-27b-galaxy-creative-200-fd05ed1f-9c89-4f1f-a821-f568ca1776f1.json",
+      "sqlite_path": "/Users/qts/obsidian-org-knowledge/org/organization/product/waterfall.run/koresim/docs/verification/model-comparison-20260504T061134Z/experiment.sqlite3",
+      "error": ""
+    }
+  ]
+}

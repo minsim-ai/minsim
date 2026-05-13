@@ -1,0 +1,422 @@
+{
+  "gate": "phase-5-phase-7-deterministic-50-200",
+  "ok": true,
+  "rows": [
+    {
+      "preset_id": "galaxy-creative",
+      "simulation_type": "creative_testing",
+      "sample_size": 50,
+      "run_id": "4ef94b35-3cb8-485f-bc22-04291151bc00",
+      "status": "completed",
+      "total_responses": 50,
+      "parse_failed": 0,
+      "quality": {
+        "overall_grade": "A",
+        "parse_success_rate": 100.0,
+        "sample_quality_grade": "A"
+      },
+      "metric_keys": [
+        "choice_counts",
+        "choice_pct",
+        "creatives",
+        "reasons_by_choice"
+      ]
+    },
+    {
+      "preset_id": "galaxy-creative",
+      "simulation_type": "creative_testing",
+      "sample_size": 200,
+      "run_id": "9278048e-61d7-45f8-bd9f-21dbf64b2c3f",
+      "status": "completed",
+      "total_responses": 200,
+      "parse_failed": 0,
+      "quality": {
+        "overall_grade": "A",
+        "parse_success_rate": 100.0,
+        "sample_quality_grade": "A"
+      },
+      "metric_keys": [
+        "choice_counts",
+        "choice_pct",
+        "creatives",
+        "reasons_by_choice"
+      ]
+    },
+    {
+      "preset_id": "coffee-price",
+      "simulation_type": "price_optimization",
+      "sample_size": 50,
+      "run_id": "90e68736-3fd1-4893-b70f-90ac7c07b775",
+      "status": "completed",
+      "total_responses": 50,
+      "parse_failed": 0,
+      "quality": {
+        "overall_grade": "A",
+        "parse_success_rate": 100.0,
+        "sample_quality_grade": "B"
+      },
+      "metric_keys": [
+        "avg_willingness_to_pay",
+        "demand_by_price",
+        "intent_counts",
+        "intent_pct",
+        "preferred_price_counts",
+        "preferred_price_pct",
+        "price_points",
+        "recommended_price",
+        "top_reasons"
+      ]
+    },
+    {
+      "preset_id": "coffee-price",
+      "simulation_type": "price_optimization",
+      "sample_size": 200,
+      "run_id": "b525887a-af83-46fe-b9d3-18340ce74e1d",
+      "status": "completed",
+      "total_responses": 200,
+      "parse_failed": 0,
+      "quality": {
+        "overall_grade": "A",
+        "parse_success_rate": 100.0,
+        "sample_quality_grade": "A"
+      },
+      "metric_keys": [
+        "avg_willingness_to_pay",
+        "demand_by_price",
+        "intent_counts",
+        "intent_pct",
+        "preferred_price_counts",
+        "preferred_price_pct",
+        "price_points",
+        "recommended_price",
+        "top_reasons"
+      ]
+    },
+    {
+      "preset_id": "home-cleaner-launch",
+      "simulation_type": "product_launch",
+      "sample_size": 50,
+      "run_id": "4ee57de1-5e03-48c5-b813-18c0fac36bfa",
+      "status": "completed",
+      "total_responses": 50,
+      "parse_failed": 0,
+      "quality": {
+        "overall_grade": "A",
+        "parse_success_rate": 100.0,
+        "sample_quality_grade": "B"
+      },
+      "metric_keys": [
+        "average_score",
+        "intent_counts",
+        "intent_pct",
+        "positioning_angles",
+        "score_counts",
+        "score_pct",
+        "top_reasons"
+      ]
+    },
+    {
+      "preset_id": "home-cleaner-launch",
+      "simulation_type": "product_launch",
+      "sample_size": 200,
+      "run_id": "73e8ef46-11b5-4b9d-bc40-1e62f484477c",
+      "status": "completed",
+      "total_responses": 200,
+      "parse_failed": 0,
+      "quality": {
+        "overall_grade": "A",
+        "parse_success_rate": 100.0,
+        "sample_quality_grade": "A"
+      },
+      "metric_keys": [
+        "average_score",
+        "intent_counts",
+        "intent_pct",
+        "positioning_angles",
+        "score_counts",
+        "score_pct",
+        "top_reasons"
+      ]
+    },
+    {
+      "preset_id": "ott-value-prop",
+      "simulation_type": "value_proposition",
+      "sample_size": 50,
+      "run_id": "4ae9bf86-281f-45b6-94bb-c50d344d6e9d",
+      "status": "completed",
+      "total_responses": 50,
+      "parse_failed": 0,
+      "quality": {
+        "overall_grade": "A",
+        "parse_success_rate": 100.0,
+        "sample_quality_grade": "B"
+      },
+      "metric_keys": [
+        "average_clarity",
+        "average_persuasiveness",
+        "average_resonance",
+        "choice_counts",
+        "choice_pct",
+        "statements",
+        "top_reasons"
+      ]
+    },
+    {
+      "preset_id": "ott-value-prop",
+      "simulation_type": "value_proposition",
+      "sample_size": 200,
+      "run_id": "5bd007e1-4081-437d-b987-86f41c4a249a",
+      "status": "completed",
+      "total_responses": 200,
+      "parse_failed": 0,
+      "quality": {
+        "overall_grade": "A",
+        "parse_success_rate": 100.0,
+        "sample_quality_grade": "A"
+      },
+      "metric_keys": [
+        "average_clarity",
+        "average_persuasiveness",
+        "average_resonance",
+        "choice_counts",
+        "choice_pct",
+        "statements",
+        "top_reasons"
+      ]
+    },
+    {
+      "preset_id": "healthy-snack-segmentation",
+      "simulation_type": "market_segmentation",
+      "sample_size": 50,
+      "run_id": "25bd68e6-cb44-4c44-95a6-884f58d203f4",
+      "status": "completed",
+      "total_responses": 50,
+      "parse_failed": 0,
+      "quality": {
+        "overall_grade": "A",
+        "parse_success_rate": 100.0,
+        "sample_quality_grade": "B"
+      },
+      "metric_keys": [
+        "category",
+        "needs",
+        "pains",
+        "recommended_first_target",
+        "segment_counts",
+        "segment_pct"
+      ]
+    },
+    {
+      "preset_id": "healthy-snack-segmentation",
+      "simulation_type": "market_segmentation",
+      "sample_size": 200,
+      "run_id": "183d2f60-dced-4868-a64b-0cfb6eff7652",
+      "status": "completed",
+      "total_responses": 200,
+      "parse_failed": 0,
+      "quality": {
+        "overall_grade": "A",
+        "parse_success_rate": 100.0,
+        "sample_quality_grade": "A"
+      },
+      "metric_keys": [
+        "category",
+        "needs",
+        "pains",
+        "recommended_first_target",
+        "segment_counts",
+        "segment_pct"
+      ]
+    },
+    {
+      "preset_id": "ott-positioning",
+      "simulation_type": "competitive_positioning",
+      "sample_size": 50,
+      "run_id": "0232d2bd-0230-4d2b-a941-0563df32f53f",
+      "status": "completed",
+      "total_responses": 50,
+      "parse_failed": 0,
+      "quality": {
+        "overall_grade": "A",
+        "parse_success_rate": 100.0,
+        "sample_quality_grade": "B"
+      },
+      "metric_keys": [
+        "preference_counts",
+        "preference_pct",
+        "products",
+        "strengths",
+        "top_reasons",
+        "weaknesses"
+      ]
+    },
+    {
+      "preset_id": "ott-positioning",
+      "simulation_type": "competitive_positioning",
+      "sample_size": 200,
+      "run_id": "2342fb7c-d096-4825-8fb1-1f7e6ee45a4f",
+      "status": "completed",
+      "total_responses": 200,
+      "parse_failed": 0,
+      "quality": {
+        "overall_grade": "A",
+        "parse_success_rate": 100.0,
+        "sample_quality_grade": "A"
+      },
+      "metric_keys": [
+        "preference_counts",
+        "preference_pct",
+        "products",
+        "strengths",
+        "top_reasons",
+        "weaknesses"
+      ]
+    },
+    {
+      "preset_id": "coffee-brand-perception",
+      "simulation_type": "brand_perception",
+      "sample_size": 50,
+      "run_id": "77fc1712-872f-4ccd-b366-a485434ffd83",
+      "status": "completed",
+      "total_responses": 50,
+      "parse_failed": 0,
+      "quality": {
+        "overall_grade": "A",
+        "parse_success_rate": 100.0,
+        "sample_quality_grade": "B"
+      },
+      "metric_keys": [
+        "associations",
+        "average_score",
+        "brand_name",
+        "negative_themes",
+        "positive_themes",
+        "score_counts",
+        "score_pct"
+      ]
+    },
+    {
+      "preset_id": "coffee-brand-perception",
+      "simulation_type": "brand_perception",
+      "sample_size": 200,
+      "run_id": "f8dae700-54d7-4910-aae3-06f1c88e0a4d",
+      "status": "completed",
+      "total_responses": 200,
+      "parse_failed": 0,
+      "quality": {
+        "overall_grade": "A",
+        "parse_success_rate": 100.0,
+        "sample_quality_grade": "A"
+      },
+      "metric_keys": [
+        "associations",
+        "average_score",
+        "brand_name",
+        "negative_themes",
+        "positive_themes",
+        "score_counts",
+        "score_pct"
+      ]
+    },
+    {
+      "preset_id": "telco-churn",
+      "simulation_type": "churn_prediction",
+      "sample_size": 50,
+      "run_id": "f7a94ac9-f522-4315-a67c-6085a6ffe542",
+      "status": "completed",
+      "total_responses": 50,
+      "parse_failed": 0,
+      "quality": {
+        "overall_grade": "A",
+        "parse_success_rate": 100.0,
+        "sample_quality_grade": "B"
+      },
+      "metric_keys": [
+        "average_confidence",
+        "churn_risk_pct",
+        "intent_counts",
+        "intent_pct",
+        "retention_hooks",
+        "retention_pct",
+        "service_name",
+        "top_reasons",
+        "watch_pct"
+      ]
+    },
+    {
+      "preset_id": "telco-churn",
+      "simulation_type": "churn_prediction",
+      "sample_size": 200,
+      "run_id": "f1db3b6c-ed17-4990-9ce1-2c516abe989f",
+      "status": "completed",
+      "total_responses": 200,
+      "parse_failed": 0,
+      "quality": {
+        "overall_grade": "A",
+        "parse_success_rate": 100.0,
+        "sample_quality_grade": "A"
+      },
+      "metric_keys": [
+        "average_confidence",
+        "churn_risk_pct",
+        "intent_counts",
+        "intent_pct",
+        "retention_hooks",
+        "retention_pct",
+        "service_name",
+        "top_reasons",
+        "watch_pct"
+      ]
+    },
+    {
+      "preset_id": "cosmetics-campaign",
+      "simulation_type": "campaign_strategy",
+      "sample_size": 50,
+      "run_id": "627e1eee-a3fc-4f59-8c08-30fa3838bf93",
+      "status": "completed",
+      "total_responses": 50,
+      "parse_failed": 0,
+      "quality": {
+        "overall_grade": "A",
+        "parse_success_rate": 100.0,
+        "sample_quality_grade": "B"
+      },
+      "metric_keys": [
+        "best_combinations",
+        "budget",
+        "channel_counts",
+        "channel_pct",
+        "message_counts",
+        "message_pct",
+        "reaction_counts",
+        "reaction_pct",
+        "top_reasons"
+      ]
+    },
+    {
+      "preset_id": "cosmetics-campaign",
+      "simulation_type": "campaign_strategy",
+      "sample_size": 200,
+      "run_id": "0af4492b-ccce-4a64-b281-8872512d28d0",
+      "status": "completed",
+      "total_responses": 200,
+      "parse_failed": 0,
+      "quality": {
+        "overall_grade": "A",
+        "parse_success_rate": 100.0,
+        "sample_quality_grade": "A"
+      },
+      "metric_keys": [
+        "best_combinations",
+        "budget",
+        "channel_counts",
+        "channel_pct",
+        "message_counts",
+        "message_pct",
+        "reaction_counts",
+        "reaction_pct",
+        "top_reasons"
+      ]
+    }
+  ]
+}

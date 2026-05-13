@@ -1,0 +1,207 @@
+{
+  "schema_version": "ai-agent-e2e/v1",
+  "created_at": "2026-05-12T12:19:49.750089+00:00",
+  "ok": true,
+  "run": {
+    "run_id": "57603c15-aee5-4f06-8126-a4136e46fcc5",
+    "status": "completed",
+    "simulation_type": "creative_testing",
+    "sample_size": 3,
+    "total_responses": 3,
+    "parse_failed": 0
+  },
+  "agent_runs": {
+    "count": 3,
+    "agents": [
+      "analysis",
+      "report",
+      "qa"
+    ],
+    "all_scores_passed": true,
+    "rows": [
+      {
+        "agent_name": "analysis",
+        "task_type": "analysis",
+        "prompt_version": "analysis:v1-20260512",
+        "mode": "llm",
+        "provider": "e2e-agent",
+        "provider_model": "e2e-analysis",
+        "trace_id": "trace-analysis",
+        "safe_input_digest": "e53a6b60d9fc8a2b891635727b714d580616283d9bc17f73c8405fa2d9ccd80c",
+        "scores": {
+          "leaked_terms": [],
+          "missing_fields": [],
+          "no_raw_leak": true,
+          "schema_valid": true
+        }
+      },
+      {
+        "agent_name": "report",
+        "task_type": "report",
+        "prompt_version": "report:v1-20260512",
+        "mode": "llm",
+        "provider": "e2e-agent",
+        "provider_model": "e2e-report",
+        "trace_id": "trace-report",
+        "safe_input_digest": "e53a6b60d9fc8a2b891635727b714d580616283d9bc17f73c8405fa2d9ccd80c",
+        "scores": {
+          "leaked_terms": [],
+          "missing_fields": [],
+          "no_raw_leak": true,
+          "schema_valid": true
+        }
+      },
+      {
+        "agent_name": "qa",
+        "task_type": "qa",
+        "prompt_version": "qa:v1-20260512",
+        "mode": "llm",
+        "provider": "e2e-agent",
+        "provider_model": "e2e-qa",
+        "trace_id": "trace-qa",
+        "safe_input_digest": "e53a6b60d9fc8a2b891635727b714d580616283d9bc17f73c8405fa2d9ccd80c",
+        "scores": {
+          "leaked_terms": [],
+          "missing_fields": [],
+          "no_raw_leak": true,
+          "schema_valid": true
+        }
+      }
+    ]
+  },
+  "checkpoints": {
+    "count": 1,
+    "rows": [
+      {
+        "graph_name": "run_scaffold",
+        "checkpoint_name": "qa",
+        "state_steps": [
+          "prepare",
+          "execute",
+          "analyze",
+          "report",
+          "qa"
+        ]
+      }
+    ]
+  },
+  "result_orchestration": {
+    "agents": {
+      "analysis": {
+        "agent": "analysis",
+        "key_findings": [
+          "A안 선택 비중이 가장 높습니다."
+        ],
+        "mode": "llm",
+        "prompt_version": "analysis:v1-20260512",
+        "provider": "e2e-agent",
+        "provider_model": "e2e-analysis",
+        "segment_notes": [
+          "소규모 표본에서는 방향성 검증으로 해석합니다."
+        ],
+        "summary": "A안이 집계 지표에서 가장 강한 반응을 보입니다.",
+        "task_type": "analysis",
+        "trace_id": "trace-analysis"
+      },
+      "qa": {
+        "agent": "qa",
+        "mode": "llm",
+        "passed": true,
+        "prompt_version": "qa:v1-20260512",
+        "provider": "e2e-agent",
+        "provider_model": "e2e-qa",
+        "review_notes": [
+          "필수 agent output field와 aggregate-only 저장을 확인했습니다."
+        ],
+        "task_type": "qa",
+        "trace_id": "trace-qa",
+        "warnings": []
+      },
+      "report": {
+        "agent": "report",
+        "headline": "A안을 다음 캠페인 기준안으로 권장합니다.",
+        "mode": "llm",
+        "prompt_version": "report:v1-20260512",
+        "provider": "e2e-agent",
+        "provider_model": "e2e-report",
+        "recommendations": [
+          "A안을 기준으로 후속 가격/메시지 테스트를 진행합니다."
+        ],
+        "risks": [
+          "실제 출시 전 더 큰 표본으로 재검증해야 합니다."
+        ],
+        "task_type": "report",
+        "trace_id": "trace-report"
+      }
+    },
+    "graph": {
+      "analysis": {
+        "metric_keys": [
+          "choice_counts",
+          "choice_pct",
+          "creatives",
+          "reasons_by_choice"
+        ],
+        "simulation_type": "creative_testing"
+      },
+      "input": {
+        "creatives": [
+          "A안: 즉시 이해되는 혜택",
+          "B안: 감성 중심 메시지"
+        ]
+      },
+      "qa": {
+        "passed": true
+      },
+      "report": {
+        "quality": {
+          "overall_grade": "D",
+          "parse_success_rate": 100.0,
+          "sample_quality_grade": "D"
+        },
+        "status": "completed"
+      },
+      "result": {
+        "metrics": {
+          "choice_counts": {
+            "A": 3,
+            "B": 0
+          },
+          "choice_pct": {
+            "A": 100.0,
+            "B": 0.0
+          },
+          "creatives": [
+            "A안: 즉시 이해되는 혜택",
+            "B안: 감성 중심 메시지"
+          ],
+          "reasons_by_choice": {
+            "A": [
+              "메시지가 명확하고 혜택이 바로 이해됩니다.",
+              "메시지가 명확하고 혜택이 바로 이해됩니다.",
+              "메시지가 명확하고 혜택이 바로 이해됩니다."
+            ],
+            "B": []
+          }
+        },
+        "parse_failed": 0,
+        "quality": {
+          "overall_grade": "D",
+          "parse_success_rate": 100.0,
+          "sample_quality_grade": "D"
+        },
+        "total_responses": 3
+      },
+      "run_id": "57603c15-aee5-4f06-8126-a4136e46fcc5",
+      "simulation_type": "creative_testing",
+      "status": "completed",
+      "steps": [
+        "prepare",
+        "execute",
+        "analyze",
+        "report",
+        "qa"
+      ]
+    }
+  }
+}

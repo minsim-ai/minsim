@@ -1,0 +1,226 @@
+{
+  "name": "creative_testing_10",
+  "creatives": [
+    "일상을 더 스마트하게 만드는 갤럭시",
+    "한 번의 터치로 펼쳐지는 가능성",
+    "이미 미래를 살고 있다"
+  ],
+  "expected": {
+    "total_responses": 10,
+    "parse_failed": 2,
+    "choice_counts": {
+      "A": 4,
+      "B": 3,
+      "C": 1
+    },
+    "choice_pct": {
+      "A": 50.0,
+      "B": 37.5,
+      "C": 12.5
+    }
+  },
+  "personas": [
+    {
+      "uuid": "fixture-001",
+      "age": 24,
+      "sex": "여자",
+      "province": "서울",
+      "district": "서울-마포구",
+      "occupation": "대학원생",
+      "education_level": "대학원",
+      "marital_status": "미혼",
+      "family_type": "1인가구",
+      "housing_type": "오피스텔",
+      "professional_persona": "트렌드와 모바일 생산성 도구에 민감하다.",
+      "family_persona": "혼자 살며 구매 결정을 빠르게 내린다.",
+      "culinary_persona": "카페와 편의 서비스를 자주 이용한다.",
+      "persona": "새로운 기기를 먼저 써 보는 소비자다."
+    },
+    {
+      "uuid": "fixture-002",
+      "age": 37,
+      "sex": "남자",
+      "province": "경기",
+      "district": "경기-성남시",
+      "occupation": "개발자",
+      "education_level": "4년제 대학교",
+      "marital_status": "기혼",
+      "family_type": "부부+자녀",
+      "housing_type": "아파트",
+      "professional_persona": "업무 효율과 기기 성능을 중요하게 본다.",
+      "family_persona": "가족 지출을 고려해 실용성을 따진다.",
+      "culinary_persona": "주말 외식을 계획적으로 한다.",
+      "persona": "기능 설명이 명확한 광고를 선호한다."
+    },
+    {
+      "uuid": "fixture-003",
+      "age": 46,
+      "sex": "여자",
+      "province": "부산",
+      "district": "부산-해운대구",
+      "occupation": "자영업",
+      "education_level": "2~3년제 전문대학",
+      "marital_status": "기혼",
+      "family_type": "부부",
+      "housing_type": "아파트",
+      "professional_persona": "가격 대비 체감 가치를 중요하게 본다.",
+      "family_persona": "배우자와 상의해 큰 구매를 결정한다.",
+      "culinary_persona": "지역 맛집과 실속 소비를 선호한다.",
+      "persona": "과장보다 안정적인 인상을 선호한다."
+    },
+    {
+      "uuid": "fixture-004",
+      "age": 31,
+      "sex": "여자",
+      "province": "대구",
+      "district": "대구-수성구",
+      "occupation": "마케터",
+      "education_level": "4년제 대학교",
+      "marital_status": "미혼",
+      "family_type": "부모 동거",
+      "housing_type": "아파트",
+      "professional_persona": "브랜드 메시지와 감성 표현에 민감하다.",
+      "family_persona": "가족에게 제품을 추천하는 편이다.",
+      "culinary_persona": "신제품 체험을 즐긴다.",
+      "persona": "광고 문구의 신선함을 중시한다."
+    },
+    {
+      "uuid": "fixture-005",
+      "age": 52,
+      "sex": "남자",
+      "province": "대전",
+      "district": "대전-유성구",
+      "occupation": "공무원",
+      "education_level": "4년제 대학교",
+      "marital_status": "기혼",
+      "family_type": "부부+자녀",
+      "housing_type": "아파트",
+      "professional_persona": "안정성과 신뢰를 중요하게 판단한다.",
+      "family_persona": "자녀 교육비와 생활비를 함께 고려한다.",
+      "culinary_persona": "검증된 브랜드를 선호한다.",
+      "persona": "차분한 설명에 설득되는 소비자다."
+    },
+    {
+      "uuid": "fixture-006",
+      "age": 29,
+      "sex": "남자",
+      "province": "인천",
+      "district": "인천-연수구",
+      "occupation": "영업직",
+      "education_level": "4년제 대학교",
+      "marital_status": "미혼",
+      "family_type": "1인가구",
+      "housing_type": "원룸",
+      "professional_persona": "이동 중 모바일 업무를 자주 처리한다.",
+      "family_persona": "개인 만족을 우선해 소비한다.",
+      "culinary_persona": "배달과 간편식을 자주 이용한다.",
+      "persona": "짧고 강한 메시지에 반응한다."
+    },
+    {
+      "uuid": "fixture-007",
+      "age": 63,
+      "sex": "여자",
+      "province": "경남",
+      "district": "경남-창원시",
+      "occupation": "퇴직자",
+      "education_level": "고등학교",
+      "marital_status": "기혼",
+      "family_type": "부부",
+      "housing_type": "단독주택",
+      "professional_persona": "복잡한 기능보다 쉬운 설명을 선호한다.",
+      "family_persona": "가족과 통화와 사진 공유를 자주 한다.",
+      "culinary_persona": "건강과 익숙함을 중요하게 본다.",
+      "persona": "부담 없는 표현에 호감을 느낀다."
+    },
+    {
+      "uuid": "fixture-008",
+      "age": 41,
+      "sex": "남자",
+      "province": "전북",
+      "district": "전북-전주시",
+      "occupation": "교사",
+      "education_level": "대학원",
+      "marital_status": "기혼",
+      "family_type": "부부+자녀",
+      "housing_type": "아파트",
+      "professional_persona": "학생과 학부모 커뮤니케이션에 모바일을 쓴다.",
+      "family_persona": "아이 교육과 가족 기록을 중요하게 생각한다.",
+      "culinary_persona": "가족 외식과 집밥을 균형 있게 즐긴다.",
+      "persona": "의미가 분명한 메시지를 선호한다."
+    },
+    {
+      "uuid": "fixture-009",
+      "age": 35,
+      "sex": "여자",
+      "province": "광주",
+      "district": "광주-북구",
+      "occupation": "간호사",
+      "education_level": "2~3년제 전문대학",
+      "marital_status": "미혼",
+      "family_type": "부모 동거",
+      "housing_type": "아파트",
+      "professional_persona": "교대 근무 중 빠른 사용성을 중시한다.",
+      "family_persona": "부모와 생활비를 나누어 부담한다.",
+      "culinary_persona": "건강한 식단과 휴식을 중요하게 본다.",
+      "persona": "실용적인 혜택에 반응한다."
+    },
+    {
+      "uuid": "fixture-010",
+      "age": 57,
+      "sex": "남자",
+      "province": "강원",
+      "district": "강원-춘천시",
+      "occupation": "택시기사",
+      "education_level": "고등학교",
+      "marital_status": "기혼",
+      "family_type": "부부",
+      "housing_type": "아파트",
+      "professional_persona": "길 안내와 통화 안정성을 중요하게 본다.",
+      "family_persona": "배우자와 함께 쓰기 쉬운 제품을 찾는다.",
+      "culinary_persona": "익숙한 식당과 단골집을 선호한다.",
+      "persona": "복잡한 표현보다 신뢰감 있는 문구를 선호한다."
+    }
+  ],
+  "responses": [
+    {
+      "uuid": "fixture-001",
+      "response": "선택: A\n이유: 일상을 더 스마트하게 만든다는 말이 제 생활과 잘 맞아요."
+    },
+    {
+      "uuid": "fixture-002",
+      "response": "선택: B\n이유: 한 번의 터치라는 표현이 기능을 바로 이해하게 합니다."
+    },
+    {
+      "uuid": "fixture-003",
+      "response": "선택: B\n이유: 가능성이라는 말이 너무 추상적이지 않고 안정적으로 느껴집니다."
+    },
+    {
+      "uuid": "fixture-004",
+      "response": "저라면 선택: A 입니다.\n이유: 첫 문구가 가장 자연스럽고 브랜드 감성이 살아 있습니다."
+    },
+    {
+      "uuid": "fixture-005",
+      "response": "선택: C\n이유: 미래를 살고 있다는 표현이 제품 이미지를 잘 보여줍니다."
+    },
+    {
+      "uuid": "fixture-006",
+      "response": "선택: B\n이유: 짧고 바로 행동을 떠올리게 합니다."
+    },
+    {
+      "uuid": "fixture-007",
+      "response": "잘 모르겠습니다. 세 문구 모두 조금 어렵게 느껴집니다."
+    },
+    {
+      "uuid": "fixture-008",
+      "response": "선택: A\n이유: 스마트한 일상이라는 방향이 학생들에게도 설명하기 쉽습니다."
+    },
+    {
+      "uuid": "fixture-009",
+      "response": "선택: A\n이유: 바쁜 근무 중에도 도움이 될 것 같은 느낌입니다."
+    },
+    {
+      "uuid": "fixture-010",
+      "response": "어느 쪽도 확 와닿지는 않습니다. 조금 더 쉬운 표현이면 좋겠습니다."
+    }
+  ]
+}

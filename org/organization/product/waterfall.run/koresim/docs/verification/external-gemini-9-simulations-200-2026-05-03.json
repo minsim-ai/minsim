@@ -1,0 +1,294 @@
+{
+  "mode": "external_api",
+  "base_url": "https://arabesque.cc",
+  "health": {
+    "ok": true,
+    "llm_backend": "gemini",
+    "model_provider": {
+      "ok": true,
+      "backend": "gemini",
+      "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
+      "model": "gemini-3-flash-preview",
+      "error": null
+    },
+    "queue": {
+      "ok": true,
+      "name": "koresim",
+      "count": 0,
+      "worker_count": 1,
+      "workers": [
+        "dbb811ffd2554a78986c486e1daa501b"
+      ],
+      "error": null
+    },
+    "redis": {
+      "ok": true,
+      "url": "redis://localhost:6379/0"
+    }
+  },
+  "ok": true,
+  "rows": [
+    {
+      "ok": true,
+      "preset_id": "galaxy-creative",
+      "simulation_type": "creative_testing",
+      "sample_size": 200,
+      "run_id": "8a75b18a-39d0-4eca-b50b-5e07e85f3b17",
+      "status": "completed",
+      "total_responses": 200,
+      "parse_failed": 0,
+      "parse_success_rate": 100.0,
+      "quality": {
+        "overall_grade": "A",
+        "parse_success_rate": 100.0,
+        "sample_quality_grade": "A"
+      },
+      "provider": "gemini",
+      "provider_model": "gemini-3-flash-preview",
+      "llm_backend": "gemini",
+      "metric_keys": [
+        "choice_counts",
+        "choice_pct",
+        "creatives",
+        "reasons_by_choice"
+      ],
+      "result_url": "/results?run_id=8a75b18a-39d0-4eca-b50b-5e07e85f3b17"
+    },
+    {
+      "ok": true,
+      "preset_id": "coffee-price",
+      "simulation_type": "price_optimization",
+      "sample_size": 200,
+      "run_id": "060b4acf-f493-4a70-a7ca-39fcdbee2dee",
+      "status": "completed",
+      "total_responses": 200,
+      "parse_failed": 0,
+      "parse_success_rate": 100.0,
+      "quality": {
+        "overall_grade": "A",
+        "parse_success_rate": 100.0,
+        "sample_quality_grade": "A"
+      },
+      "provider": "gemini",
+      "provider_model": "gemini-3-flash-preview",
+      "llm_backend": "gemini",
+      "metric_keys": [
+        "avg_willingness_to_pay",
+        "demand_by_price",
+        "intent_counts",
+        "intent_pct",
+        "preferred_price_counts",
+        "preferred_price_pct",
+        "price_points",
+        "recommended_price",
+        "top_reasons"
+      ],
+      "result_url": "/results?run_id=060b4acf-f493-4a70-a7ca-39fcdbee2dee"
+    },
+    {
+      "ok": true,
+      "preset_id": "home-cleaner-launch",
+      "simulation_type": "product_launch",
+      "sample_size": 200,
+      "run_id": "a9a5c051-2be0-4add-8f79-74be28a0291d",
+      "status": "completed",
+      "total_responses": 200,
+      "parse_failed": 3,
+      "parse_success_rate": 98.5,
+      "quality": {
+        "overall_grade": "A",
+        "parse_success_rate": 98.5,
+        "sample_quality_grade": "A"
+      },
+      "provider": "gemini",
+      "provider_model": "gemini-3-flash-preview",
+      "llm_backend": "gemini",
+      "metric_keys": [
+        "average_score",
+        "intent_counts",
+        "intent_pct",
+        "positioning_angles",
+        "score_counts",
+        "score_pct",
+        "top_reasons"
+      ],
+      "result_url": "/results?run_id=a9a5c051-2be0-4add-8f79-74be28a0291d"
+    },
+    {
+      "ok": true,
+      "preset_id": "ott-value-prop",
+      "simulation_type": "value_proposition",
+      "sample_size": 200,
+      "run_id": "05d34884-9a84-4dc1-a98f-6e0e2833c524",
+      "status": "completed",
+      "total_responses": 200,
+      "parse_failed": 0,
+      "parse_success_rate": 100.0,
+      "quality": {
+        "overall_grade": "A",
+        "parse_success_rate": 100.0,
+        "sample_quality_grade": "A"
+      },
+      "provider": "gemini",
+      "provider_model": "gemini-3-flash-preview",
+      "llm_backend": "gemini",
+      "metric_keys": [
+        "average_clarity",
+        "average_persuasiveness",
+        "average_resonance",
+        "choice_counts",
+        "choice_pct",
+        "statements",
+        "top_reasons"
+      ],
+      "result_url": "/results?run_id=05d34884-9a84-4dc1-a98f-6e0e2833c524"
+    },
+    {
+      "ok": true,
+      "preset_id": "healthy-snack-segmentation",
+      "simulation_type": "market_segmentation",
+      "sample_size": 200,
+      "run_id": "fbd29c43-0a8a-4b29-88b2-ac0f8ab54ff2",
+      "status": "completed",
+      "total_responses": 200,
+      "parse_failed": 0,
+      "parse_success_rate": 100.0,
+      "quality": {
+        "overall_grade": "A",
+        "parse_success_rate": 100.0,
+        "sample_quality_grade": "A"
+      },
+      "provider": "gemini",
+      "provider_model": "gemini-3-flash-preview",
+      "llm_backend": "gemini",
+      "metric_keys": [
+        "category",
+        "needs",
+        "pains",
+        "recommended_first_target",
+        "segment_counts",
+        "segment_pct"
+      ],
+      "result_url": "/results?run_id=fbd29c43-0a8a-4b29-88b2-ac0f8ab54ff2"
+    },
+    {
+      "ok": true,
+      "preset_id": "ott-positioning",
+      "simulation_type": "competitive_positioning",
+      "sample_size": 200,
+      "run_id": "8024e8ce-4c0f-4451-b4b8-5588f141efdb",
+      "status": "completed",
+      "total_responses": 200,
+      "parse_failed": 0,
+      "parse_success_rate": 100.0,
+      "quality": {
+        "overall_grade": "A",
+        "parse_success_rate": 100.0,
+        "sample_quality_grade": "A"
+      },
+      "provider": "gemini",
+      "provider_model": "gemini-3-flash-preview",
+      "llm_backend": "gemini",
+      "metric_keys": [
+        "preference_counts",
+        "preference_pct",
+        "products",
+        "strengths",
+        "top_reasons",
+        "weaknesses"
+      ],
+      "result_url": "/results?run_id=8024e8ce-4c0f-4451-b4b8-5588f141efdb"
+    },
+    {
+      "ok": true,
+      "preset_id": "coffee-brand-perception",
+      "simulation_type": "brand_perception",
+      "sample_size": 200,
+      "run_id": "8994554b-0c0a-4ed8-a7a3-51c19807f9a3",
+      "status": "completed",
+      "total_responses": 200,
+      "parse_failed": 0,
+      "parse_success_rate": 100.0,
+      "quality": {
+        "overall_grade": "A",
+        "parse_success_rate": 100.0,
+        "sample_quality_grade": "A"
+      },
+      "provider": "gemini",
+      "provider_model": "gemini-3-flash-preview",
+      "llm_backend": "gemini",
+      "metric_keys": [
+        "associations",
+        "average_score",
+        "brand_name",
+        "negative_themes",
+        "positive_themes",
+        "score_counts",
+        "score_pct"
+      ],
+      "result_url": "/results?run_id=8994554b-0c0a-4ed8-a7a3-51c19807f9a3"
+    },
+    {
+      "ok": true,
+      "preset_id": "telco-churn",
+      "simulation_type": "churn_prediction",
+      "sample_size": 200,
+      "run_id": "536258b4-661c-4129-8884-e182b4064a65",
+      "status": "completed",
+      "total_responses": 200,
+      "parse_failed": 0,
+      "parse_success_rate": 100.0,
+      "quality": {
+        "overall_grade": "A",
+        "parse_success_rate": 100.0,
+        "sample_quality_grade": "A"
+      },
+      "provider": "gemini",
+      "provider_model": "gemini-3-flash-preview",
+      "llm_backend": "gemini",
+      "metric_keys": [
+        "average_confidence",
+        "churn_risk_pct",
+        "intent_counts",
+        "intent_pct",
+        "retention_hooks",
+        "retention_pct",
+        "service_name",
+        "top_reasons",
+        "watch_pct"
+      ],
+      "result_url": "/results?run_id=536258b4-661c-4129-8884-e182b4064a65"
+    },
+    {
+      "ok": true,
+      "preset_id": "cosmetics-campaign",
+      "simulation_type": "campaign_strategy",
+      "sample_size": 200,
+      "run_id": "5ae261f3-4a17-479d-8457-49618c7a4927",
+      "status": "completed",
+      "total_responses": 200,
+      "parse_failed": 0,
+      "parse_success_rate": 100.0,
+      "quality": {
+        "overall_grade": "A",
+        "parse_success_rate": 100.0,
+        "sample_quality_grade": "A"
+      },
+      "provider": "gemini",
+      "provider_model": "gemini-3-flash-preview",
+      "llm_backend": "gemini",
+      "metric_keys": [
+        "best_combinations",
+        "budget",
+        "channel_counts",
+        "channel_pct",
+        "message_counts",
+        "message_pct",
+        "reaction_counts",
+        "reaction_pct",
+        "top_reasons"
+      ],
+      "result_url": "/results?run_id=5ae261f3-4a17-479d-8457-49618c7a4927"
+    }
+  ]
+}
