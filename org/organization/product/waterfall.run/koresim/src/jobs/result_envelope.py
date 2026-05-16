@@ -113,6 +113,7 @@ def build_generic_result_envelope(
         llm_backend=_resolved_llm_backend(provider),
         trace_id=trace_id,
         safe_intake_summary=_safe_intake_summary(run),
+        protocol=result.protocol,
     )
     return envelope.model_dump(mode="json")
 

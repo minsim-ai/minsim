@@ -1,5 +1,6 @@
 import { inferCreativeSurface } from "./router";
 import { createSlot, upsertSlot } from "./slotUtils";
+import { getIntakePack } from "./packRegistry";
 import type { IntakeSlotValue, TaskFrame } from "./types";
 
 const goalFragments = [
@@ -19,6 +20,7 @@ export function extractSlotsFromMessage(
   message: string,
   taskFrame: TaskFrame,
   currentSlots: Record<string, IntakeSlotValue>,
+  requestedSlotIds: string[] = [],
 ): Record<string, IntakeSlotValue> {
   let slots = currentSlots;
   if (taskFrame.primarySimulationType === "creative_testing") {
@@ -44,6 +46,9 @@ export function extractSlotsFromMessage(
     if (sampleSize) {
       slots = upsertSlot(slots, createSlot("sample_size", sampleSize, "user", 0.84, message, false));
     }
+  }
+  if (taskFrame.primarySimulationType && taskFrame.primarySimulationType !== "creative_testing") {
+    slots = extractGenericSlots(message, taskFrame.primarySimulationType, slots, requestedSlotIds);
   }
   return slots;
 }
@@ -111,6 +116,104 @@ function extractSampleSize(message: string): number | null {
   const match = message.match(/(\d{1,4})\s*명/);
   if (!match) return null;
   return Math.max(1, Math.min(Number(match[1]), 200));
+}
+
+function extractGenericSlots(
+  message: string,
+  simulationType: Exclude<TaskFrame["primarySimulationType"], "creative_testing" | null>,
+  currentSlots: Record<string, IntakeSlotValue>,
+  requestedSlotIds: string[],
+): Record<string, IntakeSlotValue> {
+  let slots = currentSlots;
+  const pack = getIntakePack(simulationType);
+  const cleanMessage = message.trim();
+  if (!cleanMessage) return slots;
+
+  for (const slotId of requestedSlotIds) {
+    if (slotId === "goal") continue;
+    const requirement = pack.slots.find((slot) => slot.id === slotId);
+    if (!requirement) continue;
+    slots = upsertSlot(
+      slots,
+      createSlot(slotId, normalizeRequestedSlotValue(cleanMessage, requirement.dataType), "user", 0.92, message, false),
+    );
+  }
+
+  const prices = extractPriceCandidates(cleanMessage);
+  if (prices.length >= 2 && pack.slots.some((slot) => slot.id === "price_points")) {
+    slots = upsertSlot(slots, createSlot("price_points", prices, "user", 0.9, message, false));
+  }
+
+  const listedItems = extractListedItems(cleanMessage);
+  for (const slotId of ["channels", "messages", "statements", "products", "attributes", "core_questions"]) {
+    if (listedItems.length === 0 || !pack.slots.some((slot) => slot.id === slotId)) continue;
+    if (slotId === "core_questions" && !/(기준|질문|나누|세분|고객군)/.test(cleanMessage)) continue;
+    slots = upsertSlot(slots, createSlot(slotId, listedItems, "user", 0.78, message, false));
+  }
+
+  const objectSlot = pack.slots.find((slot) => slot.family === "object");
+  if (objectSlot && !slots[objectSlot.id]) {
+    const objectText = extractBusinessObject(cleanMessage, taskFrameGoalLike(simulationType));
+    if (objectText) {
+      slots = upsertSlot(slots, createSlot(objectSlot.id, objectText, "user", 0.82, message, false));
+    }
+  }
+
+  return slots;
+}
+
+function normalizeRequestedSlotValue(value: string, dataType: string): string | string[] | number {
+  if (dataType === "multi_text") {
+    const items = extractListedItems(value);
+    return items.length > 0 ? items : [value];
+  }
+  if (dataType === "number") {
+    const number = value.match(/\d[\d,]*/)?.[0];
+    return number ? Number(number.replaceAll(",", "")) : value;
+  }
+  return value;
+}
+
+function extractPriceCandidates(message: string): string[] {
+  return Array.from(new Set(
+    (message.match(/\d[\d,]*(?:\s*(?:원|만원|천원|달러|usd|krw))?/gi) ?? [])
+      .map((item) => item.trim())
+      .filter(Boolean),
+  )).slice(0, 6);
+}
+
+function extractListedItems(message: string): string[] {
+  const lineItems = message
+    .split(/\n|,|\/|·/)
+    .map((item) => item.replace(/^\s*(?:[A-Z][.)]|[0-9]+[.)]|[-*])\s*/, "").trim())
+    .filter((item) => item.length >= 2 && item.length <= 80);
+  if (lineItems.length >= 2) return lineItems.slice(0, 10);
+
+  const colonMatch = message.match(/(?:채널|메시지|후보|기준|속성|경쟁 제품|경쟁사)\s*[:：]\s*(.+)$/);
+  if (!colonMatch) return [];
+  return colonMatch[1]
+    .split(/,|\/|·|와|과/)
+    .map((item) => item.trim())
+    .filter((item) => item.length >= 2)
+    .slice(0, 10);
+}
+
+function extractBusinessObject(message: string, goalLike: RegExp): string | null {
+  const trimmed = message.trim();
+  if (goalLike.test(trimmed)) return null;
+  if (extractListedItems(trimmed).length >= 2 && trimmed.length < 80) return null;
+  if (trimmed.length < 4) return null;
+  if (/(입니다|이에요|예요|상품|제품|서비스|브랜드|카테고리|SaaS|saas|구독|캠페인|출시)/.test(trimmed)) {
+    return cleanupProductText(trimmed);
+  }
+  return null;
+}
+
+function taskFrameGoalLike(simulationType: string): RegExp {
+  if (simulationType === "price_optimization") return /(가격|얼마|요금|최적화).*(해야|할까요|정하|보고 싶)/;
+  if (simulationType === "campaign_strategy") return /(캠페인|전략).*(만들|짜고|싶)/;
+  if (simulationType === "market_segmentation") return /(고객군|세그먼트|나누고 싶)/;
+  return /(보고 싶|알고 싶|테스트|검증|어떻게|할까요)/;
 }
 
 function cleanupProductText(value: string): string {

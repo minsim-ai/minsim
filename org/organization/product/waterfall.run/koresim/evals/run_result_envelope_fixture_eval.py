@@ -33,6 +33,7 @@ EXPECTED_ENVELOPE_KEYS = {
     "trace_id",
     "orchestration",
     "safe_intake_summary",
+    "protocol",
 }
 
 

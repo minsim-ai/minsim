@@ -24,6 +24,8 @@ from src.jobs.models import (
     RunRecord,
     RunResultRecord,
     RunStatusValue,
+    UserRecord,
+    UserUsageRecord,
 )
 
 
@@ -80,12 +82,47 @@ class SQLiteRunStore:
                     seed INTEGER NOT NULL,
                     model_alias TEXT,
                     intake_context_json TEXT,
+                    user_id TEXT,
+                    user_email TEXT,
                     created_at TEXT NOT NULL,
                     started_at TEXT,
                     updated_at TEXT NOT NULL,
                     completed_at TEXT,
-                    error_json TEXT
+                    error_json TEXT,
+                    FOREIGN KEY (user_id) REFERENCES users (user_id)
                 );
+
+                CREATE TABLE IF NOT EXISTS users (
+                    user_id TEXT PRIMARY KEY,
+                    email TEXT NOT NULL,
+                    name TEXT,
+                    provider TEXT NOT NULL,
+                    plan TEXT NOT NULL DEFAULT 'free',
+                    free_run_limit INTEGER NOT NULL DEFAULT 5,
+                    created_at TEXT NOT NULL,
+                    last_seen_at TEXT NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_users_email
+                    ON users (email);
+
+                CREATE TABLE IF NOT EXISTS usage_ledger (
+                    usage_id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    run_id TEXT,
+                    event_type TEXT NOT NULL,
+                    delta INTEGER NOT NULL,
+                    reason TEXT,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (user_id) REFERENCES users (user_id),
+                    FOREIGN KEY (run_id) REFERENCES runs (run_id)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_usage_ledger_user_created
+                    ON usage_ledger (user_id, created_at);
+
+                CREATE INDEX IF NOT EXISTS idx_usage_ledger_run_event
+                    ON usage_ledger (run_id, event_type);
 
                 CREATE TABLE IF NOT EXISTS run_events (
                     event_id TEXT PRIMARY KEY,
@@ -154,9 +191,12 @@ class SQLiteRunStore:
                     status TEXT NOT NULL,
                     title TEXT,
                     run_id TEXT,
+                    user_id TEXT,
+                    user_email TEXT,
                     snapshot_json TEXT NOT NULL,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
+                    FOREIGN KEY (user_id) REFERENCES users (user_id),
                     FOREIGN KEY (run_id) REFERENCES runs (run_id)
                 );
 
@@ -188,10 +228,25 @@ class SQLiteRunStore:
             )
             self._ensure_column(conn, "intake_sessions", "title", "TEXT")
             self._ensure_column(conn, "intake_sessions", "run_id", "TEXT")
+            self._ensure_column(conn, "intake_sessions", "user_id", "TEXT")
+            self._ensure_column(conn, "intake_sessions", "user_email", "TEXT")
             self._ensure_column(conn, "runs", "intake_context_json", "TEXT")
+            self._ensure_column(conn, "runs", "user_id", "TEXT")
+            self._ensure_column(conn, "runs", "user_email", "TEXT")
+            conn.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_intake_sessions_user_updated
+                    ON intake_sessions (user_id, updated_at)
+                """
+            )
             self._backfill_intake_history_with_conn(conn)
 
-    def create_run(self, request: RunCreateRequest, run_id: str | None = None) -> RunRecord:
+    def create_run(
+        self,
+        request: RunCreateRequest,
+        run_id: str | None = None,
+        user: UserRecord | None = None,
+    ) -> RunRecord:
         self.init_db()
         now = _utc_now()
         run_id = run_id or str(uuid4())
@@ -209,9 +264,10 @@ class SQLiteRunStore:
                 INSERT INTO runs (
                     run_id, simulation_type, status, input_json, sample_size,
                     total_count, done_count, target_filter_json, seed, model_alias, intake_context_json,
+                    user_id, user_email,
                     created_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     run_id,
@@ -225,6 +281,8 @@ class SQLiteRunStore:
                     request.seed,
                     request.model_alias,
                     _json_dumps(intake_context) if intake_context else None,
+                    user.user_id if user else None,
+                    user.email if user else None,
                     now,
                     now,
                 ),
@@ -248,6 +306,223 @@ class SQLiteRunStore:
         if record is None:
             raise RuntimeError(f"Run was not persisted: {run_id}")
         return record
+
+    def upsert_user_from_auth(
+        self,
+        user: dict[str, Any],
+        *,
+        free_run_limit: int = 5,
+    ) -> UserRecord:
+        self.init_db()
+        now = _utc_now()
+        user_id = _auth_user_id(user)
+        email = str(user.get("email") or "").strip().lower()
+        if not email:
+            raise ValueError("Authenticated user must include an email.")
+        provider = str(user.get("provider") or "unknown")
+        name = user.get("name")
+        with self._connect() as conn:
+            existing = conn.execute(
+                "SELECT created_at, free_run_limit, plan FROM users WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()
+            created_at = existing["created_at"] if existing else now
+            stored_limit = existing["free_run_limit"] if existing else free_run_limit
+            plan = existing["plan"] if existing else "free"
+            conn.execute(
+                """
+                INSERT INTO users (
+                    user_id, email, name, provider, plan, free_run_limit, created_at, last_seen_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(user_id)
+                DO UPDATE SET email = excluded.email,
+                              name = excluded.name,
+                              provider = excluded.provider,
+                              last_seen_at = excluded.last_seen_at
+                """,
+                (user_id, email, name, provider, plan, stored_limit, created_at, now),
+            )
+        record = self.get_user(user_id)
+        if record is None:
+            raise RuntimeError(f"User was not persisted: {user_id}")
+        return record
+
+    def get_user(self, user_id: str) -> UserRecord | None:
+        self.init_db()
+        with self._connect() as conn:
+            row = conn.execute("SELECT * FROM users WHERE user_id = ?", (user_id,)).fetchone()
+        return self._row_to_user(row) if row else None
+
+    def get_user_by_email(self, email: str) -> UserRecord | None:
+        self.init_db()
+        normalized_email = email.strip().lower()
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT * FROM users
+                WHERE email = ?
+                ORDER BY last_seen_at DESC, rowid DESC
+                LIMIT 1
+                """,
+                (normalized_email,),
+            ).fetchone()
+        return self._row_to_user(row) if row else None
+
+    def get_user_usage(
+        self,
+        user_id: str,
+        *,
+        quota_bypass: bool = False,
+    ) -> UserUsageRecord:
+        self.init_db()
+        with self._connect() as conn:
+            user = conn.execute("SELECT * FROM users WHERE user_id = ?", (user_id,)).fetchone()
+            if user is None:
+                raise KeyError(user_id)
+            usage_row = conn.execute(
+                """
+                SELECT COALESCE(SUM(delta), 0) AS used_runs
+                FROM usage_ledger
+                WHERE user_id = ?
+                    AND event_type IN ('run_completed', 'admin_adjustment')
+                """,
+                (user_id,),
+            ).fetchone()
+        used_runs = max(0, int(usage_row["used_runs"] if usage_row else 0))
+        free_run_limit = int(user["free_run_limit"])
+        remaining_runs = max(0, free_run_limit - used_runs)
+        return UserUsageRecord(
+            user_id=user["user_id"],
+            email=user["email"],
+            plan=user["plan"],
+            free_run_limit=free_run_limit,
+            used_runs=used_runs,
+            remaining_runs=remaining_runs,
+            can_create_run=quota_bypass or used_runs < free_run_limit,
+            quota_bypass=quota_bypass,
+        )
+
+    def reserve_free_run(self, user_id: str, run_id: str, *, reason: str) -> None:
+        self._append_usage_event(
+            user_id=user_id,
+            run_id=run_id,
+            event_type="run_reserved",
+            delta=1,
+            reason=reason,
+        )
+
+    def adjust_free_runs(self, user_id: str, *, delta: int, reason: str) -> UserUsageRecord:
+        if delta == 0:
+            return self.get_user_usage(user_id)
+        self._append_usage_event(
+            user_id=user_id,
+            run_id=None,
+            event_type="admin_adjustment",
+            delta=delta,
+            reason=reason,
+        )
+        return self.get_user_usage(user_id)
+
+    def reset_free_run_usage(self, user_id: str, *, reason: str) -> UserUsageRecord:
+        usage = self.get_user_usage(user_id)
+        if usage.used_runs <= 0:
+            return usage
+        return self.adjust_free_runs(user_id, delta=-usage.used_runs, reason=reason)
+
+    def complete_free_run(self, user_id: str, run_id: str, *, reason: str) -> None:
+        self.init_db()
+        with self._connect() as conn:
+            existing = conn.execute(
+                """
+                SELECT 1 FROM usage_ledger
+                WHERE user_id = ? AND run_id = ? AND event_type = 'run_completed'
+                LIMIT 1
+                """,
+                (user_id, run_id),
+            ).fetchone()
+            if existing is not None:
+                return
+            self._append_usage_event_with_conn(
+                conn,
+                user_id=user_id,
+                run_id=run_id,
+                event_type="run_completed",
+                delta=1,
+                reason=reason,
+                created_at=_utc_now(),
+            )
+
+    def try_reserve_free_run(
+        self,
+        user_id: str,
+        run_id: str,
+        *,
+        free_run_limit: int,
+        reason: str,
+    ) -> bool:
+        self.init_db()
+        with self._connect() as conn:
+            usage_row = conn.execute(
+                """
+                SELECT COALESCE(SUM(delta), 0) AS used_runs
+                FROM usage_ledger
+                WHERE user_id = ?
+                    AND event_type IN ('run_completed', 'admin_adjustment')
+                """,
+                (user_id,),
+            ).fetchone()
+            used_runs = max(0, int(usage_row["used_runs"] if usage_row else 0))
+            if used_runs >= free_run_limit:
+                return False
+            self._append_usage_event_with_conn(
+                conn,
+                user_id=user_id,
+                run_id=run_id,
+                event_type="run_reserved",
+                delta=1,
+                reason=reason,
+                created_at=_utc_now(),
+            )
+            return True
+
+    def refund_free_run(self, user_id: str, run_id: str, *, reason: str) -> None:
+        self.init_db()
+        with self._connect() as conn:
+            existing = conn.execute(
+                """
+                SELECT 1 FROM usage_ledger
+                WHERE user_id = ? AND run_id = ? AND event_type = 'run_refunded'
+                LIMIT 1
+                """,
+                (user_id, run_id),
+            ).fetchone()
+            if existing is not None:
+                return
+            self._append_usage_event_with_conn(
+                conn,
+                user_id=user_id,
+                run_id=run_id,
+                event_type="run_refunded",
+                delta=-1,
+                reason=reason,
+                created_at=_utc_now(),
+            )
+
+    def list_runs_for_user(self, user_id: str, *, limit: int = 20) -> list[RunRecord]:
+        self.init_db()
+        safe_limit = max(1, min(limit, 200))
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM runs
+                WHERE user_id = ?
+                ORDER BY created_at DESC, rowid DESC
+                LIMIT ?
+                """,
+                (user_id, safe_limit),
+            ).fetchall()
+        return [self._row_to_run(row) for row in rows]
 
     def get_run(self, run_id: str) -> RunRecord | None:
         self.init_db()
@@ -612,6 +887,7 @@ class SQLiteRunStore:
         status: str,
         snapshot: dict[str, Any],
         event_type: str = "session_saved",
+        user: UserRecord | None = None,
     ) -> IntakeSessionRecord:
         self.init_db()
         now = _utc_now()
@@ -619,22 +895,39 @@ class SQLiteRunStore:
         run_id = _intake_run_id(snapshot)
         with self._connect() as conn:
             existing = conn.execute(
-                "SELECT created_at FROM intake_sessions WHERE session_id = ?",
+                "SELECT created_at, user_id FROM intake_sessions WHERE session_id = ?",
                 (session_id,),
             ).fetchone()
+            if existing and user and existing["user_id"] and existing["user_id"] != user.user_id:
+                raise PermissionError(f"Intake session belongs to a different user: {session_id}")
             created_at = existing["created_at"] if existing else now
             conn.execute(
                 """
-                INSERT INTO intake_sessions (session_id, status, title, run_id, snapshot_json, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO intake_sessions (
+                    session_id, status, title, run_id, user_id, user_email,
+                    snapshot_json, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(session_id)
                 DO UPDATE SET status = excluded.status,
                               title = excluded.title,
                               run_id = COALESCE(excluded.run_id, intake_sessions.run_id),
+                              user_id = COALESCE(intake_sessions.user_id, excluded.user_id),
+                              user_email = COALESCE(intake_sessions.user_email, excluded.user_email),
                               snapshot_json = excluded.snapshot_json,
                               updated_at = excluded.updated_at
                 """,
-                (session_id, status, title, run_id, _json_dumps(snapshot), created_at, now),
+                (
+                    session_id,
+                    status,
+                    title,
+                    run_id,
+                    user.user_id if user else None,
+                    user.email if user else None,
+                    _json_dumps(snapshot),
+                    created_at,
+                    now,
+                ),
             )
             self._replace_intake_messages_with_conn(
                 conn,
@@ -649,20 +942,28 @@ class SQLiteRunStore:
                 payload={"status": status},
                 created_at=now,
             )
-        record = self.get_intake_session(session_id)
+        record = self.get_intake_session(session_id, user_id=user.user_id if user else None)
         if record is None:
             raise RuntimeError(f"Intake session was not persisted: {session_id}")
         return record
 
-    def attach_intake_run(self, *, session_id: str, run_id: str) -> IntakeSessionRecord:
+    def attach_intake_run(
+        self,
+        *,
+        session_id: str,
+        run_id: str,
+        user_id: str | None = None,
+    ) -> IntakeSessionRecord:
         self.init_db()
         now = _utc_now()
         with self._connect() as conn:
             row = conn.execute(
-                "SELECT snapshot_json FROM intake_sessions WHERE session_id = ?",
+                "SELECT snapshot_json, user_id FROM intake_sessions WHERE session_id = ?",
                 (session_id,),
             ).fetchone()
             if row is None:
+                raise KeyError(session_id)
+            if user_id is not None and row["user_id"] != user_id:
                 raise KeyError(session_id)
             snapshot = _json_loads(row["snapshot_json"], {})
             if isinstance(snapshot, dict):
@@ -682,12 +983,17 @@ class SQLiteRunStore:
                 payload={"run_id": run_id},
                 created_at=now,
             )
-        record = self.get_intake_session(session_id)
+        record = self.get_intake_session(session_id, user_id=user_id)
         if record is None:
             raise KeyError(session_id)
         return record
 
-    def get_intake_session(self, session_id: str) -> IntakeSessionRecord | None:
+    def get_intake_session(
+        self,
+        session_id: str,
+        *,
+        user_id: str | None = None,
+    ) -> IntakeSessionRecord | None:
         self.init_db()
         with self._connect() as conn:
             row = conn.execute(
@@ -696,27 +1002,40 @@ class SQLiteRunStore:
             ).fetchone()
         if row is None:
             return None
+        if user_id is not None and row["user_id"] != user_id:
+            return None
         return IntakeSessionRecord(
             session_id=row["session_id"],
             status=row["status"],
             snapshot=_json_loads(row["snapshot_json"], {}),
             title=row["title"],
             run_id=row["run_id"],
+            user_id=row["user_id"],
+            user_email=row["user_email"],
             created_at=row["created_at"],
             updated_at=row["updated_at"],
         )
 
-    def list_intake_sessions(self, *, limit: int = 20) -> list[IntakeSessionRecord]:
+    def list_intake_sessions(
+        self,
+        *,
+        limit: int = 20,
+        user_id: str | None = None,
+    ) -> list[IntakeSessionRecord]:
         self.init_db()
         safe_limit = max(1, min(limit, 100))
+        where_clause = "WHERE user_id = ?" if user_id is not None else ""
+        values: list[Any] = [user_id] if user_id is not None else []
+        values.append(safe_limit)
         with self._connect() as conn:
             rows = conn.execute(
-                """
+                f"""
                 SELECT * FROM intake_sessions
+                {where_clause}
                 ORDER BY updated_at DESC, rowid DESC
                 LIMIT ?
                 """,
-                (safe_limit,),
+                values,
             ).fetchall()
         return [
             IntakeSessionRecord(
@@ -725,24 +1044,35 @@ class SQLiteRunStore:
                 snapshot=_json_loads(row["snapshot_json"], {}),
                 title=row["title"],
                 run_id=row["run_id"],
+                user_id=row["user_id"],
+                user_email=row["user_email"],
                 created_at=row["created_at"],
                 updated_at=row["updated_at"],
             )
             for row in rows
         ]
 
-    def list_intake_history(self, *, limit: int = 20) -> list[IntakeHistoryRecord]:
+    def list_intake_history(
+        self,
+        *,
+        limit: int = 20,
+        user_id: str | None = None,
+    ) -> list[IntakeHistoryRecord]:
         self.init_db()
         safe_limit = max(1, min(limit, 100))
+        where_clause = "WHERE user_id = ?" if user_id is not None else ""
+        values: list[Any] = [user_id] if user_id is not None else []
+        values.append(safe_limit)
         with self._connect() as conn:
             session_rows = conn.execute(
-                """
+                f"""
                 SELECT session_id, status, title, run_id, created_at, updated_at
                 FROM intake_sessions
+                {where_clause}
                 ORDER BY updated_at DESC, rowid DESC
                 LIMIT ?
                 """,
-                (safe_limit,),
+                values,
             ).fetchall()
             session_ids = [row["session_id"] for row in session_rows]
             messages_by_session: dict[str, list[IntakeMessageRecord]] = {session_id: [] for session_id in session_ids}
@@ -861,6 +1191,48 @@ class SQLiteRunStore:
             created_at=created_at,
         )
 
+    def _append_usage_event(
+        self,
+        *,
+        user_id: str,
+        run_id: str | None,
+        event_type: str,
+        delta: int,
+        reason: str,
+    ) -> None:
+        self.init_db()
+        with self._connect() as conn:
+            self._append_usage_event_with_conn(
+                conn,
+                user_id=user_id,
+                run_id=run_id,
+                event_type=event_type,
+                delta=delta,
+                reason=reason,
+                created_at=_utc_now(),
+            )
+
+    def _append_usage_event_with_conn(
+        self,
+        conn: sqlite3.Connection,
+        *,
+        user_id: str,
+        run_id: str | None,
+        event_type: str,
+        delta: int,
+        reason: str,
+        created_at: str,
+    ) -> None:
+        conn.execute(
+            """
+            INSERT INTO usage_ledger (
+                usage_id, user_id, run_id, event_type, delta, reason, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (str(uuid4()), user_id, run_id, event_type, delta, reason, created_at),
+        )
+
     def _replace_intake_messages_with_conn(
         self,
         conn: sqlite3.Connection,
@@ -934,11 +1306,25 @@ class SQLiteRunStore:
             done_count=row["done_count"],
             model_alias=row["model_alias"],
             intake_context=_json_loads(row["intake_context_json"], None),
+            user_id=row["user_id"],
+            user_email=row["user_email"],
             created_at=row["created_at"],
             started_at=row["started_at"],
             updated_at=row["updated_at"],
             completed_at=row["completed_at"],
             error=_json_loads(row["error_json"], None),
+        )
+
+    def _row_to_user(self, row: sqlite3.Row) -> UserRecord:
+        return UserRecord(
+            user_id=row["user_id"],
+            email=row["email"],
+            name=row["name"],
+            provider=row["provider"],
+            plan=row["plan"],
+            free_run_limit=row["free_run_limit"],
+            created_at=row["created_at"],
+            last_seen_at=row["last_seen_at"],
         )
 
     def _row_to_event(self, row: sqlite3.Row) -> RunEventRecord:
@@ -1037,6 +1423,19 @@ def _intake_run_id(snapshot: dict[str, Any]) -> str | None:
         return None
     run_id = snapshot.get("run_id") or snapshot.get("runId")
     return run_id if isinstance(run_id, str) and run_id.strip() else None
+
+
+def _auth_user_id(user: dict[str, Any]) -> str:
+    provider = str(user.get("provider") or "unknown").strip().lower() or "unknown"
+    email = str(user.get("email") or "").strip().lower()
+    external_id = str(user.get("id") or "").strip()
+    if provider in {"test", "local_dev"} and email:
+        return f"{provider}:{email}"
+    if external_id:
+        return f"{provider}:{external_id}"
+    if email:
+        return f"{provider}:{email}"
+    raise ValueError("Authenticated user must include an id or email.")
 
 
 def _json_digest(value: dict[str, Any]) -> str:

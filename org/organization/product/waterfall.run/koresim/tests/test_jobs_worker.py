@@ -13,11 +13,32 @@ from src.jobs.worker import run_creative_testing_job, run_noop_job, run_simulati
 
 class FakeLLM:
     async def generate(self, request: LLMRequest) -> LLMResponse:
-        return LLMResponse(
-            content=(
+        if request.task_type == "pricing_objection":
+            content = "조건: 결과물증명\n조건상태: 조건부구매\n이유: 실제 산출물을 보면 결제할 수 있습니다."
+        elif request.task_type == "pricing_anchor":
+            content = "유사서비스: AI 업무 강의\n월지출: 12000\n앵커범주: AI학습\n이유: 업무 교육과 비슷합니다."
+        elif request.task_type == "pricing_hesitation":
+            content = "망설임: 신뢰부족\n이유: 품질 확인이 먼저 필요합니다."
+        elif request.task_type == "product_qa_response":
+            content = (
+                "순위: A > B > C\n"
+                "최상위: A\n"
+                "최하위: C\n"
+                "명확성: 4\n"
+                "신뢰도: 3\n"
+                "행동가능성: 5\n"
+                "이유: 바로 비교할 수 있어서 좋습니다."
+            )
+        else:
+            content = (
                 "선택: A\n"
+                "가격별의향:\n"
+                "9900원: 관망\n"
+                "14900원: 거부\n"
+                "19900원: 거부\n"
                 "선호가격: 5500\n"
                 "지불의향가격: 6500\n"
+                "대표의향: 거부\n"
                 "점수: 4\n"
                 "설득력: 4\n"
                 "명확성: 4\n"
@@ -39,7 +60,9 @@ class FakeLLM:
                 "메시지: 메시지 1\n"
                 "반응: 클릭\n"
                 "이유: 메시지가 명확해서 좋습니다."
-            ),
+            )
+        return LLMResponse(
+            content=content,
             provider="fake",
             provider_model="fake-model",
             metadata={"task_type": request.task_type},
@@ -157,6 +180,39 @@ def test_noop_worker_updates_sqlite_run_and_result(tmp_path) -> None:
     assert result.result["warnings"] == [
         "Gate 1C no-op worker completed without executing simulation."
     ]
+
+
+def test_worker_charges_free_run_only_after_completion(tmp_path) -> None:
+    path = tmp_path / "runs.sqlite3"
+    store = SQLiteRunStore(path)
+    user = store.upsert_user_from_auth(
+        {
+            "id": "worker-user",
+            "email": "worker@example.com",
+            "name": "Worker User",
+            "provider": "test",
+        },
+        free_run_limit=5,
+    )
+    run = store.create_run(
+        RunCreateRequest.model_validate(
+            {
+                "simulation_type": "creative_testing",
+                "input": {"creatives": ["concept A", "concept B"]},
+                "sample_size": 2,
+            }
+        ),
+        user=user,
+    )
+
+    assert store.get_user_usage(user.user_id).remaining_runs == 5
+
+    run_noop_job(run.run_id, sqlite_path=str(path))
+    run_noop_job(run.run_id, sqlite_path=str(path))
+
+    usage = store.get_user_usage(user.user_id)
+    assert usage.used_runs == 1
+    assert usage.remaining_runs == 4
 
 
 def test_rq_worker_updates_sqlite_with_fakeredis(tmp_path) -> None:
@@ -499,3 +555,77 @@ def test_registered_simulation_worker_saves_generic_envelope(
     assert metric_key in result.result["metrics"]
     assert result.result["raw_results"][0]["parsed"] is not None
     assert result.result["orchestration"]["graph"]["qa"]["passed"] is True
+
+
+def test_price_optimization_worker_saves_price_research_v2_protocol(tmp_path) -> None:
+    path = tmp_path / "price-research-v2.sqlite3"
+    store = SQLiteRunStore(path)
+    run = store.create_run(
+        RunCreateRequest.model_validate(
+            {
+                "simulation_type": "price_optimization",
+                "input": {
+                    "protocol_id": "price_research_v2",
+                    "product_name": "로나",
+                    "product_description": "업무 맞춤 AI 실습 서비스",
+                    "price_points": [9900, 14900, 19900],
+                },
+                "sample_size": 3,
+                "seed": 77,
+            }
+        )
+    )
+
+    run_simulation_job(
+        run.run_id,
+        sqlite_path=str(path),
+        llm_client=FakeLLM(),
+        sampler=FakeSampler(),
+    )
+
+    result = store.get_result(run.run_id)
+    assert result is not None
+    assert result.result["simulation_type"] == "price_optimization"
+    assert result.result["metrics"]["protocol_id"] == "price_research_v2"
+    assert result.result["metrics"]["conditional_yes_count"] == 3
+    assert result.result["protocol"]["protocol_id"] == "price_research_v2"
+    assert result.result["protocol"]["step_summaries"][0]["id"] == "price_ladder"
+    assert result.result["raw_results"][0]["parsed"]["protocol_steps"]["rejection_conditions"][
+        "condition_category"
+    ] == "결과물증명"
+
+
+def test_value_proposition_worker_saves_product_qa_v1_protocol(tmp_path) -> None:
+    path = tmp_path / "product-qa-v1.sqlite3"
+    store = SQLiteRunStore(path)
+    run = store.create_run(
+        RunCreateRequest.model_validate(
+            {
+                "simulation_type": "value_proposition",
+                "input": {
+                    "protocol_id": "product_qa_v1",
+                    "artifact_type": "landing_copy",
+                    "product_context": "AI persona research SaaS",
+                    "statements": ["빠른 리서치", "조건부 거절 분석", "인터뷰 가이드"],
+                    "criteria": ["명확성", "신뢰도", "행동가능성"],
+                },
+                "sample_size": 3,
+                "seed": 77,
+            }
+        )
+    )
+
+    run_simulation_job(
+        run.run_id,
+        sqlite_path=str(path),
+        llm_client=FakeLLM(),
+        sampler=FakeSampler(),
+    )
+
+    result = store.get_result(run.run_id)
+    assert result is not None
+    assert result.result["simulation_type"] == "value_proposition"
+    assert result.result["metrics"]["protocol_id"] == "product_qa_v1"
+    assert result.result["metrics"]["top_choice_counts"] == {"A": 3}
+    assert result.result["protocol"]["protocol_id"] == "product_qa_v1"
+    assert result.result["raw_results"][0]["parsed"]["top_choice"] == "A"

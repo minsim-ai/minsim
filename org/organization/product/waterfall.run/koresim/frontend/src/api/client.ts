@@ -3,12 +3,19 @@ import type { ErrorResponse } from '../types/api'
 export class APIError extends Error {
   status: number
   payload: ErrorResponse | null
+  reason: 'auth_required' | 'access_required' | 'api_error'
 
-  constructor(status: number, payload: ErrorResponse | null, message: string) {
+  constructor(
+    status: number,
+    payload: ErrorResponse | null,
+    message: string,
+    reason: 'auth_required' | 'access_required' | 'api_error' = 'api_error',
+  ) {
     super(message)
     this.name = 'APIError'
     this.status = status
     this.payload = payload
+    this.reason = reason
   }
 }
 
@@ -22,11 +29,20 @@ export async function requestJson<T>(path: string, init?: RequestInit): Promise<
   })
 
   if (!isJsonResponse(response)) {
-    throw new APIError(response.status, null, await readNonJsonErrorMessage(response))
+    const nonJsonError = await readNonJsonError(response, path)
+    throw new APIError(response.status, null, nonJsonError.message, nonJsonError.reason)
   }
 
   if (!response.ok) {
     const payload = await readErrorPayload(response)
+    if (response.status === 401 || String(payload?.code ?? '') === 'AUTH_REQUIRED') {
+      throw new APIError(
+        response.status,
+        payload,
+        '로그인이 필요합니다. Google 계정으로 로그인한 뒤 데모를 실행해주세요.',
+        'auth_required',
+      )
+    }
     throw new APIError(
       response.status,
       payload,
@@ -51,12 +67,44 @@ function isJsonResponse(response: Response): boolean {
   return contentType.includes('application/json')
 }
 
-async function readNonJsonErrorMessage(response: Response): Promise<string> {
+async function readNonJsonError(
+  response: Response,
+  path: string,
+): Promise<{ message: string; reason: 'auth_required' | 'access_required' | 'api_error' }> {
   const text = await response.text().catch(() => '')
-  if (isAccessChallenge(response, text)) {
-    return 'Cloudflare Access 인증이 필요합니다. 보호된 경로에서 로그인한 뒤 다시 시도하세요.'
+  if (isAppLoginChallenge(response, text) || isProtectedApiHtmlFallback(path, text)) {
+    return {
+      message: '로그인이 필요합니다. Google 계정으로 로그인한 뒤 데모를 실행해주세요.',
+      reason: 'auth_required',
+    }
   }
-  return defaultErrorMessage(response.status)
+  if (isAccessChallenge(response, text)) {
+    return {
+      message: '보호된 경로입니다. 접근 권한이 있는 계정으로 로그인한 뒤 다시 시도해주세요.',
+      reason: 'access_required',
+    }
+  }
+  return { message: defaultErrorMessage(response.status), reason: 'api_error' }
+}
+
+function isAppLoginChallenge(response: Response, body: string): boolean {
+  const marker = `${response.url}\n${body}`.toLowerCase()
+  return (
+    marker.includes('/api/auth/google/login') ||
+    marker.includes('accounts.google.com') ||
+    marker.includes('sign in - google accounts') ||
+    marker.includes('google 계정') ||
+    marker.includes('google 로그인')
+  )
+}
+
+function isProtectedApiHtmlFallback(path: string, body: string): boolean {
+  const marker = body.toLowerCase()
+  return (
+    path.startsWith('/api/') &&
+    marker.includes('<!doctype html') &&
+    (marker.includes('id="root"') || marker.includes('/src/main') || marker.includes('arabesque'))
+  )
 }
 
 function isAccessChallenge(response: Response, body: string): boolean {

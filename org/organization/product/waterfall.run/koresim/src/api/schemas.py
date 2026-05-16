@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Any, Self
+from typing import Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -43,6 +43,7 @@ class ErrorCode(StrEnum):
     RESULT_NOT_READY = "RESULT_NOT_READY"
     RUN_NOT_CANCELABLE = "RUN_NOT_CANCELABLE"
     QUEUE_UNAVAILABLE = "QUEUE_UNAVAILABLE"
+    FREE_QUOTA_EXHAUSTED = "FREE_QUOTA_EXHAUSTED"
     WORKER_INTERRUPTED = "WORKER_INTERRUPTED"
     LLM_UNAVAILABLE = "LLM_UNAVAILABLE"
     LLM_TIMEOUT = "LLM_TIMEOUT"
@@ -94,10 +95,12 @@ class CreativeTestingInput(APIModel):
 
 
 class PriceOptimizationInput(APIModel):
+    protocol_id: Literal["price_research_v2"] | None = None
     product_name: str = Field(min_length=1, max_length=120)
     product_description: str = Field(min_length=1, max_length=1200)
     price_points: list[int] = Field(min_length=3, max_length=6)
     context_note: str | None = Field(default=None, max_length=1000)
+    calibration: dict[str, Any] | None = None
 
     @field_validator("price_points")
     @classmethod
@@ -118,8 +121,11 @@ class ProductLaunchInput(APIModel):
 
 
 class ValuePropositionInput(APIModel):
+    protocol_id: Literal["product_qa_v1"] | None = None
+    artifact_type: str | None = Field(default=None, max_length=80)
     product_context: str = Field(min_length=1, max_length=1000)
     statements: list[str] = Field(min_length=2, max_length=5)
+    criteria: list[str] = Field(default_factory=list, max_length=8)
 
     @field_validator("statements")
     @classmethod
@@ -437,6 +443,7 @@ class RunResultEnvelope(APIModel):
     trace_id: str | None = None
     orchestration: dict[str, Any] = Field(default_factory=dict)
     safe_intake_summary: SafeIntakeSummary | None = None
+    protocol: dict[str, Any] | None = None
 
 
 class RunPartialResultsResponse(APIModel):
@@ -465,6 +472,17 @@ class AuthSessionResponse(APIModel):
     test_login_enabled: bool
     login_url: str
     logout_url: str
+
+
+class UserUsageResponse(APIModel):
+    user_id: str
+    email: str
+    plan: str
+    free_run_limit: int = Field(ge=0)
+    used_runs: int = Field(ge=0)
+    remaining_runs: int = Field(ge=0)
+    can_create_run: bool
+    quota_bypass: bool = False
 
 
 class RunExportResponse(APIModel):

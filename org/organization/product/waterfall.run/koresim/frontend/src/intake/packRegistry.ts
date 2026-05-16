@@ -4,24 +4,47 @@ import type { IntakeFieldType, IntakeSlotFamily, IntakeSlotImportance, Simulatio
 
 const packPlaceholders: Record<Exclude<SimulationType, "creative_testing">, SimulationIntakePack> = {
   price_optimization: pack("price_optimization", "가격 최적화", ["가격", "가격대", "얼마", "요금", "구독료"], [
-    slot("product_description", "제품 설명", "object", "critical", "textarea"),
-    slot("price_points", "비교할 가격 후보", "options", "critical", "multi_text", { minItems: 3, maxItems: 6, canGenerate: true }),
-    slot("purchase_context", "구매 상황", "context", "recommended", "textarea", { canGenerate: true }),
-    slot("target_customers", "핵심 고객", "audience", "recommended", "multi_text", { recommendedItems: 3, canGenerate: true }),
-    slot("competitor_prices", "경쟁 가격", "context", "recommended", "multi_text", { canGenerate: true }),
+    slot("product_description", "제품 설명", "object", "critical", "textarea", {
+      placeholder: "예: AI 리서치 SaaS 월 구독 상품입니다.",
+      helperText: "제품명, 판매 방식, 현재 가격대가 있으면 함께 적어주세요.",
+    }),
+    slot("price_points", "비교할 가격 후보", "options", "critical", "multi_text", {
+      minItems: 3,
+      maxItems: 6,
+      canGenerate: true,
+      placeholder: "예: 29,000원",
+      helperText: "3개 이상 권장합니다. 모르면 비워두고 후보 생성을 요청할 수 있습니다.",
+    }),
+    slot("purchase_context", "구매 상황", "context", "recommended", "textarea", {
+      canGenerate: true,
+      placeholder: "예: 팀 단위로 월 구독 도입을 검토하는 상황",
+      helperText: "모르면 비워도 됩니다. 결과 해석의 배경으로만 사용합니다.",
+    }),
+    slot("target_customers", "핵심 고객", "audience", "recommended", "multi_text", {
+      recommendedItems: 3,
+      maxItems: 5,
+      canGenerate: true,
+      placeholder: "예: B2B 마케터",
+      helperText: "모르면 비워도 됩니다. 입력값이 없으면 전체 페르소나 기준으로 시작합니다.",
+    }),
+    slot("competitor_prices", "경쟁 가격", "context", "recommended", "multi_text", {
+      canGenerate: true,
+      placeholder: "예: 월 49,000원 경쟁 SaaS",
+      helperText: "아는 경쟁 가격만 적어주세요. 모르면 비워도 됩니다.",
+    }),
   ]),
   product_launch: pack("product_launch", "제품 출시 예측", ["신제품", "출시", "시장 반응", "런칭"], [
     slot("product_concept", "제품 컨셉", "object", "critical", "textarea"),
     slot("target_use_case", "사용 상황", "context", "critical", "textarea", { canInfer: true }),
     slot("key_features", "핵심 기능", "criteria", "recommended", "multi_text", { minItems: 1, maxItems: 8, canGenerate: true }),
-    slot("target_customers", "핵심 고객", "audience", "recommended", "multi_text", { recommendedItems: 3, canGenerate: true }),
+    slot("target_customers", "핵심 고객", "audience", "recommended", "multi_text", { recommendedItems: 3, maxItems: 5, canGenerate: true }),
     slot("expected_price_range", "예상 가격대", "constraints", "optional", "text"),
   ]),
   value_proposition: pack("value_proposition", "가치 제안 테스트", ["가치 제안", "장점", "소구점", "USP", "어필"], [
     slot("product_context", "제품 컨텍스트", "object", "critical", "textarea"),
     slot("statements", "가치 제안 후보", "options", "critical", "multi_text", { minItems: 2, maxItems: 5, canGenerate: true }),
-    slot("target_customers", "핵심 고객", "audience", "recommended", "multi_text", { recommendedItems: 3, canGenerate: true }),
-    slot("pain_points", "고객 문제", "criteria", "recommended", "multi_text", { canGenerate: true }),
+    slot("target_customers", "핵심 고객", "audience", "recommended", "multi_text", { recommendedItems: 3, maxItems: 5, canGenerate: true }),
+    slot("pain_points", "고객 문제", "criteria", "recommended", "multi_text", { recommendedItems: 2, maxItems: 8, canGenerate: true }),
     slot("competitors", "대안/경쟁 제품", "context", "optional", "multi_text"),
   ]),
   market_segmentation: pack("market_segmentation", "시장 세분화", ["고객군", "세그먼트", "타겟", "시장 나누", "분류"], [

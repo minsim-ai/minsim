@@ -13,7 +13,7 @@ FRONTEND_DIST = PROJECT_ROOT / "frontend" / "dist"
 
 
 def install_static_routes(app: FastAPI, dist_dir: Path = FRONTEND_DIST) -> None:
-    for directory_name in ("assets", "fonts", "persona"):
+    for directory_name in ("assets", "fonts", "maps", "organization", "persona"):
         directory = dist_dir / directory_name
         if directory.exists():
             app.mount(f"/{directory_name}", StaticFiles(directory=directory), name=directory_name)

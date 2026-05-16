@@ -21,8 +21,12 @@ class ModelRoute:
 TASK_MODEL_ALIASES: dict[str, str] = {
     "persona_response": MODEL_PERSONA_DEFAULT,
     "pricing_response": MODEL_PERSONA_DEFAULT,
+    "pricing_objection": MODEL_PERSONA_STRONG,
+    "pricing_anchor": MODEL_PERSONA_STRONG,
+    "pricing_hesitation": MODEL_PERSONA_STRONG,
     "launch_response": MODEL_PERSONA_DEFAULT,
     "value_prop_response": MODEL_PERSONA_DEFAULT,
+    "product_qa_response": MODEL_PERSONA_DEFAULT,
     "segmentation_response": MODEL_PERSONA_STRONG,
     "positioning_response": MODEL_PERSONA_DEFAULT,
     "brand_response": MODEL_PERSONA_DEFAULT,

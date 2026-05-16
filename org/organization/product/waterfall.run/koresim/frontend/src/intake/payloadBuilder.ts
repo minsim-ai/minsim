@@ -16,7 +16,7 @@ export function buildCreativeTestingPayload(session: IntakeSession): RunCreateRe
     input: {
       creatives: candidates,
     },
-    sample_size: parseSampleSize(asString(session.slots.sample_size), 200),
+    sample_size: parseSampleSize(session.slots.sample_size?.value, 200),
     target_filter: parseTargetFilter([
       asString(session.slots.product_description),
       ...asStringArray(session.slots.target_customers),
@@ -52,8 +52,8 @@ export function buildGenericSimulationPayload(session: IntakeSession): RunCreate
   return {
     simulation_type: simulationType,
     input: buildGenericInput(simulationType, session),
-    sample_size: parseSampleSize(asString(session.slots.sample_size), 200),
-    target_filter: parseTargetFilter(Object.values(session.slots).map((slot) => String(slot.value ?? "")).join(" ")),
+    sample_size: parseSampleSize(session.slots.sample_size?.value, 200),
+    target_filter: parseTargetFilter(buildTargetFilterText(session)),
     seed: parseSeed(asString(session.slots.seed)),
     intake_context: buildIntakeContextEnvelope(session),
   };
@@ -240,8 +240,7 @@ function asNumber(slot: IntakeSession["slots"][string] | undefined, fallback: nu
 function asNumberArray(slot: IntakeSession["slots"][string] | undefined, fallback: number[]): number[] {
   const rawValues = Array.isArray(slot?.value) ? slot.value : [slot?.value];
   const parsed = rawValues
-    .flatMap((value) => String(value ?? "").match(/\d[\d,]*/g) ?? [])
-    .map((value) => Number(value.replaceAll(",", "")))
+    .flatMap((value) => parseAmountCandidates(String(value ?? "")))
     .filter((value) => Number.isFinite(value) && value > 0);
   return Array.from(new Set(parsed.length > 0 ? parsed : fallback));
 }
@@ -250,10 +249,10 @@ function firstPhrase(value: string, fallback: string): string {
   return value.split(/[.\n]/)[0]?.trim().slice(0, 120) || fallback;
 }
 
-function parseSampleSize(value: string, fallback: number): number {
-  const match = value.match(/\d+/);
+function parseSampleSize(value: unknown, fallback: number): number {
+  const match = String(value ?? "").match(/\d+/);
   const parsed = match ? Number(match[0]) : fallback;
-  return Math.max(1, Math.min(parsed, 200));
+  return Math.max(50, Math.min(parsed, 200));
 }
 
 function parseSeed(value: string): number {
@@ -263,14 +262,77 @@ function parseSeed(value: string): number {
 
 function parseTargetFilter(text: string): TargetFilter {
   const targetFilter: TargetFilter = {};
-  const ageMatch = text.match(/(\d{1,3})\D+(\d{1,3})/);
-  if (ageMatch) {
-    targetFilter.age_min = Number(ageMatch[1]);
-    targetFilter.age_max = Number(ageMatch[2]);
+  const ageRange = parseAgeRange(text);
+  if (ageRange) {
+    targetFilter.age_min = ageRange.age_min;
+    targetFilter.age_max = ageRange.age_max;
   }
   if (text.includes("서울")) targetFilter.province = ["서울"];
   if (text.includes("경기")) targetFilter.province = [...(targetFilter.province ?? []), "경기"];
   if (text.includes("여성")) targetFilter.sex = "여자";
   if (text.includes("남성")) targetFilter.sex = "남자";
   return targetFilter;
+}
+
+const TARGET_FILTER_SLOT_IDS = new Set([
+  "target_customers",
+  "target_use_case",
+  "purchase_context",
+  "category",
+  "category_context",
+  "product_family",
+  "current_situation",
+  "recent_context",
+]);
+
+function buildTargetFilterText(session: IntakeSession): string {
+  return Object.values(session.slots)
+    .filter((slot) => TARGET_FILTER_SLOT_IDS.has(slot.slotId))
+    .flatMap((slot) => slotValueToText(slot.value))
+    .join(" ");
+}
+
+function slotValueToText(value: unknown): string[] {
+  if (Array.isArray(value)) return value.flatMap(slotValueToText);
+  return typeof value === "string" ? [value] : [];
+}
+
+function parseAmountCandidates(text: string): number[] {
+  return Array.from(text.replaceAll(",", "").matchAll(/(\d+(?:\.\d+)?)\s*(만\s*원|만원|천\s*원|천원|원|달러|usd|krw)?/gi))
+    .map((match) => {
+      const base = Number(match[1]);
+      const unit = (match[2] ?? "").replace(/\s/g, "").toLowerCase();
+      if (!Number.isFinite(base)) return null;
+      if (unit === "만원") return Math.round(base * 10_000);
+      if (unit === "천원") return Math.round(base * 1_000);
+      return Math.round(base);
+    })
+    .filter((value): value is number => value !== null && value > 0);
+}
+
+function parseAgeRange(text: string): { age_min: number; age_max: number } | null {
+  const normalized = text.replace(/\s+/g, " ");
+  const exactAgeRange = normalized.match(/(\d{1,3})\s*(?:세|살)\s*(?:부터|에서|~|-|–|—|to|까지)\s*(\d{1,3})\s*(?:세|살)?/i)
+    ?? normalized.match(/(\d{1,3})\s*(?:~|-|–|—|to)\s*(\d{1,3})\s*(?:세|살)/i);
+  if (exactAgeRange) return normalizeAgeRange(Number(exactAgeRange[1]), Number(exactAgeRange[2]));
+
+  const decadeRange = normalized.match(/([1-9]\d)\s*(?:대)?\s*(?:부터|에서|~|-|–|—|to|까지)\s*([1-9]\d)\s*대/i);
+  if (decadeRange) return normalizeAgeRange(Number(decadeRange[1]), Number(decadeRange[2]) + 9);
+
+  const decades = Array.from(normalized.matchAll(/([1-9]\d)\s*대/g))
+    .map((match) => Number(match[1]))
+    .filter((value) => value >= 10 && value <= 90);
+  if (decades.length > 0) {
+    const min = Math.min(...decades);
+    const max = Math.max(...decades) + 9;
+    return normalizeAgeRange(min, max);
+  }
+  return null;
+}
+
+function normalizeAgeRange(first: number, second: number): { age_min: number; age_max: number } | null {
+  if (!Number.isFinite(first) || !Number.isFinite(second)) return null;
+  const age_min = Math.max(0, Math.min(first, second));
+  const age_max = Math.min(120, Math.max(first, second));
+  return { age_min, age_max };
 }

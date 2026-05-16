@@ -22,6 +22,36 @@ Do not treat unrelated Obsidian vault changes as part of this project unless the
 - Queue and persistence: Redis + RQ worker, SQLite job/result store.
 - LLM direction: provider-agnostic `LLMClient`, LiteLLM Proxy, Gemini first external provider, Ollama local fallback, Langfuse metadata-only observability.
 
+## Live Deployment
+
+Current live deployment is not Vercel. It is a local Mac Studio/FastAPI origin exposed through Cloudflare Tunnel:
+
+- Public URL: `https://arabesque.cc`
+- Origin: `uv run uvicorn src.api.main:app --host 127.0.0.1 --port 8000`
+- React production build: `frontend/dist`, served by FastAPI via `src/api/static.py`
+- Tunnel: Cloudflare Named Tunnel using `/Users/qts/.cloudflared/koresim-arabesque.yml`
+- launchd services:
+  - `com.koresim.api` — FastAPI origin
+  - `com.koresim.worker` — RQ worker
+  - `com.koresim.tunnel` — Cloudflare tunnel
+- Runtime data: `/Users/qts/koresim-runtime`
+
+Deployment update procedure:
+
+```bash
+npm --prefix frontend run build
+launchctl kickstart -k gui/$(id -u)/com.koresim.api
+launchctl kickstart -k gui/$(id -u)/com.koresim.worker
+uv run python scripts/check_mac_studio_production.py --external --timeout-seconds 15
+```
+
+The tunnel usually does not need a restart for normal frontend/backend code changes because it forwards to the FastAPI origin. Restart `com.koresim.tunnel` only when Cloudflare tunnel config or connectivity changes.
+
+When adding new public static asset folders under `frontend/public`, make sure both of these are updated:
+
+- `src/api/static.py` mounts the built `frontend/dist/<folder>` directory.
+- `src/api/main.py` `_is_public_path()` allows the route when it must load on the public landing page before login.
+
 ## Required Reading Before Complex Work
 
 Read the relevant files before editing:
@@ -39,6 +69,98 @@ Read the relevant files before editing:
 For complex implementation, create or update an execution plan using:
 
 `docs/templates/execution-plan-template.md`
+
+## Agent Architecture Records
+
+When working on KoreaSim's LLM/agent structure, treat these files as the source of truth:
+
+- `README.md` — product-level architecture and plain-language Korean agent flow for orientation.
+- `docs/design/llm-gateway-orchestration.md` — LLM client boundary, LiteLLM routing, LangGraph run-level scope, analysis/report/QA agent roles, memory boundaries.
+- `docs/phases/phase-7-llm-gateway-orchestration.md` — validated Phase 7 gate, current agent orchestration status, validation evidence, and deferred scope.
+- `docs/execution/ai-agent-improvement-loop-v1.md` — `agent_runs` storage, prompt versions, eval harness, artifact contract, and run-level checkpoint persistence.
+- `docs/execution/agentic-intake-layer-v2.md` — current intake-agent execution plan and validation log.
+- `docs/design/agentic-intake-workflows/intake-layer-v2-contract.md` — `IntakeContextEnvelope`, `safe_intake_summary`, `/api/intake/advance`, and result-agent safe context contract.
+- `docs/design/agentic-intake-workflows/universal-agentic-intake-workflow.md` — goal-first intake workflow, slot/provenance model, and planner policy.
+- `docs/design/agentic-intake-workflows/simulation-intake-pack-standard.md` — common intake engine plus simulation-specific pack contract.
+- `docs/design/agentic-intake-workflows/intake-evaluation-fixtures-plan.md` — intake regression fixture categories and pass/fail criteria.
+- `docs/runbooks/llm-gemini-langfuse-operations.md` — Gemini/LiteLLM/Langfuse operational setup and metadata-only observability policy.
+
+Current architectural boundary:
+
+- Do not move persona fanout into LangGraph by default. Keep 50-200 persona response generation in the existing RQ worker and async batch simulator.
+- LangGraph is used for run-level orchestration/checkpointing and intake checkpoint shape, not per-persona branching.
+- Result-level agents operate after aggregate result envelopes are complete: `AnalysisAgent`, `ReportAgent`, and `QAAgent`.
+- Intake agent behavior converts user goals into structured slots and `safe_intake_summary`; result agents may use only safe summaries, not raw chat transcripts.
+- Langfuse payloads remain metadata-only by default.
+
+Overall flow:
+
+```mermaid
+flowchart TD
+  U["User natural-language goal"] --> FE["React Goal-first Intake UI"]
+  FE --> INTAKE["Intake Planner / /api/intake/advance"]
+  INTAKE --> ROUTER["Intent Router"]
+  ROUTER --> PACK["Simulation Intake Pack"]
+  PACK --> SLOTS["Slot Extraction + Provenance"]
+  SLOTS --> GAP["Gap Analyzer"]
+  GAP --> DECIDE{"Next action"}
+  DECIDE -->|"critical missing"| ASK["Ask one clarifying question"]
+  DECIDE -->|"many fields missing"| FORM["Dynamic form"]
+  DECIDE -->|"candidate needed"| GEN["Generate candidates"]
+  DECIDE -->|"assumptions matter"| REVIEW["Assumption review"]
+  ASK --> FE
+  FORM --> FE
+  GEN --> REVIEW
+  REVIEW --> FE
+  DECIDE -->|"ready"| CTX["IntakeContextEnvelope + safe_intake_summary"]
+  CTX --> RUNAPI["POST /api/runs"]
+  RUNAPI --> STORE["SQLite run/intake store"]
+  RUNAPI --> RQ["Redis / RQ worker"]
+  RQ --> SIM["Simulation engine"]
+  SIM --> PERSONAS["Persona sampler"]
+  SIM --> LLM["LLMClient -> LiteLLM/Gemini/Ollama"]
+  LLM --> RAW["50-200 persona responses"]
+  RAW --> AGG["Aggregate result envelope"]
+  AGG --> GRAPH["Run-level LangGraph checkpoint"]
+  AGG --> ANALYSIS["AnalysisAgent"]
+  ANALYSIS --> REPORT["ReportAgent"]
+  REPORT --> QA["QAAgent"]
+  CTX -. "safe context only" .-> ANALYSIS
+  CTX -. "safe context only" .-> REPORT
+  CTX -. "safe context only" .-> QA
+  QA --> RESULT["Persist result + agent_runs"]
+  RESULT --> UI["ResultsPage / API artifact"]
+  LLM -. "metadata only" .-> LF["Langfuse"]
+  ANALYSIS -. "prompt/model/score metadata" .-> LF
+  REPORT -. "prompt/model/score metadata" .-> LF
+  QA -. "prompt/model/score metadata" .-> LF
+```
+
+Important data boundaries:
+
+- `raw_results` stay in protected product storage and must not be sent to Langfuse by default.
+- `safe_intake_summary` may be included in result-agent prompts and stored agent records.
+- full raw chat transcript is an intake record, not a default result-agent input.
+- per-persona response fanout remains outside LangGraph.
+
+## Architecture Change Logging
+
+Important architectural changes must leave a durable record in the same change set.
+
+Update the relevant docs whenever a change affects:
+
+- agent boundaries, prompt versions, model routing, or LangGraph nodes/checkpoints.
+- intake schema, `safe_intake_summary`, slot provenance, or `/api/intake/*` behavior.
+- result envelope shape, `agent_runs` storage, eval scoring, or artifact contracts.
+- queue/RQ behavior, persistence schema, auth boundaries, deployment topology, or observability payload policy.
+
+Required logging pattern:
+
+- Update the relevant design doc under `docs/design/`.
+- Update or create the execution plan under `docs/execution/` using `docs/templates/execution-plan-template.md`.
+- Update `CLAUDE.md` when the current project status, active phase, validation evidence, or deferred scope changes.
+- Add validation evidence to the execution plan only after the command/API/browser check has actually passed.
+- If the change is agent-related, record prompt/router/planner versions and eval fixture coverage.
 
 ## Skill Routing
 

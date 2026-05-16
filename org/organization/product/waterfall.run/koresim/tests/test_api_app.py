@@ -160,6 +160,43 @@ def test_intake_session_api_persists_snapshot(tmp_path) -> None:
     assert link_response.json()["run_id"] == run_response.json()["run_id"]
 
 
+def test_intake_history_is_scoped_to_authenticated_user(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("KORESIM_AUTH_SECRET", "test-secret")
+    monkeypatch.setenv("KORESIM_AUTH_COOKIE_SECURE", "false")
+    monkeypatch.setenv("GOOGLE_CLIENT_ID", "google-client")
+    monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "google-secret")
+    monkeypatch.setenv("KORESIM_AUTH_TEST_LOGIN_ENABLED", "true")
+    store = SQLiteRunStore(tmp_path / "runs.sqlite3")
+
+    monkeypatch.setenv("KORESIM_AUTH_TEST_EMAIL", "first@example.com")
+    first_client = TestClient(create_app(store=store, enqueue_run_func=lambda run_id: "job-1"))
+    first_client.get("/api/auth/test-login", follow_redirects=False)
+    first_saved = first_client.post(
+        "/api/intake/sessions",
+        json={
+            "session_id": "intake-first-user",
+            "status": "collecting",
+            "snapshot": {"messages": [{"role": "user", "content": "첫 번째 사용자 대화"}]},
+        },
+    )
+    assert first_saved.status_code == 200
+
+    monkeypatch.setenv("KORESIM_AUTH_TEST_EMAIL", "second@example.com")
+    second_client = TestClient(create_app(store=store, enqueue_run_func=lambda run_id: "job-1"))
+    second_client.get("/api/auth/test-login", follow_redirects=False)
+
+    second_history = second_client.get("/api/intake/history")
+    assert second_history.status_code == 200
+    assert second_history.json()["items"] == []
+
+    leaked_session = second_client.get("/api/intake/sessions/intake-first-user")
+    assert leaked_session.status_code == 404
+
+    first_history = first_client.get("/api/intake/history")
+    assert first_history.status_code == 200
+    assert [item["session_id"] for item in first_history.json()["items"]] == ["intake-first-user"]
+
+
 def test_intake_advance_api_returns_safe_summary_and_checkpoint(tmp_path) -> None:
     store = SQLiteRunStore(tmp_path / "runs.sqlite3")
     client = TestClient(create_app(store=store, enqueue_run_func=lambda run_id: "job-1", llm_client=IntakeFakeLLM()))
@@ -319,6 +356,135 @@ def test_create_run_records_queue_unavailable_failure(tmp_path) -> None:
     run = store.get_run(detail["details"]["run_id"])
     assert run is not None
     assert run.status.value == "failed"
+
+
+def test_authenticated_new_user_gets_five_free_runs_and_sixth_is_blocked(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("KORESIM_AUTH_SECRET", "test-secret")
+    monkeypatch.setenv("KORESIM_AUTH_COOKIE_SECURE", "false")
+    monkeypatch.setenv("GOOGLE_CLIENT_ID", "google-client")
+    monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "google-secret")
+    monkeypatch.setenv("KORESIM_AUTH_TEST_LOGIN_ENABLED", "true")
+    monkeypatch.setenv("KORESIM_AUTH_TEST_EMAIL", "launch@example.com")
+    store = SQLiteRunStore(tmp_path / "runs.sqlite3")
+    client = TestClient(create_app(store=store, enqueue_run_func=lambda run_id: f"job-{run_id}"))
+    client.get("/api/auth/test-login", follow_redirects=False)
+
+    usage = client.get("/api/me/usage")
+    assert usage.status_code == 200
+    assert usage.json()["remaining_runs"] == 5
+
+    for index in range(5):
+        response = client.post(
+            "/api/runs",
+            json={
+                "simulation_type": "creative_testing",
+                "input": {"creatives": [f"concept A {index}", f"concept B {index}"]},
+                "sample_size": 2,
+            },
+        )
+        assert response.status_code == 200
+        store.complete_free_run(
+            "test:launch@example.com",
+            response.json()["run_id"],
+            reason="test_run_completed",
+        )
+
+    exhausted = client.get("/api/me/usage").json()
+    assert exhausted["used_runs"] == 5
+    assert exhausted["remaining_runs"] == 0
+    assert exhausted["can_create_run"] is False
+
+    blocked = client.post(
+        "/api/runs",
+        json={
+            "simulation_type": "creative_testing",
+            "input": {"creatives": ["concept A final", "concept B final"]},
+            "sample_size": 2,
+        },
+    )
+    assert blocked.status_code == 403
+    assert blocked.json()["detail"]["code"] == "FREE_QUOTA_EXHAUSTED"
+
+
+def test_queue_failure_refunds_reserved_free_run(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("KORESIM_AUTH_SECRET", "test-secret")
+    monkeypatch.setenv("KORESIM_AUTH_COOKIE_SECURE", "false")
+    monkeypatch.setenv("GOOGLE_CLIENT_ID", "google-client")
+    monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "google-secret")
+    monkeypatch.setenv("KORESIM_AUTH_TEST_LOGIN_ENABLED", "true")
+    monkeypatch.setenv("KORESIM_AUTH_TEST_EMAIL", "refund@example.com")
+    monkeypatch.setenv("KORESIM_FREE_RUN_LIMIT", "1")
+    store = SQLiteRunStore(tmp_path / "runs.sqlite3")
+
+    def failing_enqueue(run_id: str) -> str:
+        raise RuntimeError("redis unavailable")
+
+    failing_client = TestClient(create_app(store=store, enqueue_run_func=failing_enqueue))
+    failing_client.get("/api/auth/test-login", follow_redirects=False)
+    failed = failing_client.post(
+        "/api/runs",
+        json={
+            "simulation_type": "creative_testing",
+            "input": {"creatives": ["concept A", "concept B"]},
+            "sample_size": 2,
+        },
+    )
+    assert failed.status_code == 503
+
+    usage_after_failure = failing_client.get("/api/me/usage").json()
+    assert usage_after_failure["used_runs"] == 0
+    assert usage_after_failure["remaining_runs"] == 1
+
+    success_client = TestClient(create_app(store=store, enqueue_run_func=lambda run_id: "job-1"))
+    success_client.get("/api/auth/test-login", follow_redirects=False)
+    accepted = success_client.post(
+        "/api/runs",
+        json={
+            "simulation_type": "creative_testing",
+            "input": {"creatives": ["concept A", "concept B"]},
+            "sample_size": 2,
+        },
+    )
+    assert accepted.status_code == 200
+    assert success_client.get("/api/me/usage").json()["remaining_runs"] == 1
+    store.complete_free_run(
+        "test:refund@example.com",
+        accepted.json()["run_id"],
+        reason="test_run_completed",
+    )
+    assert success_client.get("/api/me/usage").json()["remaining_runs"] == 0
+
+
+def test_admin_email_bypasses_free_run_quota(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("KORESIM_AUTH_SECRET", "test-secret")
+    monkeypatch.setenv("KORESIM_AUTH_COOKIE_SECURE", "false")
+    monkeypatch.setenv("GOOGLE_CLIENT_ID", "google-client")
+    monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "google-secret")
+    monkeypatch.setenv("KORESIM_AUTH_TEST_LOGIN_ENABLED", "true")
+    monkeypatch.setenv("KORESIM_AUTH_TEST_EMAIL", "admin@example.com")
+    monkeypatch.setenv("KORESIM_FREE_RUN_LIMIT", "1")
+    monkeypatch.setenv("KORESIM_ADMIN_EMAILS", "admin@example.com")
+    store = SQLiteRunStore(tmp_path / "runs.sqlite3")
+    client = TestClient(create_app(store=store, enqueue_run_func=lambda run_id: f"job-{run_id}"))
+    client.get("/api/auth/test-login", follow_redirects=False)
+
+    for index in range(2):
+        response = client.post(
+            "/api/runs",
+            json={
+                "simulation_type": "creative_testing",
+                "input": {"creatives": [f"concept A {index}", f"concept B {index}"]},
+                "sample_size": 2,
+            },
+        )
+        assert response.status_code == 200
+
+    usage = client.get("/api/me/usage").json()
+    assert usage["quota_bypass"] is True
+    assert usage["can_create_run"] is True
 
 
 def test_run_events_stream_replays_persisted_events_and_closes_on_terminal_run(tmp_path) -> None:

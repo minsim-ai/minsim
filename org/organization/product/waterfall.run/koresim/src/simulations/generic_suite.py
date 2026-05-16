@@ -17,13 +17,15 @@ from src.simulations.common import (
     pct,
     top_counts,
 )
+from src.simulations.price_research_v2 import PriceResearchV2Simulation, PROTOCOL_ID
+from src.simulations.product_qa_v1 import ProductQAV1Simulation, PRODUCT_QA_PROTOCOL_ID
 
 
 SimulationRunner = Callable[..., Any]
 
 
 def price_optimization_runner() -> GenericPersonaSimulation:
-    return GenericPersonaSimulation(
+    return PriceOptimizationSimulation(
         simulation_type="price_optimization",
         purpose="pricing research",
         task_type="pricing_response",
@@ -31,6 +33,13 @@ def price_optimization_runner() -> GenericPersonaSimulation:
         parser=_parse_price_response,
         aggregator=_aggregate_price,
     )
+
+
+class PriceOptimizationSimulation(GenericPersonaSimulation):
+    async def run(self, input_data: dict[str, Any], *args: Any, **kwargs: Any) -> Any:
+        if input_data.get("protocol_id") == PROTOCOL_ID:
+            return await PriceResearchV2Simulation().run(input_data, *args, **kwargs)
+        return await super().run(input_data, *args, **kwargs)
 
 
 def product_launch_runner() -> GenericPersonaSimulation:
@@ -45,7 +54,7 @@ def product_launch_runner() -> GenericPersonaSimulation:
 
 
 def value_proposition_runner() -> GenericPersonaSimulation:
-    return GenericPersonaSimulation(
+    return ValuePropositionSimulation(
         simulation_type="value_proposition",
         purpose="value proposition research",
         task_type="value_prop_response",
@@ -53,6 +62,13 @@ def value_proposition_runner() -> GenericPersonaSimulation:
         parser=_parse_value_proposition_response,
         aggregator=_aggregate_value_proposition,
     )
+
+
+class ValuePropositionSimulation(GenericPersonaSimulation):
+    async def run(self, input_data: dict[str, Any], *args: Any, **kwargs: Any) -> Any:
+        if input_data.get("protocol_id") == PRODUCT_QA_PROTOCOL_ID:
+            return await ProductQAV1Simulation().run(input_data, *args, **kwargs)
+        return await super().run(input_data, *args, **kwargs)
 
 
 def market_segmentation_runner() -> GenericPersonaSimulation:

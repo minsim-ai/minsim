@@ -42,11 +42,37 @@ class RunRecord:
     done_count: int = 0
     model_alias: str | None = None
     intake_context: dict[str, Any] | None = None
+    user_id: str | None = None
+    user_email: str | None = None
     created_at: str = ""
     started_at: str | None = None
     updated_at: str = ""
     completed_at: str | None = None
     error: dict[str, Any] | None = None
+
+
+@dataclass(frozen=True)
+class UserRecord:
+    user_id: str
+    email: str
+    provider: str
+    name: str | None = None
+    plan: str = "free"
+    free_run_limit: int = 5
+    created_at: str = ""
+    last_seen_at: str = ""
+
+
+@dataclass(frozen=True)
+class UserUsageRecord:
+    user_id: str
+    email: str
+    plan: str
+    free_run_limit: int
+    used_runs: int
+    remaining_runs: int
+    can_create_run: bool
+    quota_bypass: bool = False
 
 
 @dataclass(frozen=True)
@@ -100,6 +126,8 @@ class IntakeSessionRecord:
     snapshot: dict[str, Any]
     title: str | None = None
     run_id: str | None = None
+    user_id: str | None = None
+    user_email: str | None = None
     created_at: str = ""
     updated_at: str = ""
 

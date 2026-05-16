@@ -3,7 +3,7 @@ title: Execution Plans
 type: index
 tags: [execution, phase-plan, implementation]
 created: 2026-05-02
-updated: 2026-05-12
+updated: 2026-05-14
 status: active
 related: [[../templates/execution-plan-template]], [[../design/react-fastapi-migration]], [[../design/harness-engineering-controls]], [[../design/data-governance-and-io-boundary]], [[../design/evaluation-framework]], [[../research/harness-engineering-gap-review]]
 ---
@@ -39,3 +39,4 @@ related: [[../templates/execution-plan-template]], [[../design/react-fastapi-mig
 - [x] [[phase-7-llm-gateway-orchestration]] — model routing, graph expansion, memory schema, LiteLLM/Gemini/Ollama, and Langfuse metadata-only tracing complete for current demo gate
 - [x] [[ai-agent-improvement-loop-v1]] — agent_runs storage, prompt versioning, deterministic agent evals, local E2E artifact, and run-level checkpoint storage
 - [ ] [[agentic-intake-creative-testing-v1]] — planned goal-first intake workflow for Creative Testing, with reusable planner contracts for all 9 simulations
+- [ ] [[persona-simulation-performance-upgrade-v1]] — planned protocol engine, multi-turn price research, Product QA, calibration, interview guide, and case-equivalent benchmark

@@ -1,13 +1,12 @@
-import { useEffect, useState, type CSSProperties } from 'react'
-import { ArrowLeft, UserCircle, WarningCircle, X } from '@phosphor-icons/react'
-import { Download } from 'lucide-react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { ArrowLeft, GenderFemale, GenderMale, WarningCircle, X } from '@phosphor-icons/react'
+import { Download, Info } from 'lucide-react'
 import { APIError } from './api/client'
 import { getRun, getRunExport, getRunPartials, getRunResult } from './api/runs'
 import { AuthStatus } from './components/AuthStatus'
 import { runStateFixtures } from './data/runStateFixtures'
 import {
   getMetricSections,
-  getPersonaPrimaryLabel,
   getSimulationLabel,
   type MetricSection,
   type MetricRow,
@@ -15,6 +14,42 @@ import {
 import type { JsonObject, RawPersonaResult, RunResultEnvelope, RunSnapshot } from './types/api'
 
 const CHOICE_COLORS = ['#0066FF', '#00A878', '#7C3AED', '#D97706', '#64748B']
+const KOREA_PROVINCE_MAP_PATH = '/maps/korea-provinces.svg'
+
+const PROVINCE_ID_ALIASES: Record<string, string> = {
+  서울: '서울특별시',
+  부산: '부산광역시',
+  대구: '대구광역시',
+  인천: '인천광역시',
+  광주: '광주광역시',
+  대전: '대전광역시',
+  울산: '울산광역시',
+  세종: '세종특별자치시',
+  경기: '경기도',
+  경기도: '경기도',
+  강원: '강원도',
+  강원도: '강원도',
+  충북: '충청북도',
+  충청북: '충청북도',
+  충청북도: '충청북도',
+  충남: '충청남도',
+  충청남: '충청남도',
+  충청남도: '충청남도',
+  전북: '전라북도',
+  전라북: '전라북도',
+  전라북도: '전라북도',
+  전남: '전라남도',
+  전라남: '전라남도',
+  전라남도: '전라남도',
+  경북: '경상북도',
+  경상북: '경상북도',
+  경상북도: '경상북도',
+  경남: '경상남도',
+  경상남: '경상남도',
+  경상남도: '경상남도',
+  제주: '제주특별자치도',
+  제주특별자치도: '제주특별자치도',
+}
 
 type RankedMetricRow = MetricRow & {
   sectionTitle: string
@@ -39,6 +74,8 @@ type SegmentMatrix = {
   columns: string[]
   rows: SegmentMatrixRow[]
 }
+
+type SegmentViewMode = 'table' | 'visual'
 
 type SegmentSignal = {
   dimension: string
@@ -158,6 +195,192 @@ function compactJson(value: unknown): string {
   return String(value)
 }
 
+function humanizeKey(key: string): string {
+  const labels: Record<string, string> = {
+    actual_sample_size: '실제 표본 수',
+    age_buckets: '연령 구성',
+    province: '지역 구성',
+    sex: '성별 구성',
+    choice_counts: '선택 수',
+    choice_pct: '선택 비율',
+    preference_counts: '제품 선호 수',
+    preference_pct: '제품 선호 비율',
+    intent_counts: '의향 수',
+    intent_pct: '의향 비율',
+    score_counts: '점수 분포',
+    score_pct: '점수 비율',
+    segment_counts: '세그먼트 수',
+    segment_pct: '세그먼트 비율',
+    channel_counts: '채널 선호 수',
+    channel_pct: '채널 선호 비율',
+    message_counts: '메시지 선호 수',
+    message_pct: '메시지 선호 비율',
+    creatives: '후보 문구',
+    statements: '가치 제안',
+    products: '제품 후보',
+    reasons_by_choice: '선택 이유',
+    breakdown_by_age: '연령대별 반응',
+    breakdown_by_province: '지역별 반응',
+    breakdown_by_sex: '성별 반응',
+    parse_success_rate: '응답 해석 성공률',
+    sample_quality_grade: '표본 품질',
+    overall_grade: '전체 품질',
+    exclude_unemployed: '무직 제외',
+    metric: '분석 지표',
+    choice: '선택',
+    reason: '선택 이유',
+    intent: '의향',
+    segment: '세그먼트',
+    preferred_price: '선호 가격',
+    reaction: '반응',
+    score: '점수',
+    sentiment: '감성',
+  }
+  return labels[key] ?? key.replace(/^breakdown_by_/, '').replace(/_/g, ' ')
+}
+
+function yesNoLabel(value: unknown): string {
+  if (value === true) return '예'
+  if (value === false) return '아니오'
+  return compactJson(value)
+}
+
+function shortenText(value: string, max = 72): string {
+  return value.length > max ? `${value.slice(0, max).trim()}...` : value
+}
+
+function optionCodeLabel(label: string | null | undefined): string {
+  if (!label) return 'N/A'
+  return /^[A-Z]$/.test(label) ? `${label}안` : label
+}
+
+function choiceLabel(row: RankedMetricRow | MetricRow | null): string {
+  if (!row) return 'N/A'
+  return optionCodeLabel(row.label)
+}
+
+function choiceTitle(row: RankedMetricRow | MetricRow | null): string {
+  if (!row) return '"N/A"'
+  return `"${row.detail || choiceLabel(row)}"`
+}
+
+function choiceDisplayTitle(row: RankedMetricRow | MetricRow | null): string {
+  if (!row) return 'N/A'
+  return row.detail || choiceLabel(row)
+}
+
+function choiceCodeChip(row: RankedMetricRow | MetricRow | null): string | null {
+  if (!row || !/^[A-Z]$/.test(row.label)) return null
+  return `${row.label}안`
+}
+
+function segmentChoiceLabel(label: string): string {
+  return optionCodeLabel(label)
+}
+
+function provincePathId(label: string): string {
+  return PROVINCE_ID_ALIASES[label] ?? label
+}
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const normalized = hex.replace('#', '')
+  const full = normalized.length === 3
+    ? normalized.split('').map((char) => `${char}${char}`).join('')
+    : normalized
+  const value = Number.parseInt(full, 16)
+  return {
+    r: (value >> 16) & 255,
+    g: (value >> 8) & 255,
+    b: value & 255,
+  }
+}
+
+function mixHex(source: string, target: string, sourcePct: number): string {
+  const a = hexToRgb(source)
+  const b = hexToRgb(target)
+  const t = Math.max(0, Math.min(1, sourcePct / 100))
+  const channel = (from: number, to: number) => Math.round(from * t + to * (1 - t))
+  return `rgb(${channel(a.r, b.r)}, ${channel(a.g, b.g)}, ${channel(a.b, b.b)})`
+}
+
+function personaValue(persona: JsonObject, keys: string[]): string | null {
+  for (const key of keys) {
+    const value = asString(persona[key])
+    if (value) return value
+  }
+  return null
+}
+
+function getPersonaName(raw: RawPersonaResult): string {
+  const direct = personaValue(raw.persona, ['name', 'persona_name', 'full_name', 'korean_name'])
+  if (direct) return direct
+  const narrative = personaValue(raw.persona, ['persona', 'arts_persona', 'professional_persona', 'family_persona'])
+  const match = narrative?.match(/^([가-힣]{2,4})\s*씨/)
+  if (match) return match[1]
+  return `페르소나 ${raw.uuid.slice(0, 4)}`
+}
+
+function getPersonaChoice(raw: RawPersonaResult): string | null {
+  const parsed = raw.parsed
+  if (!parsed) return null
+  return asString(parsed.choice)
+    ?? asString(parsed.intent)
+    ?? asString(parsed.segment)
+    ?? asString(parsed.primary)
+    ?? asString(parsed.preferred_price)
+    ?? asString(parsed.reaction)
+}
+
+function getPersonaChoiceText(raw: RawPersonaResult, optionMap: Map<string, RankedMetricRow>): string | null {
+  const choice = getPersonaChoice(raw)
+  if (!choice) return null
+  return optionMap.get(choice)?.detail || optionCodeLabel(choice)
+}
+
+function hashString(value: string): number {
+  let hash = 0
+  for (let index = 0; index < value.length; index += 1) {
+    hash = ((hash << 5) - hash + value.charCodeAt(index)) | 0
+  }
+  return Math.abs(hash)
+}
+
+function getPersonaAvatarSrc(raw: RawPersonaResult): string {
+  const index = (hashString(raw.uuid) % 31) + 1
+  return `/landing/portraits/portrait-${String(index).padStart(2, '0')}.png`
+}
+
+function getReadablePersonaRows(raw: RawPersonaResult): Array<{ label: string; value: string }> {
+  const persona = raw.persona
+  const rows = [
+    { label: '이름', value: getPersonaName(raw) },
+    { label: '선택', value: getPersonaChoice(raw) },
+    { label: '성별', value: asString(persona.sex) },
+    { label: '나이', value: asNumber(persona.age) !== null ? `${asNumber(persona.age)}세` : null },
+    {
+      label: '지역',
+      value: [asString(persona.province), asString(persona.district)].filter(Boolean).join(' ') || null,
+    },
+    { label: '직업', value: asString(persona.occupation) },
+    { label: '학력', value: asString(persona.education_level) },
+    { label: '가구', value: asString(persona.family_type) },
+    { label: '관심사', value: asString(persona.hobbies_and_interests) },
+  ]
+  return rows
+    .filter((row): row is { label: string; value: string } => Boolean(row.value))
+    .map((row) => ({ ...row, value: shortenText(row.value, 160) }))
+}
+
+function getReadableParsedRows(raw: RawPersonaResult): Array<{ label: string; value: string }> {
+  if (!raw.parsed) return []
+  return Object.entries(raw.parsed)
+    .filter(([, value]) => value !== null && value !== undefined && value !== '')
+    .map(([key, value]) => ({
+      label: humanizeKey(key),
+      value: shortenText(compactJson(value), 180),
+    }))
+}
+
 function asStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return []
   return value.map(asString).filter((item): item is string => Boolean(item))
@@ -179,11 +402,33 @@ function formatDate(value: string | null | undefined): string {
 }
 
 function getInsightTitle(insight: JsonObject, index: number): string {
-  return asString(insight.title) ?? asString(insight.type) ?? `Insight ${index + 1}`
+  const type = asString(insight.type)
+  const choice = asString(insight.choice)
+  if (type === 'top_choice' && choice) return `${choice}안이 가장 많이 선택됐습니다`
+  if (type === 'segment_signal') return '특정 세그먼트에서 반응 차이가 보입니다'
+  if (type === 'risk' || type === 'quality_warning') return '해석할 때 주의가 필요합니다'
+
+  const title = asString(insight.title)
+  if (title && !/creative|choice|count|pct|metric|_/.test(title.toLowerCase())) return title
+  return `${index + 1}번째 인사이트`
 }
 
 function getInsightBody(insight: JsonObject): string {
-  return asString(insight.evidence) ?? compactJson(insight)
+  const type = asString(insight.type)
+  const choice = asString(insight.choice)
+  const count = asNumber(insight.count)
+  const pct = asNumber(insight.pct)
+  const evidence = asString(insight.evidence)
+
+  if (type === 'top_choice' && choice && count !== null && pct !== null) {
+    return `${choice}안이 ${formatNumber(count)}명(${formatPct(pct)})에게 선택되어 가장 강한 반응을 얻었습니다.`
+  }
+  if (evidence) return evidence
+
+  const parts = Object.entries(insight)
+    .filter(([key]) => !['type', 'title'].includes(key))
+    .map(([key, value]) => `${humanizeKey(key)}: ${compactJson(value)}`)
+  return parts.length > 0 ? parts.join(' · ') : '추가 설명이 없습니다.'
 }
 
 function getPersonaMeta(raw: RawPersonaResult): string {
@@ -248,10 +493,9 @@ function formatPoint(value: number): string {
   return `${value >= 0 ? '+' : '-'}${Number.isInteger(abs) ? abs : abs.toFixed(1)}pt`
 }
 
-function rowDisplayName(row: RankedMetricRow | MetricRow | null): string {
+function rowShortName(row: RankedMetricRow | MetricRow | null): string {
   if (!row) return 'N/A'
-  if (row.detail) return `${row.label} · ${row.detail}`
-  return row.label
+  return choiceLabel(row)
 }
 
 function flattenMetricRows(sections: MetricSection[]): RankedMetricRow[] {
@@ -352,7 +596,7 @@ function collectEvidenceQuotes(result: RunResultEnvelope, metricRows: RankedMetr
       const text = asString(reason)
       if (text) {
         quotes.push({
-          label: rowDisplayName(row),
+          label: rowShortName(row),
           meta: row.sectionTitle,
           body: text,
           tone: row === metricRows[0] ? 'positive' : 'neutral',
@@ -373,7 +617,7 @@ function collectEvidenceQuotes(result: RunResultEnvelope, metricRows: RankedMetr
     const body = reason ?? (raw.error ? raw.error : null)
     if (!body || quotes.some((quote) => quote.body === body)) continue
     quotes.push({
-      label: getPersonaPrimaryLabel(raw),
+      label: getPersonaName(raw),
       meta: getPersonaMeta(raw) || raw.uuid.slice(0, 8),
       body,
       tone: getPersonaTone(raw),
@@ -390,8 +634,8 @@ function buildNextActions(
   segmentSignals: SegmentSignal[],
 ): string[] {
   const actions: string[] = []
-  const winnerName = rowDisplayName(winner)
-  const runnerName = rowDisplayName(runnerUp)
+  const winnerName = choiceTitle(winner)
+  const runnerName = choiceTitle(runnerUp)
 
   if (result.total_responses < 50) {
     actions.push('현재 결과는 방향성 확인용으로 보고, 동일 조건에서 50명 이상으로 재실행해 결론을 고정합니다.')
@@ -409,7 +653,7 @@ function buildNextActions(
 
   if (segmentSignals.length > 0) {
     const signal = segmentSignals[0]
-    actions.push(`${signal.dimension} ${signal.segment}에서 ${signal.winner} 반응이 두드러집니다. 전체용 메시지와 세그먼트 전용 메시지를 분리해 검토합니다.`)
+    actions.push(`${signal.dimension} ${signal.segment}에서 ${segmentChoiceLabel(signal.winner)} 반응이 두드러집니다. 전체용 메시지와 세그먼트 전용 메시지를 분리해 검토합니다.`)
   }
 
   switch (result.simulation_type) {
@@ -462,20 +706,20 @@ function buildReportAnalysis(result: RunResultEnvelope, metricSections: MetricSe
     confidenceBody = '빠른 탐색에는 충분하지만 외부 공유용 결론으로 쓰기에는 표본이 작습니다.'
   }
 
-  let decisionLabel = winner ? `${rowDisplayName(winner)} 중심` : '집계 대기'
+  let decisionLabel = winner ? choiceTitle(winner) : '집계 대기'
   let decisionBody = winner
-    ? `${rowDisplayName(winner)}이 현재 결과의 중심입니다.`
+    ? `가장 높은 반응은 ${choiceDisplayTitle(winner)}입니다. 이 후보를 중심으로 다음 실험 조건을 좁힐 수 있습니다.`
     : '집계 가능한 정량 결과가 아직 없습니다.'
   if (winner && runnerUp && marginPct !== null) {
     if (marginPct >= 15) {
-      decisionLabel = `${rowDisplayName(winner)} 채택 후보`
-      decisionBody = `${rowDisplayName(winner)}이 ${rowDisplayName(runnerUp)}보다 ${formatPoint(marginPct)} 앞서며, 전체 선택 구조에서 분명한 우위를 보입니다.`
+      decisionLabel = choiceDisplayTitle(winner)
+      decisionBody = `${choiceDisplayTitle(winner)} 후보가 ${choiceDisplayTitle(runnerUp)} 후보보다 ${formatPoint(marginPct)} 앞섰습니다. 전체 선택 구조에서 분명한 우위가 보이며, 바로 적용 후보로 검토할 만합니다.`
     } else if (marginPct <= 6) {
       decisionLabel = '박빙 구간'
-      decisionBody = `${rowDisplayName(winner)}이 앞서지만 ${rowDisplayName(runnerUp)}와의 차이가 ${formatPoint(marginPct)}에 그쳐, 메시지 조합 또는 세그먼트 분리 검토가 필요합니다.`
+      decisionBody = `${choiceDisplayTitle(winner)} 후보가 앞서지만 ${choiceDisplayTitle(runnerUp)} 후보와의 차이가 ${formatPoint(marginPct)}에 그쳐, 메시지 조합 또는 세그먼트 분리 검토가 필요합니다.`
     } else {
-      decisionLabel = `${rowDisplayName(winner)} 조건부 우세`
-      decisionBody = `${rowDisplayName(winner)}이 앞서지만, ${rowDisplayName(runnerUp)}도 충분히 가까워 세그먼트별 선택 이유를 같이 봐야 합니다.`
+      decisionLabel = `${choiceDisplayTitle(winner)} 우세`
+      decisionBody = `${choiceDisplayTitle(winner)} 후보가 앞서지만, ${choiceDisplayTitle(runnerUp)} 후보도 충분히 가까워 세그먼트별 선택 이유를 같이 봐야 합니다.`
     }
   }
 
@@ -597,6 +841,75 @@ function qaSeverityLabel(severity: string | null): string {
   }
 }
 
+function runStatusLabel(status: string): string {
+  switch (status) {
+    case 'completed':
+      return '완료'
+    case 'running':
+      return '실행 중'
+    case 'queued':
+      return '대기 중'
+    case 'failed':
+      return '실패'
+    case 'interrupted':
+      return '중단됨'
+    case 'canceled':
+      return '취소됨'
+    default:
+      return status
+  }
+}
+
+function displayRunId(runId: string | null | undefined): string {
+  if (!runId) return '실행 ID 없음'
+  return runId.startsWith('fixture-') ? '샘플 결과' : `실행 ID ${runId.slice(0, 8)}`
+}
+
+function userFacingError(message: string | null | undefined): string {
+  const text = message ?? '알 수 없는 오류가 발생했습니다.'
+  if (/timed out/i.test(text)) {
+    return '응답 생성 시간이 초과됐습니다. 잠시 후 다시 실행하거나 표본 수를 줄여서 시도해주세요.'
+  }
+  if (/auth|required|login/i.test(text)) {
+    return '로그인이 필요합니다. 로그인한 뒤 다시 시도해주세요.'
+  }
+  return text
+}
+
+function qaPassedLabel(passed: boolean | null): string {
+  if (passed === null) return '검수 결과 없음'
+  return passed ? '검수 통과' : '검토 필요'
+}
+
+function priorityLabel(value: string): string {
+  switch (value) {
+    case 'high':
+      return '높음'
+    case 'medium':
+      return '중간'
+    case 'low':
+      return '낮음'
+    default:
+      return value
+  }
+}
+
+function severityLabel(value: string): string {
+  switch (value) {
+    case 'high':
+    case 'warning':
+      return '주의'
+    case 'medium':
+      return '검토'
+    case 'low':
+      return '낮음'
+    case 'fail':
+      return '실패'
+    default:
+      return value
+  }
+}
+
 function Shell({
   children,
   subtitle,
@@ -639,7 +952,7 @@ function Shell({
         </button>
         <div style={{ minWidth:0, flex:1 }}>
           <p style={{ margin:0, fontSize:14, fontWeight:700, color:'var(--color-fg-strong)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-            Arabesque Results
+            Arabesque 결과
           </p>
           {subtitle && (
             <p style={{ margin:'2px 0 0', fontSize:12, color:'var(--color-fg-subtle)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
@@ -658,10 +971,16 @@ function StatePanel({
   title,
   body,
   tone = 'neutral',
+  runId,
+  primaryActionLabel = '앱으로 돌아가기',
+  secondaryActionLabel,
 }: {
   title: string
   body: string
   tone?: 'neutral' | 'warning'
+  runId?: string | null
+  primaryActionLabel?: string
+  secondaryActionLabel?: string
 }) {
   return (
     <Shell subtitle={title}>
@@ -677,7 +996,12 @@ function StatePanel({
           {tone === 'warning' && <WarningCircle size={24} color='var(--color-status-destructive)' />}
           <h1 style={{ margin:0, fontSize:24, color:'var(--color-fg-strong)' }}>{title}</h1>
           <p style={{ margin:0, fontSize:15, lineHeight:1.7, color:'var(--color-fg-muted)' }}>{body}</p>
-          <div>
+          {runId && (
+            <p style={{ margin:'2px 0 0', color:'var(--color-fg-subtle)', fontSize:12 }}>
+              오류 확인 ID: {displayRunId(runId)}
+            </p>
+          )}
+          <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
             <button
               onClick={navigateToApp}
               style={{
@@ -690,12 +1014,109 @@ function StatePanel({
                 cursor:'pointer',
               }}
             >
-              앱으로 돌아가기
+              {primaryActionLabel}
             </button>
+            {secondaryActionLabel && (
+              <button
+                onClick={() => window.location.reload()}
+                style={{
+                  padding:'9px 18px',
+                  borderRadius:'var(--radius-pill)',
+                  border:'1px solid var(--color-border)',
+                  background:'var(--color-bg)',
+                  color:'var(--color-fg)',
+                  fontWeight:700,
+                  cursor:'pointer',
+                }}
+              >
+                {secondaryActionLabel}
+              </button>
+            )}
           </div>
         </section>
       </main>
     </Shell>
+  )
+}
+
+function countEntries(value: unknown): Array<{ label: string; count: number }> {
+  if (!isRecord(value)) return []
+  return Object.entries(value)
+    .map(([label, item]) => ({ label, count: asNumber(item) ?? 0 }))
+    .filter((item) => item.count > 0)
+}
+
+function sampleOrder(label: string): number {
+  const age = Number(label.match(/\d+/)?.[0])
+  if (Number.isFinite(age)) return age
+  return label.localeCompare('가')
+}
+
+function SampleBars({
+  title,
+  entries,
+  compact = false,
+}: {
+  title: string
+  entries: Array<{ label: string; count: number }>
+  compact?: boolean
+}) {
+  const total = entries.reduce((sum, item) => sum + item.count, 0)
+  const visible = compact ? [...entries].sort((a, b) => b.count - a.count).slice(0, 8) : entries
+  if (visible.length === 0) return null
+  return (
+    <div className="ks-sample-bars">
+      <p>{title}</p>
+      {visible.map((entry) => {
+        const pct = total > 0 ? (entry.count / total) * 100 : 0
+        return (
+          <div className="ks-sample-bar-row" key={entry.label}>
+            <span>{entry.label}</span>
+            <div><b style={{ width: `${Math.max(2, Math.min(100, pct))}%` }} /></div>
+            <strong>{formatNumber(entry.count)}명</strong>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function SampleSummaryVisual({ summary }: { summary: JsonObject }) {
+  const actualSampleSize = asNumber(summary.actual_sample_size)
+  const ageEntries = countEntries(summary.age_buckets).sort((a, b) => sampleOrder(a.label) - sampleOrder(b.label))
+  const sexEntries = countEntries(summary.sex)
+  const provinceEntries = countEntries(summary.province)
+
+  return (
+    <div className="ks-sample-summary">
+      {actualSampleSize !== null && (
+        <div className="ks-sample-total">
+          <p>실제 분석 표본</p>
+          <strong>{formatNumber(actualSampleSize)}명</strong>
+        </div>
+      )}
+      <SampleBars title="연령대" entries={ageEntries} />
+      <SampleBars title="성별" entries={sexEntries} />
+      <SampleBars title="지역 상위 분포" entries={provinceEntries} compact />
+    </div>
+  )
+}
+
+function TargetFilterSummary({ targetFilter }: { targetFilter: JsonObject }) {
+  const entries = Object.entries(targetFilter)
+    .filter(([, value]) => value !== null && value !== undefined && value !== '')
+  if (entries.length === 0) {
+    return <p className="ks-report-muted-text">별도 타겟 조건 없이 전체 표본을 사용했습니다.</p>
+  }
+  return (
+    <dl className="ks-target-filter-list">
+      {entries.map(([key, value]) => (
+        <div key={key}>
+          <dt>{humanizeKey(key)}</dt>
+          <dd>{typeof value === 'boolean' ? yesNoLabel(value) : compactJson(value)}</dd>
+        </div>
+      ))}
+    </dl>
   )
 }
 
@@ -709,7 +1130,6 @@ function TrustLayer({
   analysis: ReportAnalysis
 }) {
   const parseSuccessRate = result.quality.parse_success_rate
-  const model = result.model_alias ?? result.provider_model ?? result.provider ?? result.llm_backend ?? 'N/A'
   const generatedAt = snapshot?.completed_at ?? snapshot?.updated_at ?? snapshot?.created_at
   const cards = [
     { label: '응답 커버리지', value: `${formatNumber(result.total_responses)}/${formatNumber(result.sample_size)}` },
@@ -719,7 +1139,7 @@ function TrustLayer({
   ]
 
   return (
-    <Section title="방법론과 신뢰 정보" kicker="Method">
+    <Section title="방법론과 신뢰 정보" kicker="검증 정보">
       <div className="ks-report-trust-grid">
         {cards.map((card) => (
           <div key={card.label} className="ks-report-trust-card">
@@ -730,19 +1150,16 @@ function TrustLayer({
       </div>
       <div className="ks-report-two-col">
         <div>
-          <p className="ks-report-kv-label">Sample footprint</p>
-          <p className="ks-report-muted-text">
-            {compactJson(result.sample_summary)}
-          </p>
+          <p className="ks-report-kv-label">표본 구성</p>
+          <SampleSummaryVisual summary={result.sample_summary} />
         </div>
         <div>
-          <p className="ks-report-kv-label">Reproducibility</p>
+          <p className="ks-report-kv-label">재현 정보</p>
           <p className="ks-report-muted-text">
-            seed {result.seed} · model {model} · {formatDate(generatedAt)}
+            seed {result.seed} · {formatDate(generatedAt)}
           </p>
-          <p className="ks-report-subtle-text">
-            target {compactJson(result.target_filter)}
-          </p>
+          <p className="ks-report-kv-label ks-report-kv-label--sub">타겟 조건</p>
+          <TargetFilterSummary targetFilter={result.target_filter} />
         </div>
       </div>
       {result.warnings.length > 0 && (
@@ -764,40 +1181,35 @@ function MetricDistribution({ section }: { section: MetricSection }) {
   if (section.rows.length === 0) {
     return (
       <Section title={section.title}>
-        <p style={{ margin:0, color:'var(--color-fg-muted)', fontSize:14 }}>집계 가능한 선택 결과가 없습니다.</p>
+        <p className="ks-report-muted-text">집계 가능한 선택 결과가 없습니다.</p>
       </Section>
     )
   }
 
   return (
     <Section title={section.title}>
-      <div style={{ display:'grid', gap:14 }}>
+      <div className="ks-metric-distribution">
         {section.rows.map((row, index) => {
           const color = CHOICE_COLORS[index % CHOICE_COLORS.length]
           const pct = row.pct ?? 0
+          const chip = choiceCodeChip(row)
           return (
-            <div key={`${row.label}-${index}`}>
-              <div style={{ display:'flex', justifyContent:'space-between', gap:16, alignItems:'baseline', marginBottom:8 }}>
-                <div style={{ minWidth:0 }}>
-                  <p style={{ margin:0, fontSize:15, fontWeight:800, color:'var(--color-fg-strong)' }}>
-                    {row.label}
-                  </p>
-                  {row.detail && (
-                    <p style={{ margin:'4px 0 0', fontSize:13, color:'var(--color-fg-muted)', lineHeight:1.45 }}>
-                      {row.detail}
-                    </p>
-                  )}
+            <article className="ks-metric-distribution-row" key={`${row.label}-${index}`}>
+              <div className="ks-metric-distribution-head">
+                <div>
+                  <p>{choiceDisplayTitle(row)}</p>
+                  {chip && <span>{chip}</span>}
                 </div>
-                <p style={{ margin:0, fontSize:16, fontWeight:800, color }}>
+                <strong style={{ color }}>
                   {row.value ?? `${row.count ?? 0}명`}{row.pct !== null && row.pct !== undefined ? ` · ${row.pct}%` : ''}
-                </p>
+                </strong>
               </div>
               {row.pct !== null && row.pct !== undefined && (
-                <div style={{ height:8, borderRadius:4, background:'var(--color-border)', overflow:'hidden' }}>
-                  <div style={{ width:`${Math.max(0, Math.min(100, pct))}%`, height:'100%', background:color }} />
+                <div className="ks-metric-distribution-track">
+                  <span style={{ width:`${Math.max(0, Math.min(100, pct))}%`, background:color }} />
                 </div>
               )}
-            </div>
+            </article>
           )
         })}
       </div>
@@ -833,11 +1245,11 @@ function InsightList({ insights }: { insights: JsonObject[] }) {
       {insights.length === 0 ? (
         <p style={{ margin:0, color:'var(--color-fg-muted)', fontSize:14 }}>생성된 인사이트가 없습니다.</p>
       ) : (
-        <div style={{ display:'grid', gap:12 }}>
+        <div className="ks-insight-list">
           {insights.map((insight, index) => (
-            <article key={`${getInsightTitle(insight, index)}-${index}`} style={{ padding:14, border:'1px solid var(--color-border)', borderRadius:8 }}>
-              <h3 style={{ margin:'0 0 6px', fontSize:15, color:'var(--color-fg-strong)' }}>{getInsightTitle(insight, index)}</h3>
-              <p style={{ margin:0, fontSize:13, lineHeight:1.6, color:'var(--color-fg-muted)' }}>{getInsightBody(insight)}</p>
+            <article key={`${getInsightTitle(insight, index)}-${index}`} className="ks-insight-card">
+              <h3>{getInsightTitle(insight, index)}</h3>
+              <p>{getInsightBody(insight)}</p>
             </article>
           ))}
         </div>
@@ -859,18 +1271,38 @@ function ReportHero({
 }) {
   const winner = analysis.winner
   const runner = analysis.runnerUp
+  const winnerChip = choiceCodeChip(winner)
+  const runnerChip = choiceCodeChip(runner)
   return (
     <section className="ks-report-hero">
       <div className="ks-report-hero-copy">
         <p className="ks-report-eyebrow">{getSimulationLabel(result.simulation_type)} 분석 보고서</p>
+        {winnerChip && <span className="ks-report-option-chip">{winnerChip} 선두</span>}
         <h1>{analysis.decisionLabel}</h1>
         <p>{analysis.decisionBody}</p>
+        <div className="ks-report-hero-metrics" aria-label="핵심 지표">
+          <article>
+            <p>응답 표본</p>
+            <strong>{formatNumber(analysis.validResponses)}명</strong>
+            <span>전체 {formatNumber(result.total_responses)}명 중 해석 가능</span>
+          </article>
+          <article>
+            <p>선호 격차</p>
+            <strong>{analysis.marginPct !== null ? formatPoint(analysis.marginPct) : 'N/A'}</strong>
+            <span>{runner ? `${choiceDisplayTitle(runner)} 대비` : '비교 후보 부족'}</span>
+          </article>
+          <article>
+            <p>해석 상태</p>
+            <strong>{analysis.confidenceLabel}</strong>
+            <span>{analysis.parseSuccessRate !== null ? `구조화 성공 ${formatPct(analysis.parseSuccessRate)}` : '구조화율 없음'}</span>
+          </article>
+        </div>
         <div className="ks-report-hero-actions">
           <button className="ks-report-export" onClick={onExport} type="button">
             <Download size={15} strokeWidth={2.2} />
-            검토용 JSON export
+            검토용 보고서 내보내기
           </button>
-          <span>{result.run_id.slice(0, 8)} · n={formatNumber(result.total_responses)}</span>
+          <span>{displayRunId(result.run_id)} · n={formatNumber(result.total_responses)}</span>
         </div>
         {exportError && <p className="ks-report-export-error">Export failed: {exportError}</p>}
       </div>
@@ -882,13 +1314,15 @@ function ReportHero({
         </div>
         <div>
           <p>1위 항목</p>
-          <strong>{rowDisplayName(winner)}</strong>
+          <strong>{choiceDisplayTitle(winner)}</strong>
           <span>{winner?.pct !== undefined ? `${formatPct(winner.pct)} · ${winner.count ?? 0}명` : '집계 없음'}</span>
+          {winnerChip && <span>{winnerChip}</span>}
         </div>
         <div>
           <p>비교 기준</p>
-          <strong>{runner ? rowDisplayName(runner) : 'N/A'}</strong>
+          <strong>{runner ? choiceDisplayTitle(runner) : 'N/A'}</strong>
           <span>{analysis.marginPct !== null ? `격차 ${formatPoint(analysis.marginPct)}` : '격차 산출 불가'}</span>
+          {runnerChip && <span>{runnerChip}</span>}
         </div>
       </div>
     </section>
@@ -903,9 +1337,10 @@ function ExecutiveSummary({ analysis }: { analysis: ReportAnalysis }) {
       body: analysis.decisionBody,
     },
     {
-      label: '얼마나 믿을 수 있나',
+      label: '신뢰도',
       value: analysis.confidenceLabel,
       body: analysis.confidenceBody,
+      info: '표본 수, 응답 해석 성공률, 세그먼트 비교 가능성을 합쳐 판단한 내부 기준입니다.',
     },
     {
       label: '승자 격차',
@@ -916,11 +1351,18 @@ function ExecutiveSummary({ analysis }: { analysis: ReportAnalysis }) {
     },
   ]
   return (
-    <Section title="Executive Summary" kicker="Decision">
+    <Section title="핵심 요약" kicker="의사결정">
       <div className="ks-report-brief-grid">
         {rows.map((row) => (
           <article key={row.label} className="ks-report-brief-card">
-            <p>{row.label}</p>
+            <p>
+              {row.label}
+              {'info' in row && row.info && (
+                <button className="ks-info-button" title={row.info} aria-label={row.info} type="button">
+                  <Info size={13} strokeWidth={2.4} />
+                </button>
+              )}
+            </p>
             <strong>{row.value}</strong>
             <span>{row.body}</span>
           </article>
@@ -945,33 +1387,33 @@ function AgentReportPanel({ result }: { result: RunResultEnvelope }) {
   const qaClass = agentReport.qa.severity ? ` ks-agent-qa--${agentReport.qa.severity}` : ''
 
   return (
-    <Section title="AI Agent Report" kicker="Analysis · Report · QA">
+    <Section title="AI 해석 보고서" kicker="분석·보고·검수">
       <div className="ks-agent-summary">
         <div>
-          <p>Agent headline</p>
-          <strong>{agentReport.headline ?? 'Agent headline 없음'}</strong>
+          <p>핵심 결론</p>
+          <strong>{agentReport.headline ?? '핵심 결론 없음'}</strong>
           {agentReport.summary && <span>{agentReport.summary}</span>}
         </div>
         <div className={`ks-agent-qa${qaClass}`}>
-          <p>QA status</p>
+          <p>검수 상태</p>
           <strong>{qaLabel}</strong>
           <span>
-            passed {agentReport.qa.passed === null ? 'N/A' : agentReport.qa.passed ? 'true' : 'false'}
-            {agentReport.qa.confidence !== null ? ` · confidence ${Math.round(agentReport.qa.confidence * 100)}%` : ''}
+            {qaPassedLabel(agentReport.qa.passed)}
+            {agentReport.qa.confidence !== null ? ` · 신뢰도 ${Math.round(agentReport.qa.confidence * 100)}%` : ''}
           </span>
         </div>
       </div>
 
       <div className="ks-agent-grid">
         <div className="ks-agent-panel">
-          <h3>Key findings</h3>
+          <h3>핵심 발견</h3>
           {agentReport.findings.length === 0 ? (
             <p className="ks-report-muted-text">구조화된 핵심 발견이 없습니다.</p>
           ) : (
             <ul>
               {agentReport.findings.map((finding, index) => (
                 <li key={`${finding.metricKey}-${index}`}>
-                  <b>{finding.metricKey}</b>
+                  <b>{humanizeKey(finding.metricKey)}</b>
                   <span>{finding.finding}</span>
                   <small>{finding.evidence}{finding.confidence !== null ? ` · ${Math.round(finding.confidence * 100)}%` : ''}</small>
                 </li>
@@ -981,14 +1423,14 @@ function AgentReportPanel({ result }: { result: RunResultEnvelope }) {
         </div>
 
         <div className="ks-agent-panel">
-          <h3>Recommendations</h3>
+          <h3>추천 행동</h3>
           {agentReport.recommendations.length === 0 ? (
             <p className="ks-report-muted-text">구조화된 권고가 없습니다.</p>
           ) : (
             <ol>
               {agentReport.recommendations.map((item, index) => (
                 <li key={`${item.priority}-${index}`}>
-                  <b>{item.priority}</b>
+                  <b>{priorityLabel(item.priority)}</b>
                   <span>{item.action}</span>
                   <small>{item.reason}</small>
                 </li>
@@ -998,14 +1440,14 @@ function AgentReportPanel({ result }: { result: RunResultEnvelope }) {
         </div>
 
         <div className="ks-agent-panel">
-          <h3>Risks</h3>
+          <h3>주의할 점</h3>
           {agentReport.risks.length === 0 ? (
             <p className="ks-report-muted-text">구조화된 리스크가 없습니다.</p>
           ) : (
             <ul>
               {agentReport.risks.map((item, index) => (
                 <li key={`${item.severity}-${index}`}>
-                  <b>{item.severity}</b>
+                  <b>{severityLabel(item.severity)}</b>
                   <span>{item.risk}</span>
                   <small>{item.mitigation}</small>
                 </li>
@@ -1017,33 +1459,141 @@ function AgentReportPanel({ result }: { result: RunResultEnvelope }) {
 
       {(agentReport.qa.warnings.length > 0 || agentReport.qa.reviewNotes.length > 0) && (
         <div className="ks-agent-notes">
-          {[...agentReport.qa.warnings, ...agentReport.qa.reviewNotes].map((note) => (
-            <span key={note}>{note}</span>
-          ))}
+          <h3>검수 메모</h3>
+          <ul>
+            {[...agentReport.qa.warnings, ...agentReport.qa.reviewNotes].map((note) => (
+              <li key={note}>{note}</li>
+            ))}
+          </ul>
         </div>
       )}
     </Section>
   )
 }
 
+function ProtocolPanel({ result }: { result: RunResultEnvelope }) {
+  const protocol = isRecord(result.protocol) ? result.protocol : null
+  if (!protocol) return null
+  const protocolId = asString(protocol.protocol_id) ?? asString(result.metrics.protocol_id) ?? 'protocol'
+  const calibration = isRecord(result.metrics.calibration) ? result.metrics.calibration : null
+  const interviewGuide = isRecord(protocol.interview_guide) ? protocol.interview_guide : null
+  const stepSummaries = Array.isArray(protocol.step_summaries)
+    ? protocol.step_summaries.filter(isRecord)
+    : []
+  return (
+    <Section title="리서치 프로토콜" kicker={protocolId}>
+      <div className="ks-agent-grid">
+        {stepSummaries.length > 0 && (
+          <div className="ks-agent-panel">
+            <h3>진행 단계</h3>
+            <ul>
+              {stepSummaries.map((step, index) => (
+                <li key={`${asString(step.id) ?? 'step'}-${index}`}>
+                  <b>{humanizeKey(asString(step.id) ?? `step_${index + 1}`)}</b>
+                  <span>
+                    parsed {String(step.parsed_count ?? 0)} · failed {String(step.parse_failed ?? 0)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {calibration && <CalibrationPanel calibration={calibration} />}
+        {interviewGuide && <InterviewGuidePanel guide={interviewGuide} />}
+      </div>
+    </Section>
+  )
+}
+
+function CalibrationPanel({ calibration }: { calibration: Record<string, unknown> }) {
+  const [view, setView] = useState<'weighted' | 'sample'>('weighted')
+  const weightedPct = isRecord(calibration.weighted_pct) ? calibration.weighted_pct : {}
+  const weightedCounts = isRecord(calibration.weighted_counts) ? calibration.weighted_counts : {}
+  const sampleDistribution = isRecord(calibration.sample_distribution) ? calibration.sample_distribution : {}
+  const rows = Object.entries(view === 'weighted' ? weightedPct : sampleDistribution)
+  const warnings = Array.isArray(calibration.warnings) ? calibration.warnings.map(String) : []
+  return (
+    <div className="ks-agent-panel">
+      <h3>보정 결과</h3>
+      <div className="ks-report-tabs" role="tablist" aria-label="Calibration view">
+        <button
+          aria-selected={view === 'weighted'}
+          className={view === 'weighted' ? 'is-active' : ''}
+          onClick={() => setView('weighted')}
+          type="button"
+        >
+          보정 후
+        </button>
+        <button
+          aria-selected={view === 'sample'}
+          className={view === 'sample' ? 'is-active' : ''}
+          onClick={() => setView('sample')}
+          type="button"
+        >
+          표본 분포
+        </button>
+      </div>
+      {rows.length === 0 ? (
+        <p className="ks-report-muted-text">보정 가능한 집계가 없습니다.</p>
+      ) : (
+        <ul>
+          {rows.map(([label, value]) => (
+            <li key={label}>
+              <b>{label}</b>
+              <span>
+                {view === 'weighted'
+                  ? `${formatPercent(asNumber(value))} · ${formatNumber(asNumber(weightedCounts[label]) ?? 0)} weighted`
+                  : `${formatNumber(asNumber(value) ?? 0)}명`}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {warnings.length > 0 && <small>{warnings.join(' · ')}</small>}
+    </div>
+  )
+}
+
+function InterviewGuidePanel({ guide }: { guide: Record<string, unknown> }) {
+  const questions = Array.isArray(guide.questions) ? guide.questions.filter(isRecord) : []
+  return (
+    <div className="ks-agent-panel">
+      <h3>다음 인터뷰 질문</h3>
+      {questions.length === 0 ? (
+        <p className="ks-report-muted-text">생성된 인터뷰 질문이 없습니다.</p>
+      ) : (
+        <ol>
+          {questions.map((item, index) => (
+            <li key={`${asString(item.slot_id) ?? 'question'}-${index}`}>
+              <b>{asString(item.question) ?? '질문 없음'}</b>
+              <span>{asString(item.why_this_question) ?? '근거 없음'}</span>
+              {isRecord(item.evidence) && <small>{compactJson(item.evidence)}</small>}
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
+  )
+}
+
 function MetricNarrative({ analysis }: { analysis: ReportAnalysis }) {
   if (analysis.metricRows.length === 0) {
     return (
-      <Section title="주요 지표 해석" kicker="Market response">
+      <Section title="주요 지표 해석" kicker="시장 반응">
         <p className="ks-report-muted-text">집계 가능한 지표가 아직 없습니다.</p>
       </Section>
     )
   }
 
   return (
-    <Section title="주요 지표 해석" kicker="Market response">
+    <Section title="주요 지표 해석" kicker="시장 반응">
       <div className="ks-report-rank-list">
         {analysis.metricRows.slice(0, 8).map((row, index) => (
           <div className="ks-report-rank-row" key={`${row.sectionTitle}-${row.label}`}>
             <span className="ks-report-rank-index">{index + 1}</span>
             <div>
-              <p>{rowDisplayName(row)}</p>
-              <span>{row.sectionTitle}</span>
+              <p>{choiceDisplayTitle(row)}</p>
+              <span>{choiceCodeChip(row) ? `${row.sectionTitle} · ${choiceCodeChip(row)}` : row.sectionTitle}</span>
             </div>
             <strong style={{ color: row.color }}>
               {row.pct !== null && row.pct !== undefined ? formatPct(row.pct) : row.value ?? `${row.count ?? 0}명`}
@@ -1062,7 +1612,7 @@ function MetricNarrative({ analysis }: { analysis: ReportAnalysis }) {
 
 function SegmentSignalTable({ signals }: { signals: SegmentSignal[] }) {
   return (
-    <Section title="세그먼트별 해석 포인트" kicker="Over-index">
+    <Section title="세그먼트별 해석 포인트" kicker="세그먼트 신호">
       {signals.length === 0 ? (
         <p className="ks-report-muted-text">비교 가능한 세그먼트 신호가 없습니다.</p>
       ) : (
@@ -1071,7 +1621,7 @@ function SegmentSignalTable({ signals }: { signals: SegmentSignal[] }) {
             <article key={`${signal.dimension}-${signal.segment}-${signal.winner}`}>
               <div>
                 <p>{signal.dimension} · {signal.segment}</p>
-                <strong>{signal.winner} 반응 집중</strong>
+                <strong>{segmentChoiceLabel(signal.winner)} 반응 집중</strong>
               </div>
               <span>{formatPct(signal.pct)} · {formatNumber(signal.total)}명</span>
               <em>{signal.lift !== null ? `전체 대비 ${formatPoint(signal.lift)}` : '전체 기준 없음'}</em>
@@ -1083,43 +1633,248 @@ function SegmentSignalTable({ signals }: { signals: SegmentSignal[] }) {
   )
 }
 
-function SegmentHeatmaps({ matrices }: { matrices: SegmentMatrix[] }) {
+function colorForColumn(columns: string[], label: string): string {
+  const index = Math.max(0, columns.indexOf(label))
+  return CHOICE_COLORS[index % CHOICE_COLORS.length]
+}
+
+function sortedMatrixRows(matrix: SegmentMatrix): SegmentMatrixRow[] {
+  if (matrix.id.includes('age')) {
+    return [...matrix.rows].sort((a, b) => sampleOrder(a.segment) - sampleOrder(b.segment))
+  }
+  return [...matrix.rows].sort((a, b) => b.total - a.total)
+}
+
+function MatrixStackedBars({ matrix }: { matrix: SegmentMatrix }) {
   return (
-    <Section title="세그먼트 반응 매트릭스" kicker="Heatmap" wide>
+    <div className="ks-segment-stack-bars">
+      {sortedMatrixRows(matrix).map((row) => (
+        <article key={row.segment} className="ks-segment-stack-row">
+          <div>
+            <strong>{row.segment}</strong>
+            <span>{formatNumber(row.total)}명</span>
+          </div>
+          <div className="ks-segment-stack-track">
+            {row.cells
+              .filter((cell) => cell.count > 0)
+              .map((cell) => (
+                <span
+                  key={cell.label}
+                  style={{
+                    width: `${Math.max(3, Math.min(100, cell.pct))}%`,
+                    background: colorForColumn(matrix.columns, cell.label),
+                  }}
+                  title={`${cell.label}: ${cell.count}명 · ${formatPct(cell.pct)}`}
+                />
+              ))}
+          </div>
+          <p>
+            {row.cells
+              .filter((cell) => cell.count > 0)
+              .sort((a, b) => b.count - a.count)
+              .map((cell) => `${cell.label} ${formatPct(cell.pct)}`)
+              .join(' · ')}
+          </p>
+        </article>
+      ))}
+    </div>
+  )
+}
+
+function GenderSegmentBars({ matrix }: { matrix: SegmentMatrix }) {
+  return (
+    <div className="ks-gender-bars">
+      {sortedMatrixRows(matrix).map((row) => {
+        const winner = [...row.cells].sort((a, b) => b.count - a.count)[0]
+        const isFemale = row.segment.includes('여')
+        return (
+          <article key={row.segment}>
+            <div className="ks-gender-icon" aria-hidden="true">
+              {isFemale ? <GenderFemale size={22} weight="duotone" /> : <GenderMale size={22} weight="duotone" />}
+            </div>
+            <div>
+              <strong>{row.segment}</strong>
+              <span>{formatNumber(row.total)}명 · {winner ? `${segmentChoiceLabel(winner.label)} ${formatPct(winner.pct)}` : '집계 없음'}</span>
+              <div className="ks-segment-stack-track">
+                {row.cells
+                  .filter((cell) => cell.count > 0)
+                  .map((cell) => (
+                    <span
+                      key={cell.label}
+                      style={{
+                        width: `${Math.max(3, Math.min(100, cell.pct))}%`,
+                        background: colorForColumn(matrix.columns, cell.label),
+                      }}
+                      title={`${segmentChoiceLabel(cell.label)}: ${cell.count}명 · ${formatPct(cell.pct)}`}
+                    />
+                  ))}
+              </div>
+            </div>
+          </article>
+        )
+      })}
+    </div>
+  )
+}
+
+function KoreaProvinceMap({ matrix }: { matrix: SegmentMatrix }) {
+  const [svgMarkup, setSvgMarkup] = useState<string | null>(null)
+
+  useEffect(() => {
+    let active = true
+    fetch(KOREA_PROVINCE_MAP_PATH)
+      .then((response) => response.text())
+      .then((text) => {
+        if (active) setSvgMarkup(text)
+      })
+      .catch(() => {
+        if (active) setSvgMarkup(null)
+      })
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const styledSvg = useMemo(() => {
+    if (!svgMarkup) return null
+    const regionStyles = sortedMatrixRows(matrix)
+      .map((row) => {
+        const winner = [...row.cells].sort((a, b) => b.count - a.count)[0]
+        if (!winner) return ''
+        const color = colorForColumn(matrix.columns, winner.label)
+        const fill = mixHex(color, '#f8fafc', Math.max(18, Math.min(88, winner.pct)))
+        return `path[id="${provincePathId(row.segment)}"]{fill:${fill};stroke:${color};stroke-width:1.2;}`
+      })
+      .filter(Boolean)
+      .join('')
+    const style = `<style>
+      .ks-korea-svg-map path{fill:#eef2f7;stroke:#ffffff;stroke-width:.7;transition:fill .18s ease,stroke .18s ease;}
+      .ks-korea-svg-map path:hover{stroke:#111827;stroke-width:2;}
+      ${regionStyles}
+    </style>`
+    return svgMarkup
+      .replace('<svg ', '<svg class="ks-korea-svg-map" role="img" aria-label="대한민국 지역별 반응 지도" ')
+      .replace('<g id="전국_시도_경계">', `${style}<g id="전국_시도_경계">`)
+  }, [matrix, svgMarkup])
+
+  if (!styledSvg) {
+    return <p className="ks-report-muted-text">지도를 불러오는 중입니다.</p>
+  }
+
+  return (
+    <div className="ks-korea-map">
+      <div className="ks-korea-map-canvas" dangerouslySetInnerHTML={{ __html: styledSvg }} />
+      <div className="ks-korea-map-list">
+        {sortedMatrixRows(matrix).slice(0, 8).map((row) => {
+          const winner = [...row.cells].sort((a, b) => b.count - a.count)[0]
+          return (
+            <article key={row.segment}>
+              <strong>{row.segment}</strong>
+              <span>{winner ? `${segmentChoiceLabel(winner.label)} ${formatPct(winner.pct)}` : '집계 없음'}</span>
+              <small>{formatNumber(row.total)}명</small>
+            </article>
+          )
+        })}
+      </div>
+      <p className="ks-korea-map-source">
+        행정경계 SVG: statgarten/maps · SGIS 기반 · MIT
+      </p>
+    </div>
+  )
+}
+
+function SegmentVisualizations({ matrices }: { matrices: SegmentMatrix[] }) {
+  return (
+    <div className="ks-segment-visual-stack">
+      {matrices.map((matrix) => (
+        <article className="ks-segment-visual-card" key={matrix.id}>
+          <div className="ks-segment-visual-head">
+            <h3>{matrix.id.includes('province') ? '지역별 반응 지도' : `${matrix.label}별 반응`}</h3>
+            <div className="ks-segment-legend">
+              {matrix.columns.map((column) => (
+                <span key={column}>
+                  <b style={{ background: colorForColumn(matrix.columns, column) }} />
+                  {column}
+                </span>
+              ))}
+            </div>
+          </div>
+          {matrix.id.includes('province') ? (
+            <KoreaProvinceMap matrix={matrix} />
+          ) : matrix.id.includes('sex') ? (
+            <GenderSegmentBars matrix={matrix} />
+          ) : (
+            <MatrixStackedBars matrix={matrix} />
+          )}
+        </article>
+      ))}
+    </div>
+  )
+}
+
+function SegmentHeatmaps({ matrices }: { matrices: SegmentMatrix[] }) {
+  const [viewMode, setViewMode] = useState<SegmentViewMode>('visual')
+
+  return (
+    <Section title="세그먼트 반응 매트릭스" kicker="세그먼트 표" wide>
       {matrices.length === 0 ? (
         <p className="ks-report-muted-text">시각화 가능한 세그먼트 breakdown이 없습니다.</p>
       ) : (
-        <div className="ks-report-heatmap-stack">
-          {matrices.map((matrix) => (
-            <article className="ks-report-heatmap" key={matrix.id}>
-              <h3>{matrix.label}</h3>
-              <div
-                className="ks-report-heatmap-grid"
-                style={{ gridTemplateColumns: `minmax(112px, 1.15fr) repeat(${matrix.columns.length}, minmax(118px, 1fr))` }}
-              >
-                <span />
-                {matrix.columns.map((column) => <strong key={column}>{column}</strong>)}
-                {matrix.rows.map((row) => (
-                  <div className="ks-report-heatmap-row" key={row.segment}>
-                    <b>{row.segment}</b>
-                    {matrix.columns.map((column) => {
-                      const cell = row.cells.find((item) => item.label === column) ?? { label: column, count: 0, pct: 0 }
-                      return (
-                        <span
-                          key={column}
-                          className="ks-report-heatmap-cell"
-                          style={{ '--ks-cell-alpha': `${Math.max(8, Math.min(90, Math.round(cell.pct)))}%` } as CSSProperties}
-                        >
-                          {cell.count > 0 ? `${cell.count}명 · ${formatPct(cell.pct)}` : '-'}
-                        </span>
-                      )
-                    })}
+        <>
+          <div className="ks-segment-view-toggle" role="tablist" aria-label="세그먼트 시각화 방법">
+            <button
+              aria-selected={viewMode === 'visual'}
+              onClick={() => setViewMode('visual')}
+              role="tab"
+              type="button"
+            >
+              직관 보기
+            </button>
+            <button
+              aria-selected={viewMode === 'table'}
+              onClick={() => setViewMode('table')}
+              role="tab"
+              type="button"
+            >
+              표로 보기
+            </button>
+          </div>
+          {viewMode === 'visual' ? (
+            <SegmentVisualizations matrices={matrices} />
+          ) : (
+            <div className="ks-report-heatmap-stack">
+              {matrices.map((matrix) => (
+                <article className="ks-report-heatmap" key={matrix.id}>
+                  <h3>{matrix.label}</h3>
+                  <div
+                    className="ks-report-heatmap-grid"
+                    style={{ gridTemplateColumns: `minmax(112px, 1.15fr) repeat(${matrix.columns.length}, minmax(118px, 1fr))` }}
+                  >
+                    <span />
+                    {matrix.columns.map((column) => <strong key={column}>{column}</strong>)}
+                    {sortedMatrixRows(matrix).map((row) => (
+                      <div className="ks-report-heatmap-row" key={row.segment}>
+                        <b>{row.segment}</b>
+                        {matrix.columns.map((column) => {
+                          const cell = row.cells.find((item) => item.label === column) ?? { label: column, count: 0, pct: 0 }
+                          return (
+                            <span
+                              key={column}
+                              className="ks-report-heatmap-cell"
+                              style={{ '--ks-cell-alpha': `${Math.max(8, Math.min(90, Math.round(cell.pct)))}%` } as CSSProperties}
+                            >
+                              {cell.count > 0 ? `${cell.count}명 · ${formatPct(cell.pct)}` : '-'}
+                            </span>
+                          )
+                        })}
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </article>
-          ))}
-        </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </>
       )}
     </Section>
   )
@@ -1127,7 +1882,7 @@ function SegmentHeatmaps({ matrices }: { matrices: SegmentMatrix[] }) {
 
 function EvidenceBoard({ quotes }: { quotes: EvidenceQuote[] }) {
   return (
-    <Section title="해석 근거 발언" kicker="Voice evidence">
+    <Section title="해석 근거 발언" kicker="응답 근거">
       {quotes.length === 0 ? (
         <p className="ks-report-muted-text">표시할 근거 발언이 없습니다.</p>
       ) : (
@@ -1145,19 +1900,28 @@ function EvidenceBoard({ quotes }: { quotes: EvidenceQuote[] }) {
   )
 }
 
-function SegmentBreakdown({ segments }: { segments: JsonObject }) {
-  const entries = Object.entries(segments)
+function SegmentBreakdown({ matrices }: { matrices: SegmentMatrix[] }) {
   return (
-    <Section title="세그먼트 원본 요약" kicker="Appendix">
-      {entries.length === 0 ? (
+    <Section title="세그먼트 보조 요약" kicker="부록">
+      {matrices.length === 0 ? (
         <p style={{ margin:0, color:'var(--color-fg-muted)', fontSize:14 }}>세그먼트 집계가 없습니다.</p>
       ) : (
-        <div style={{ display:'grid', gap:12 }}>
-          {entries.map(([name, value]) => (
-            <div key={name} style={{ padding:14, border:'1px solid var(--color-border)', borderRadius:8 }}>
-              <p style={{ margin:'0 0 6px', fontSize:13, fontWeight:800, color:'var(--color-primary)' }}>{name}</p>
-              <p style={{ margin:0, fontSize:13, lineHeight:1.65, color:'var(--color-fg-muted)', overflowWrap:'anywhere' }}>{compactJson(value)}</p>
-            </div>
+        <div className="ks-segment-appendix-compact">
+          {matrices.map((matrix) => (
+            <article key={matrix.id}>
+              <h3>{matrix.label}</h3>
+              <div>
+                {sortedMatrixRows(matrix).slice(0, 4).map((row) => {
+                  const winner = [...row.cells].sort((a, b) => b.count - a.count)[0]
+                  return (
+                    <span key={row.segment}>
+                      <b>{row.segment}</b>
+                      {winner ? `${segmentChoiceLabel(winner.label)} ${formatPct(winner.pct)}` : '집계 없음'}
+                    </span>
+                  )
+                })}
+              </div>
+            </article>
           ))}
         </div>
       )}
@@ -1168,21 +1932,19 @@ function SegmentBreakdown({ segments }: { segments: JsonObject }) {
 function PersonaEvidence({ rawResults }: { rawResults: RawPersonaResult[] }) {
   const examples = rawResults.filter((raw) => raw.response || raw.error).slice(0, 6)
   return (
-    <Section title="페르소나 응답 예시">
+    <Section title="페르소나 별 피드백">
       {examples.length === 0 ? (
         <p style={{ margin:0, color:'var(--color-fg-muted)', fontSize:14 }}>표시할 응답 예시가 없습니다.</p>
       ) : (
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(240px, 1fr))', gap:12 }}>
+        <div className="ks-persona-feedback-grid">
           {examples.map((raw) => (
-            <article key={raw.uuid} style={{ border:'1px solid var(--color-border)', borderRadius:8, padding:14 }}>
-              <div style={{ display:'flex', justifyContent:'space-between', gap:10, marginBottom:8 }}>
-                <p style={{ margin:0, fontSize:13, fontWeight:800, color:'var(--color-fg-strong)' }}>
-                  {getPersonaPrimaryLabel(raw)}
-                </p>
-                <span style={{ color:'var(--color-fg-subtle)', fontSize:11 }}>{raw.uuid.slice(0, 8)}</span>
+            <article key={raw.uuid} className="ks-persona-feedback-card">
+              <div>
+                <p>{getPersonaName(raw)}</p>
+                {getPersonaChoice(raw) && <span>{getPersonaChoice(raw)} 선택</span>}
               </div>
-              <p style={{ margin:'0 0 8px', fontSize:12, color:'var(--color-fg-subtle)' }}>{getPersonaMeta(raw)}</p>
-              <p style={{ margin:0, fontSize:13, lineHeight:1.6, color:'var(--color-fg-muted)' }}>{getPersonaReason(raw)}</p>
+              <small>{getPersonaMeta(raw)}</small>
+              <p>{getPersonaReason(raw)}</p>
             </article>
           ))}
         </div>
@@ -1191,12 +1953,22 @@ function PersonaEvidence({ rawResults }: { rawResults: RawPersonaResult[] }) {
   )
 }
 
-function PersonaCrowd({ rawResults }: { rawResults: RawPersonaResult[] }) {
+function PersonaCrowd({
+  rawResults,
+  metricRows,
+}: {
+  rawResults: RawPersonaResult[]
+  metricRows: RankedMetricRow[]
+}) {
   const personas = rawResults.filter((raw) => raw.response || raw.error)
-  const visible = personas.slice(0, 100)
+  const visible = personas
   const quotes = personas.slice(0, 12)
   const [quoteIndex, setQuoteIndex] = useState(0)
   const [selected, setSelected] = useState<RawPersonaResult | null>(null)
+  const optionMap = useMemo(
+    () => new Map(metricRows.map((row) => [row.label, row])),
+    [metricRows],
+  )
 
   useEffect(() => {
     if (quotes.length < 2) return
@@ -1225,8 +1997,7 @@ function PersonaCrowd({ rawResults }: { rawResults: RawPersonaResult[] }) {
       <div className="ks-crowd-section">
         <div className="ks-crowd-header">
           <p>
-            카드 {visible.length}명 표시
-            {rawResults.length > visible.length ? ` · 전체 응답 ${rawResults.length}명 중 일부` : ` · 전체 응답 ${rawResults.length}명`}
+            카드 {visible.length}명 표시 · 전체 응답 {rawResults.length}명
           </p>
           {hasToneMetric ? (
             <span>
@@ -1234,7 +2005,7 @@ function PersonaCrowd({ rawResults }: { rawResults: RawPersonaResult[] }) {
             </span>
           ) : (
             <span>
-              응답 {responseCount} · 오류 {errorCount} · 감성 분류 미적용 (아직고정값)
+              응답 {responseCount} · 오류 {errorCount}
             </span>
           )}
         </div>
@@ -1242,8 +2013,12 @@ function PersonaCrowd({ rawResults }: { rawResults: RawPersonaResult[] }) {
         {quote && (
           <article className={`ks-crowd-quote ks-crowd-quote--${getPersonaTone(quote)}`}>
             <div>
-              <strong>{getPersonaPrimaryLabel(quote)}</strong>
-              <span>{getPersonaMeta(quote) || quote.uuid.slice(0, 8)}</span>
+              <img alt="" loading="lazy" src={getPersonaAvatarSrc(quote)} />
+              <div>
+                <strong>{getPersonaName(quote)}</strong>
+                <span>{getPersonaMeta(quote) || quote.uuid.slice(0, 8)}</span>
+              </div>
+              {getPersonaChoiceText(quote, optionMap) && <em>{getPersonaChoiceText(quote, optionMap)}</em>}
             </div>
             <p>{getPersonaReason(quote)}</p>
           </article>
@@ -1255,11 +2030,13 @@ function PersonaCrowd({ rawResults }: { rawResults: RawPersonaResult[] }) {
               className={`ks-crowd-person ks-crowd-person--${getPersonaTone(raw)}`}
               key={raw.uuid}
               onClick={() => setSelected(raw)}
-              title={`${index + 1}. ${getPersonaPrimaryLabel(raw)} · ${getPersonaMeta(raw)}`}
+              title={`${index + 1}. ${getPersonaName(raw)} · ${getPersonaMeta(raw)}`}
               type="button"
             >
-              <UserCircle size={18} weight="fill" />
+              <img alt="" loading="lazy" src={getPersonaAvatarSrc(raw)} />
               <span>{index + 1}</span>
+              <strong>{getPersonaName(raw)}</strong>
+              <small>{getPersonaChoiceText(raw, optionMap) ?? '응답 보기'}</small>
             </button>
           ))}
         </div>
@@ -1275,9 +2052,13 @@ function PersonaCrowd({ rawResults }: { rawResults: RawPersonaResult[] }) {
             role="dialog"
           >
             <div className="ks-crowd-modal-head">
-              <div>
-                <p>{getPersonaPrimaryLabel(selected)}</p>
-                <span>{getPersonaMeta(selected) || selected.uuid}</span>
+              <div className="ks-crowd-modal-person">
+                <img alt="" src={getPersonaAvatarSrc(selected)} />
+                <div>
+                  <p>{getPersonaName(selected)}</p>
+                  <span>{getPersonaMeta(selected) || selected.uuid}</span>
+                  {getPersonaChoiceText(selected, optionMap) && <em>{getPersonaChoiceText(selected, optionMap)}</em>}
+                </div>
               </div>
               <button aria-label="닫기" className="ks-crowd-modal-close" onClick={() => setSelected(null)} type="button">
                 <X size={16} weight="bold" />
@@ -1286,13 +2067,19 @@ function PersonaCrowd({ rawResults }: { rawResults: RawPersonaResult[] }) {
             <p className="ks-crowd-modal-response">{selected.error ?? selected.response}</p>
             <dl className="ks-crowd-modal-fields">
               <div>
-                <dt>persona</dt>
-                <dd>{compactJson(selected.persona)}</dd>
+                <dt>페르소나 정보</dt>
+                {getReadablePersonaRows(selected).map((row) => (
+                  <dd key={row.label}><b>{row.label}</b><span>{row.value}</span></dd>
+                ))}
               </div>
-              <div>
-                <dt>parsed</dt>
-                <dd>{compactJson(selected.parsed)}</dd>
-              </div>
+              {getReadableParsedRows(selected).length > 0 && (
+                <div>
+                  <dt>응답 해석</dt>
+                  {getReadableParsedRows(selected).map((row) => (
+                    <dd key={row.label}><b>{row.label}</b><span>{row.value}</span></dd>
+                  ))}
+                </div>
+              )}
             </dl>
           </article>
         </div>
@@ -1318,7 +2105,7 @@ function ApiReport({
     })
   }
   return (
-    <Shell subtitle={`${result.run_id.slice(0, 8)} · ${result.status}`}>
+    <Shell subtitle={`${displayRunId(result.run_id)} · ${runStatusLabel(result.status)}`}>
       <main className="ks-report-main">
         <ReportHero
           analysis={analysis}
@@ -1329,6 +2116,7 @@ function ApiReport({
 
         <ExecutiveSummary analysis={analysis} />
         <AgentReportPanel result={result} />
+        <ProtocolPanel result={result} />
 
         <div className="ks-report-grid">
           <MetricNarrative analysis={analysis} />
@@ -1352,9 +2140,9 @@ function ApiReport({
 
         <SegmentHeatmaps matrices={analysis.segmentMatrices} />
         <EvidenceBoard quotes={analysis.evidenceQuotes} />
-        <SegmentBreakdown segments={result.segments} />
+        <SegmentBreakdown matrices={analysis.segmentMatrices} />
         <TrustLayer analysis={analysis} result={result} snapshot={snapshot} />
-        <PersonaCrowd rawResults={result.raw_results} />
+        <PersonaCrowd metricRows={analysis.metricRows} rawResults={result.raw_results} />
         <PersonaEvidence rawResults={result.raw_results} />
       </main>
     </Shell>
@@ -1368,7 +2156,7 @@ export function ResultsStoryPage({ storyId }: { storyId: string }) {
     return (
       <StatePanel
         title="알 수 없는 결과 상태입니다"
-        body={`등록된 story fixture가 없습니다: ${storyId}`}
+        body={`등록된 결과 샘플이 없습니다: ${storyId}`}
         tone="warning"
       />
     )
@@ -1382,7 +2170,7 @@ export function ResultsStoryPage({ storyId }: { storyId: string }) {
     return (
       <StatePanel
         title="표시할 run이 없습니다"
-        body="Story fixture: no_run_selected. 실제 run_id가 없을 때 결과 페이지가 보여주는 상태입니다."
+        body="실제 실행 ID가 없을 때는 결과를 표시할 수 없습니다. 새 시뮬레이션을 시작해주세요."
       />
     )
   }
@@ -1390,8 +2178,11 @@ export function ResultsStoryPage({ storyId }: { storyId: string }) {
   if (story.snapshot.status === 'failed' || story.snapshot.status === 'interrupted') {
     return (
       <StatePanel
-        title={`Run ${story.snapshot.status}`}
-        body={story.snapshot.error?.message ?? `${story.label} 상태입니다.`}
+        title={`시뮬레이션 ${runStatusLabel(story.snapshot.status)}`}
+        body={`입력 내용은 브라우저에 보존됩니다. ${userFacingError(story.snapshot.error?.message ?? `${story.label} 상태입니다.`)}`}
+        runId={story.snapshot.run_id}
+        primaryActionLabel="입력으로 돌아가기"
+        secondaryActionLabel="다시 확인"
         tone="warning"
       />
     )
@@ -1399,12 +2190,12 @@ export function ResultsStoryPage({ storyId }: { storyId: string }) {
 
   return (
     <StatePanel
-      title={`Run ${story.snapshot.status}`}
+      title={`시뮬레이션 ${runStatusLabel(story.snapshot.status)}`}
       body={[
-        story.restored ? 'localStorage restore state' : null,
-        `run ${story.snapshot.run_id.slice(0, 8)}`,
-        `${story.snapshot.done_count}/${story.snapshot.total_count} complete`,
-        story.partials ? `partials ${story.partials.partial_count}` : null,
+        story.restored ? '이전 실행을 복원했습니다' : null,
+        displayRunId(story.snapshot.run_id),
+        `${story.snapshot.done_count}/${story.snapshot.total_count}명 응답 완료`,
+        story.partials ? `부분 결과 ${story.partials.partial_count}개` : null,
         story.label,
       ].filter(Boolean).join(' · ')}
     />
@@ -1480,7 +2271,10 @@ export function ResultsPage() {
     return (
       <StatePanel
         title="시뮬레이션 실패"
-        body={apiSnapshot.error?.message ?? apiMessage}
+        body={`입력 내용은 유지됩니다. ${userFacingError(apiSnapshot.error?.message ?? apiMessage)}`}
+        runId={apiSnapshot.run_id}
+        primaryActionLabel="입력으로 돌아가기"
+        secondaryActionLabel="다시 확인"
         tone="warning"
       />
     )
@@ -1488,11 +2282,11 @@ export function ResultsPage() {
 
   return (
     <StatePanel
-      title={apiSnapshot ? `Run ${apiSnapshot.status}` : '결과를 불러오는 중'}
+      title={apiSnapshot ? `시뮬레이션 ${runStatusLabel(apiSnapshot.status)}` : '결과를 불러오는 중'}
       body={[
-        apiRunId ? `run ${apiRunId.slice(0, 8)}` : null,
-        apiSnapshot ? `${apiSnapshot.done_count}/${apiSnapshot.total_count} complete` : null,
-        partialCount !== null ? `partials ${partialCount}` : null,
+        apiRunId ? displayRunId(apiRunId) : null,
+        apiSnapshot ? `${apiSnapshot.done_count}/${apiSnapshot.total_count}명 응답 완료` : null,
+        partialCount !== null ? `부분 결과 ${partialCount}개` : null,
         apiMessage,
       ].filter(Boolean).join(' · ') || '잠시 후 다시 확인합니다.'}
     />

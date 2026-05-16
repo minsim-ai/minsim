@@ -39,6 +39,7 @@ export type ErrorCode =
   | 'RESULT_NOT_READY'
   | 'RUN_NOT_CANCELABLE'
   | 'QUEUE_UNAVAILABLE'
+  | 'FREE_QUOTA_EXHAUSTED'
   | 'WORKER_INTERRUPTED'
   | 'LLM_UNAVAILABLE'
   | 'LLM_TIMEOUT'
@@ -63,10 +64,12 @@ export interface CreativeTestingInput {
 }
 
 export interface PriceOptimizationInput {
+  protocol_id?: 'price_research_v2' | null
   product_name: string
   product_description: string
   price_points: number[]
   context_note?: string | null
+  calibration?: JsonObject | null
 }
 
 export interface ProductLaunchInput {
@@ -78,8 +81,11 @@ export interface ProductLaunchInput {
 }
 
 export interface ValuePropositionInput {
+  protocol_id?: 'product_qa_v1' | null
+  artifact_type?: string | null
   product_context: string
   statements: string[]
+  criteria?: string[]
 }
 
 export interface MarketSegmentationInput {
@@ -343,6 +349,7 @@ export interface RunResultEnvelope {
   trace_id?: string | null
   orchestration?: JsonObject
   safe_intake_summary?: SafeIntakeSummary | null
+  protocol?: JsonObject | null
 }
 
 export interface RunPartialResultsResponse {
@@ -371,6 +378,17 @@ export interface AuthSessionResponse {
   test_login_enabled: boolean
   login_url: string
   logout_url: string
+}
+
+export interface UserUsageResponse {
+  user_id: string
+  email: string
+  plan: string
+  free_run_limit: number
+  used_runs: number
+  remaining_runs: number
+  can_create_run: boolean
+  quota_bypass: boolean
 }
 
 export interface RunExportResponse {

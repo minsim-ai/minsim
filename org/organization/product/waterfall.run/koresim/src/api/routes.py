@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
@@ -37,13 +38,18 @@ from src.api.schemas import (
     RunSnapshot,
     RunStatus,
     SimulationType,
+    UserUsageResponse,
 )
 from src.intake import advance_intake
 from src.api.auth import (
+    auth_required,
     build_google_callback_response,
     build_google_login_response,
     build_logout_response,
     build_test_login_response,
+    local_dev_auto_login_enabled,
+    local_dev_user,
+    read_session_user,
     session_summary,
 )
 from src.api.presets import list_demo_presets
@@ -60,6 +66,7 @@ from src.config import (
 )
 from src.jobs.events import format_heartbeat, format_snapshot, format_sse_event
 from src.jobs.models import RunEventType, RunRecord, RunStatusValue
+from src.jobs.models import UserRecord
 from src.jobs.store import SQLiteRunStore
 from src.llm.base import LLMClientProtocol, LLMMessage, LLMRequest
 from src.llm.factory import create_llm_client
@@ -87,6 +94,60 @@ def _llm_client(request: Request) -> LLMClientProtocol:
 
 def _error(status_code: int, response: ErrorResponse) -> HTTPException:
     return HTTPException(status_code=status_code, detail=response.model_dump(mode="json"))
+
+
+def _free_run_limit() -> int:
+    raw_value = os.getenv("KORESIM_FREE_RUN_LIMIT", "5")
+    try:
+        return max(0, int(raw_value))
+    except ValueError:
+        return 5
+
+
+def _quota_bypass_emails() -> set[str]:
+    raw_values = [
+        os.getenv("KORESIM_ADMIN_EMAILS", ""),
+        os.getenv("KORESIM_QUOTA_BYPASS_EMAILS", ""),
+    ]
+    emails: set[str] = set()
+    for raw_value in raw_values:
+        for item in raw_value.split(","):
+            email = item.strip().lower()
+            if email:
+                emails.add(email)
+    return emails
+
+
+def _quota_bypass(email: str) -> bool:
+    return email.strip().lower() in _quota_bypass_emails()
+
+
+def _authenticated_user(request: Request) -> dict[str, Any] | None:
+    user = read_session_user(request)
+    if user is None and auth_required() and local_dev_auto_login_enabled(request):
+        user = local_dev_user()
+    return user
+
+
+def _user_record_for_request(request: Request) -> UserRecord | None:
+    user = _authenticated_user(request)
+    if user is None:
+        return None
+    return _store(request).upsert_user_from_auth(user, free_run_limit=_free_run_limit())
+
+
+def _usage_response(store: SQLiteRunStore, user: UserRecord) -> UserUsageResponse:
+    usage = store.get_user_usage(user.user_id, quota_bypass=_quota_bypass(user.email))
+    return UserUsageResponse(
+        user_id=usage.user_id,
+        email=usage.email,
+        plan=usage.plan,
+        free_run_limit=usage.free_run_limit,
+        used_runs=usage.used_runs,
+        remaining_runs=usage.remaining_runs,
+        can_create_run=usage.can_create_run,
+        quota_bypass=usage.quota_bypass,
+    )
 
 
 def _run_snapshot(store: SQLiteRunStore, run: RunRecord) -> RunSnapshot:
@@ -254,6 +315,20 @@ async def auth_session(request: Request) -> AuthSessionResponse:
     return AuthSessionResponse.model_validate(session_summary(request))
 
 
+@router.get("/api/me/usage")
+async def my_usage(request: Request) -> UserUsageResponse:
+    user = _user_record_for_request(request)
+    if user is None:
+        raise _error(
+            401,
+            ErrorResponse(
+                code=ErrorCode.INVALID_REQUEST,
+                message="로그인이 필요합니다.",
+            ),
+        )
+    return _usage_response(_store(request), user)
+
+
 @router.get("/api/auth/google/login")
 async def auth_google_login(request: Request, next: str = "/app") -> RedirectResponse:
     return build_google_login_response(request, next_url=next)
@@ -290,18 +365,24 @@ async def save_intake_session(
     payload: IntakeSessionSaveRequest,
 ) -> IntakeSessionResponse:
     session_id = payload.session_id or f"intake-{uuid4()}"
+    user = _user_record_for_request(request)
     record = _store(request).save_intake_session(
         session_id=session_id,
         status=payload.status,
         snapshot=payload.snapshot,
         event_type="session_saved",
+        user=user,
     )
     return _intake_session_response(record)
 
 
 @router.get("/api/intake/sessions")
 async def list_intake_sessions(request: Request, limit: int = 20) -> IntakeSessionListResponse:
-    records = _store(request).list_intake_sessions(limit=limit)
+    user = _user_record_for_request(request)
+    records = _store(request).list_intake_sessions(
+        limit=limit,
+        user_id=user.user_id if user else None,
+    )
     return IntakeSessionListResponse(
         sessions=[_intake_session_response(record) for record in records],
     )
@@ -309,7 +390,11 @@ async def list_intake_sessions(request: Request, limit: int = 20) -> IntakeSessi
 
 @router.get("/api/intake/history")
 async def list_intake_history(request: Request, limit: int = 20) -> IntakeHistoryResponse:
-    records = _store(request).list_intake_history(limit=limit)
+    user = _user_record_for_request(request)
+    records = _store(request).list_intake_history(
+        limit=limit,
+        user_id=user.user_id if user else None,
+    )
     return IntakeHistoryResponse(items=[_intake_history_response(record) for record in records])
 
 
@@ -324,11 +409,13 @@ async def advance_intake_session(
         snapshot=payload.snapshot,
         event=payload.event,
     )
+    user = _user_record_for_request(request)
     _store(request).save_intake_session(
         session_id=session_id,
         status=str(advanced["status"]),
         snapshot=advanced["snapshot"],
         event_type="advance",
+        user=user,
     )
     return IntakeAdvanceResponse.model_validate(advanced)
 
@@ -339,11 +426,13 @@ async def update_intake_session(
     session_id: str,
     payload: IntakeSessionSaveRequest,
 ) -> IntakeSessionResponse:
+    user = _user_record_for_request(request)
     record = _store(request).save_intake_session(
         session_id=session_id,
         status=payload.status,
         snapshot=payload.snapshot,
         event_type="session_updated",
+        user=user,
     )
     return _intake_session_response(record)
 
@@ -354,8 +443,13 @@ async def link_intake_session_run(
     session_id: str,
     payload: IntakeSessionRunLinkRequest,
 ) -> IntakeSessionResponse:
+    user = _user_record_for_request(request)
     try:
-        record = _store(request).attach_intake_run(session_id=session_id, run_id=payload.run_id)
+        record = _store(request).attach_intake_run(
+            session_id=session_id,
+            run_id=payload.run_id,
+            user_id=user.user_id if user else None,
+        )
     except KeyError as exc:
         raise _error(
             404,
@@ -370,7 +464,11 @@ async def link_intake_session_run(
 
 @router.get("/api/intake/sessions/{session_id}")
 async def get_intake_session(request: Request, session_id: str) -> IntakeSessionResponse:
-    record = _store(request).get_intake_session(session_id)
+    user = _user_record_for_request(request)
+    record = _store(request).get_intake_session(
+        session_id,
+        user_id=user.user_id if user else None,
+    )
     if record is None:
         raise _error(
             404,
@@ -432,8 +530,25 @@ async def generate_intake_candidates(
 @router.post("/api/runs")
 async def create_run(request: Request, payload: RunCreateRequest) -> RunCreateResponse:
     store = _store(request)
-    run = store.create_run(payload)
+    user = _user_record_for_request(request)
+    bypass_quota = bool(user and _quota_bypass(user.email))
+    if user and not bypass_quota:
+        usage = store.get_user_usage(user.user_id)
+        if not usage.can_create_run:
+            raise _error(
+                403,
+                ErrorResponse(
+                    code=ErrorCode.FREE_QUOTA_EXHAUSTED,
+                    message="무료 실행 5회를 모두 사용했습니다.",
+                    details={
+                        "free_run_limit": usage.free_run_limit,
+                        "used_runs": usage.used_runs,
+                        "remaining_runs": usage.remaining_runs,
+                    },
+                ),
+            )
 
+    run = store.create_run(payload, user=user)
     try:
         job_id = _enqueue_run(request)(run.run_id)
         store.append_event(run.run_id, RunEventType.QUEUED, {"job_id": job_id})

@@ -32,8 +32,9 @@ export function advanceIntakeSession(session: IntakeSession, event: IntakeEvent)
   if (event.type === "reset") return createInitialIntakeSession();
 
   if (event.type === "user_message") {
-    const taskFrame = session.taskFrame ?? routeIntent(event.content);
-    const slots = extractSlotsFromMessage(event.content, taskFrame, session.slots);
+    const taskFrame = session.taskFrame ?? routeIntent(event.content, event.selectedSimulationType);
+    const requestedSlotIds = session.action?.type === "ask_question" ? session.action.slotIds : [];
+    const slots = extractSlotsFromMessage(event.content, taskFrame, session.slots, requestedSlotIds);
     const next = {
       ...session,
       taskFrame,
@@ -114,28 +115,36 @@ function planGenericSimulationAction(session: IntakeSession): IntakeAction {
     .filter((requirement) => pack.formFieldOrder.includes(requirement.id))
     .filter((requirement) => !hasEnoughCollectedValue(session.slots[requirement.id], requirement));
   const missingCritical = missingFields.filter((requirement) => requirement.importance === "critical");
+  const formId = `${pack.simulationType}_intake_v1`;
 
   if (missingCritical.length > 0 && session.turnCount <= 1) {
     const target = missingCritical[0];
     return {
       type: "ask_question",
-      message: `${pack.label}을 실행하려면 먼저 ${target.label}이 필요합니다. 어떤 내용인지 알려주세요.`,
+      message: `${withObjectParticle(pack.label)} 실행하려면 먼저 ${target.label}이 필요합니다. ${questionHelpText(target.id)}`,
       slotIds: [target.id],
     };
   }
 
   if (missingFields.length > 0) {
+    if (missingCritical.length === 0 && session.action?.type === "show_form" && session.action.form.id === formId) {
+      return buildGenericRunReadyAction(session);
+    }
     return {
       type: "show_form",
       message: `${pack.label} 시뮬레이션에 필요한 정보를 입력해주세요. 모르는 항목은 비워두고 나중에 보완할 수 있습니다.`,
       form: {
-        id: `${pack.simulationType}_intake_v1`,
-        fields: missingFields.map((requirement) => toFormField(requirement, session.slots[requirement.id])),
+        id: formId,
+        fields: compactFormFields(missingFields).map((requirement) => toFormField(requirement, session.slots[requirement.id])),
         primaryAction: "다음",
       },
     };
   }
 
+  return buildGenericRunReadyAction(session);
+}
+
+function buildGenericRunReadyAction(session: IntakeSession): IntakeAction {
   return {
     type: "run_ready",
     message: "필요한 입력이 준비되었습니다. 이 조건으로 시뮬레이션을 시작할 수 있습니다.",
@@ -228,9 +237,15 @@ function withPlannedAction(session: IntakeSession): IntakeSession {
     status: action.type === "run_ready" ? "ready" : action.type === "candidate_review" ? "reviewing" : "collecting",
     action,
     messages: action.type === "ask_question" || action.type === "show_form"
-      ? [...session.messages, { role: "assistant" as const, content: action.message }]
+      ? appendAssistantMessage(session.messages, action.message)
       : session.messages,
   };
+}
+
+function appendAssistantMessage(messages: IntakeSession["messages"], content: string): IntakeSession["messages"] {
+  const last = messages.at(-1);
+  if (last?.role === "assistant" && last.content === content) return messages;
+  return [...messages, { role: "assistant", content }];
 }
 
 function shouldShowCreativeForm(session: IntakeSession): boolean {
@@ -258,6 +273,7 @@ function toFormField(requirement: SlotRequirement, slot: IntakeSlotValue | undef
     type: requirement.dataType,
     required: requirement.importance === "critical",
     value,
+    source: slot?.source,
     placeholder: requirement.placeholder,
     helperText: requirement.helperText,
     options: requirement.options,
@@ -265,6 +281,35 @@ function toFormField(requirement: SlotRequirement, slot: IntakeSlotValue | undef
     recommendedItems: requirement.recommendedItems,
     allowAutoFill: requirement.canGenerate,
   };
+}
+
+function compactFormFields(requirements: SlotRequirement[]): SlotRequirement[] {
+  const critical = requirements.filter((requirement) => requirement.importance === "critical");
+  const recommended = requirements.filter((requirement) => requirement.importance === "recommended");
+  const optional = requirements.filter((requirement) => requirement.importance === "optional");
+  return [...critical, ...recommended.slice(0, Math.max(0, 3 - critical.length)), ...optional.slice(0, 1)];
+}
+
+function withObjectParticle(label: string): string {
+  const last = label.trim().at(-1);
+  if (!last) return label;
+  const code = last.charCodeAt(0);
+  if (code < 0xac00 || code > 0xd7a3) return `${label}를`;
+  return (code - 0xac00) % 28 === 0 ? `${label}를` : `${label}을`;
+}
+
+function questionHelpText(slotId: string): string {
+  switch (slotId) {
+    case "product_description":
+      return "제품명, 판매 방식, 현재 가격대를 한 문장으로 알려주세요. 예: AI 리서치 SaaS 월 구독 상품입니다.";
+    case "price_points":
+      return "비교하고 싶은 가격 후보를 알려주세요. 예: 29,000원 / 39,000원 / 49,000원";
+    case "product_context":
+    case "product_concept":
+      return "어떤 제품이나 서비스를 검증하려는지 한 문장으로 알려주세요.";
+    default:
+      return "아는 만큼만 짧게 알려주세요.";
+  }
 }
 
 function summarizeFormSubmit(values: Record<string, string | string[] | number>): string {
