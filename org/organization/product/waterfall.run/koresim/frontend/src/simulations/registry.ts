@@ -63,6 +63,27 @@ export function getMetricSections(result: RunResultEnvelope): MetricSection[] {
         },
       ]
     case 'price_optimization':
+      if (metrics.protocol_id === 'price_research_v2') {
+        return [
+          {
+            title: '헤드라인 구매 의향',
+            rows: countPctRows(metrics, 'headline_intent_counts', 'headline_intent_pct'),
+          },
+          {
+            title: '조건부 구매 전환',
+            rows: [
+              {
+                label: '조건 충족 시 구매 가능',
+                count: asNumber(metrics.conditional_yes_count) ?? undefined,
+                pct: asNumber(metrics.conditional_yes_rate),
+              },
+            ],
+          },
+          { title: '거절 후 조건', rows: countRows(metrics.condition_category_counts) },
+          { title: '비교 앵커', rows: countRows(metrics.anchor_category_counts) },
+          { title: '가격 외 망설임', rows: countRows(metrics.hesitation_reason_counts) },
+        ]
+      }
       return [
         {
           title: '가격 후보별 수요',
@@ -83,6 +104,22 @@ export function getMetricSections(result: RunResultEnvelope): MetricSection[] {
         { title: '점수 분포', rows: countPctRows(metrics, 'score_counts', 'score_pct') },
       ]
     case 'value_proposition':
+      if (metrics.protocol_id === 'product_qa_v1') {
+        return [
+          {
+            title: 'Product QA 최상위 후보',
+            rows: choiceRows(metrics, 'top_choice_counts', 'top_choice_pct', metrics.artifacts),
+          },
+          {
+            title: '가장 약한 후보',
+            rows: choiceRows(metrics, 'bottom_choice_counts', 'bottom_choice_pct', metrics.artifacts),
+          },
+          {
+            title: '평균 평가 점수',
+            rows: scoreRows(metrics.average_scores),
+          },
+        ]
+      }
       return [
         {
           title: '가치 제안 선택',
@@ -152,6 +189,25 @@ function countPctRows(metrics: JsonObject, countKey: string, pctKey: string): Me
     }))
     .filter((row) => row.count > 0)
     .sort((a, b) => (b.count ?? 0) - (a.count ?? 0))
+}
+
+function countRows(value: unknown): MetricRow[] {
+  if (!isRecord(value)) return []
+  return Object.entries(value)
+    .map(([label, count]) => ({
+      label,
+      count: asNumber(count) ?? 0,
+    }))
+    .filter((row) => row.count > 0)
+    .sort((a, b) => (b.count ?? 0) - (a.count ?? 0))
+}
+
+function scoreRows(value: unknown): MetricRow[] {
+  if (!isRecord(value)) return []
+  return Object.entries(value).map(([label, score]) => ({
+    label,
+    value: asNumber(score),
+  }))
 }
 
 function objectRows(

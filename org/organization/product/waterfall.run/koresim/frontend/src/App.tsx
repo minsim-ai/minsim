@@ -1,12 +1,14 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback, useLayoutEffect } from "react";
 import { APIError } from "./api/client";
+import { recordAnalyticsEvent } from "./api/analytics";
+import { getUserUsage, googleLogin } from "./api/auth";
 import { linkIntakeSessionRun } from "./api/intake";
 import { cancelRun, createRun, getPresets, getRun } from "./api/runs";
 import { AuthStatus } from "./components/AuthStatus";
 import { GoalFirstChatFlow } from "./components/intake/GoalFirstChatFlow";
 import { SimulationProgress } from "./components/SimulationProgress";
 import { useRunEvents } from "./hooks/useRunEvents";
-import type { DemoPreset, RunCreateRequest, SimulationType, TargetFilter } from "./types/api";
+import type { DemoPreset, RunCreateRequest, SimulationType, TargetFilter, UserUsageResponse } from "./types/api";
 import {
   simulations,
   introPlaceholders,
@@ -79,14 +81,39 @@ function SimPicker({
   );
 }
 
+function SimulationFirstPanel({
+  selected,
+  onSelect,
+}: {
+  selected: SimulationType;
+  onSelect: (key: string) => void;
+}) {
+  const selectedLabel = simulations.find((sim) => sim.key === selected)?.label ?? "시뮬레이션";
+  return (
+    <section className="ks-sim-first" aria-label="시뮬레이션 유형 선택">
+      <div className="ks-sim-first-head">
+        <span className="ks-preset-kicker">먼저 선택</span>
+        <h2>어떤 시뮬레이션으로 볼까요?</h2>
+        <p>유형을 먼저 고르면 대화에서 필요한 질문과 입력폼이 그 목적에 맞게 정리됩니다.</p>
+      </div>
+      <SimPicker selected={selected} onSelect={onSelect} />
+      <p className="ks-sim-first-selected">현재 선택: {selectedLabel}</p>
+    </section>
+  );
+}
+
 function PresetSelector({
   presets,
   loading,
   onStart,
+  runDisabled = false,
+  runDisabledMessage,
 }: {
   presets: DemoPreset[];
   loading: boolean;
   onStart: (preset: DemoPreset) => void;
+  runDisabled?: boolean;
+  runDisabledMessage?: string;
 }) {
   if (!loading && presets.length === 0) return null;
   return (
@@ -102,6 +129,7 @@ function PresetSelector({
           <button
             key={preset.id}
             className="ks-preset-card"
+            disabled={runDisabled}
             type="button"
             onClick={() => onStart(preset)}
           >
@@ -114,10 +142,51 @@ function PresetSelector({
             {preset.fallback_reason && (
               <span className="ks-preset-fallback">{preset.fallback_reason}</span>
             )}
+            {runDisabled && runDisabledMessage && (
+              <span className="ks-preset-fallback">{runDisabledMessage}</span>
+            )}
           </button>
         ))}
       </div>
     </section>
+  );
+}
+
+function ApiErrorBanner({ message, authRequired }: { message: string; authRequired: boolean }) {
+  return (
+    <div className={`ks-api-error${authRequired ? " ks-api-error--auth" : ""}`} role="alert">
+      <div>
+        <strong>{authRequired ? "로그인이 필요합니다" : "요청을 처리하지 못했습니다"}</strong>
+        <p>{message}</p>
+      </div>
+      {authRequired && (
+        <button className="ks-chat-btn ks-chat-btn--primary" type="button" onClick={() => googleLogin("/app")}>
+          Google 로그인
+        </button>
+      )}
+    </div>
+  );
+}
+
+function QuotaPill({
+  usage,
+  loading,
+}: {
+  usage: UserUsageResponse | null;
+  loading: boolean;
+}) {
+  if (loading) {
+    return <span className="ks-quota-pill ks-quota-pill--muted">무료 실행 확인 중</span>;
+  }
+  if (!usage) return null;
+  if (usage.quota_bypass) {
+    return <span className="ks-quota-pill">운영 계정 · 무제한</span>;
+  }
+  const exhausted = usage.remaining_runs <= 0;
+  return (
+    <span className={`ks-quota-pill${exhausted ? " ks-quota-pill--exhausted" : ""}`}>
+      무료 실행 {usage.remaining_runs}회 남음
+    </span>
   );
 }
 
@@ -210,10 +279,14 @@ function ChatFlow({
   simKey,
   onStart,
   scenario,
+  runDisabled = false,
+  runDisabledMessage,
 }: {
   simKey: string;
   onStart: (answers: Record<string, string>) => void;
   scenario: ChatScenarioFixture | null;
+  runDisabled?: boolean;
+  runDisabledMessage?: string;
 }) {
   const [state, setState] = useState<ChatState>({ step: 0, answers: {} });
   const [thinking, setThinking] = useState(false);
@@ -423,7 +496,14 @@ function ChatFlow({
 
         {state.step >= DONE_STEP && (
           <div className="ks-chat-actions">
-            <button className="ks-chat-btn ks-chat-btn--primary" onClick={() => onStart(state.answers)}>
+            {runDisabled && runDisabledMessage && (
+              <p className="ks-quota-inline">{runDisabledMessage}</p>
+            )}
+            <button
+              className="ks-chat-btn ks-chat-btn--primary"
+              disabled={runDisabled}
+              onClick={() => onStart(state.answers)}
+            >
               🚀 시뮬레이션 시작
             </button>
           </div>
@@ -456,7 +536,28 @@ function App() {
   const [presets, setPresets] = useState<DemoPreset[]>([]);
   const [presetsLoading, setPresetsLoading] = useState(true);
   const [activeScenarioId, setActiveScenarioId] = useState<string | null>(null);
+  const [usage, setUsage] = useState<UserUsageResponse | null>(null);
+  const [usageLoading, setUsageLoading] = useState(true);
   const runEvents = useRunEvents(activeRunId, phase === 'loading');
+  const runDisabled = usage?.can_create_run === false;
+  const runDisabledMessage = runDisabled
+    ? '무료 실행 5회를 모두 사용했습니다. 추가 실행은 운영자에게 문의해주세요.'
+    : undefined;
+
+  useLayoutEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, []);
+
+  useEffect(() => {
+    recordAnalyticsEvent({
+      event_name: 'page_view',
+      page: '/app',
+      simulation_type: selectedSim,
+      payload: {},
+    }).catch(() => {
+      // Analytics must not block the simulation workflow.
+    });
+  }, [selectedSim]);
 
   const handleSimChange = (key: string) => {
     setSelectedSim(key as SimulationType);
@@ -470,6 +571,30 @@ function App() {
     [activeScenarioId],
   );
 
+  const refreshUsage = useCallback(() => {
+    setUsageLoading(true);
+    return getUserUsage()
+      .then((value) => setUsage(value))
+      .catch((err) => {
+        if (err instanceof APIError && err.reason === 'auth_required') {
+          setUsage(null);
+          return;
+        }
+        setUsage(null);
+      })
+      .finally(() => setUsageLoading(false));
+  }, []);
+
+  const guardQuota = () => {
+    if (!runDisabled) return true;
+    setApiError(runDisabledMessage ?? '무료 실행 횟수가 남아 있지 않습니다.');
+    return false;
+  };
+
+  useEffect(() => {
+    void refreshUsage();
+  }, [refreshUsage]);
+
   useEffect(() => {
     let cancelled = false;
     getPresets()
@@ -479,7 +604,9 @@ function App() {
       })
       .catch((err) => {
         if (cancelled) return;
-        setApiError(`프리셋을 불러오지 못했습니다. ${formatError(err)}`);
+        setApiError(err instanceof APIError && err.reason === 'auth_required'
+          ? formatError(err)
+          : `프리셋을 불러오지 못했습니다. ${formatError(err)}`);
       })
       .finally(() => {
         if (!cancelled) setPresetsLoading(false);
@@ -536,6 +663,7 @@ function App() {
   }, [startFreshIntake]);
 
   const handleStart = async (answers: Record<string, string>) => {
+    if (!guardQuota()) return;
     setApiError(null);
     setPhase('loading');
     try {
@@ -543,14 +671,17 @@ function App() {
       const created = await createRun(payload);
       setActiveRunId(created.run_id);
       localStorage.setItem('koresim:lastRunId', created.run_id);
+      void refreshUsage();
     } catch (err) {
       setPhase('chat');
       setActiveRunId(null);
       setApiError(formatError(err));
+      void refreshUsage();
     }
   };
 
   const handleIntakeStart = async (payload: RunCreateRequest, intakeSessionId: string) => {
+    if (!guardQuota()) return;
     setApiError(null);
     setActiveScenarioId(null);
     setSelectedSim(payload.simulation_type);
@@ -560,14 +691,17 @@ function App() {
       setActiveRunId(created.run_id);
       localStorage.setItem('koresim:lastRunId', created.run_id);
       void linkIntakeSessionRun(intakeSessionId, { run_id: created.run_id });
+      void refreshUsage();
     } catch (err) {
       setPhase('chat');
       setActiveRunId(null);
       setApiError(formatError(err));
+      void refreshUsage();
     }
   };
 
   const handlePresetStart = async (preset: DemoPreset) => {
+    if (!guardQuota()) return;
     setApiError(null);
     setActiveScenarioId(null);
     setSelectedSim(preset.simulation_type);
@@ -577,10 +711,12 @@ function App() {
       const created = await createRun(payload);
       setActiveRunId(created.run_id);
       localStorage.setItem('koresim:lastRunId', created.run_id);
+      void refreshUsage();
     } catch (err) {
       setPhase('chat');
       setActiveRunId(null);
       setApiError(formatError(err));
+      void refreshUsage();
     }
   };
 
@@ -610,7 +746,9 @@ function App() {
             <a href="/">공개 랜딩</a>
             <a href="/results">최근 결과</a>
             <a href="/validation">검증 사례</a>
+            <a href="/admin">어드민</a>
             <a href="/app" className="ks-cta">데모 실행</a>
+            <QuotaPill usage={usage} loading={usageLoading} />
             <AuthStatus compact />
           </nav>
         </div>
@@ -619,44 +757,63 @@ function App() {
       {/* 히어로 */}
       <section className="ks-hero">
         <h1>한국 시장 결정을 빠르게 시뮬레이션하세요</h1>
-        <p>한국 페르소나 100만 명을 대상으로 프리셋을 실행하고 결과를 확인합니다.</p>
+        <p>가격, 캠페인, 메시지, 출시 고민을 먼저 적으면 필요한 정보만 묻고 결과 보고서까지 생성합니다.</p>
       </section>
 
       {/* 메인 콘텐츠 */}
       <div className="ks-main">
         <div className="ks-layout">
-          {/* 좌측: 시뮬레이션 선택 */}
-          <aside className="ks-sidebar">
-            <SimPicker selected={selectedSim} onSelect={handleSimChange} />
-          </aside>
-
-          {/* 우측: 채팅 + 결과 */}
           <div className="ks-content">
             {apiError && (
-              <div className="ks-api-error" role="alert">
-                {apiError}
-              </div>
+              <ApiErrorBanner
+                message={apiError}
+                authRequired={isAuthRequiredMessage(apiError)}
+              />
             )}
-            <PresetSelector
-              presets={presets}
-              loading={presetsLoading}
-              onStart={handlePresetStart}
+            <SimulationFirstPanel selected={selectedSim} onSelect={handleSimChange} />
+            <GoalFirstChatFlow
+              onStart={handleIntakeStart}
+              runDisabled={runDisabled}
+              runDisabledMessage={runDisabledMessage}
+              selectedSimulationType={selectedSim}
+              startFresh={startFreshIntake}
+              storageNamespace={usage?.user_id ?? "anonymous"}
             />
-            <GoalFirstChatFlow onStart={handleIntakeStart} startFresh={startFreshIntake} />
-            <DevScenarioPicker
-              selectedSim={selectedSim}
-              activeScenarioId={activeScenarioId}
-              onSelect={(scenario) => {
-                setSelectedSim(scenario.simulationType);
-                setActiveScenarioId(scenario.id);
-                setPhase('chat');
-                setApiError(null);
-              }}
-              onClear={() => setActiveScenarioId(null)}
-            />
+            <details className="ks-aux-panel">
+              <summary>샘플 프리셋으로 빠르게 보기</summary>
+              <PresetSelector
+                presets={presets}
+                loading={presetsLoading}
+                onStart={handlePresetStart}
+                runDisabled={runDisabled}
+                runDisabledMessage={runDisabledMessage}
+              />
+            </details>
+            {import.meta.env.DEV && (
+              <details className="ks-aux-panel">
+                <summary>개발용 대화 샘플</summary>
+                <DevScenarioPicker
+                  selectedSim={selectedSim}
+                  activeScenarioId={activeScenarioId}
+                  onSelect={(scenario) => {
+                    setSelectedSim(scenario.simulationType);
+                    setActiveScenarioId(scenario.id);
+                    setPhase('chat');
+                    setApiError(null);
+                  }}
+                  onClear={() => setActiveScenarioId(null)}
+                />
+              </details>
+            )}
             <details className="ks-manual-chat">
               <summary>수동 시뮬레이션 입력</summary>
-              <ChatFlow simKey={selectedSim} onStart={handleStart} scenario={activeScenario} />
+              <ChatFlow
+                simKey={selectedSim}
+                onStart={handleStart}
+                runDisabled={runDisabled}
+                runDisabledMessage={runDisabledMessage}
+                scenario={activeScenario}
+              />
             </details>
           </div>
         </div>
@@ -708,13 +865,16 @@ function buildRunPayload(simKey: string, answers: Record<string, string>): RunCr
     return { ...base, input: { creatives: parseCreatives(answers.creatives) } };
   }
   if (simKey === 'price_optimization') {
+    const usePriceResearchV2 = answers.protocol_mode?.includes('멀티턴')
     return {
       ...base,
       input: {
+        ...(usePriceResearchV2 ? { protocol_id: 'price_research_v2' as const } : {}),
         product_name: firstSentence(answers.product, '가격 테스트 제품'),
         product_description: answers.product || answers.intro || '가격 민감도를 확인할 제품입니다.',
         price_points: parseNumberList(answers.prices, [4500, 5500, 6500]),
         context_note: answers.target || answers.intro || null,
+        ...(usePriceResearchV2 ? { calibration: parseCalibration(answers.calibration) } : {}),
       },
     };
   }
@@ -731,11 +891,15 @@ function buildRunPayload(simKey: string, answers: Record<string, string>): RunCr
     };
   }
   if (simKey === 'value_proposition') {
+    const useProductQa = answers.protocol_mode?.includes('Product QA')
     return {
       ...base,
       input: {
+        ...(useProductQa ? { protocol_id: 'product_qa_v1' as const } : {}),
+        ...(useProductQa ? { artifact_type: answers.artifact_type || 'landing_copy' } : {}),
         product_context: answers.context || answers.intro || '가치 제안 테스트 대상',
         statements: parseLines(answers.vps, ['첫 번째 가치 제안', '두 번째 가치 제안']).slice(0, 5),
+        ...(useProductQa ? { criteria: ['명확성', '신뢰도', '행동가능성'] } : {}),
       },
     };
   }
@@ -836,6 +1000,24 @@ function parseNumberList(value: string | undefined, fallback: number[]): number[
   return Array.from(new Set(numbers.length >= 3 ? numbers : fallback)).slice(0, 6).sort((a, b) => a - b);
 }
 
+function parseCalibration(value: string | undefined): Record<string, unknown> | null {
+  const entries = (value ?? '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .map((item) => {
+      const match = item.match(/^(.+?)\s+(\d+(?:\.\d+)?)$/)
+      return match ? [match[1].trim(), Number(match[2])] as const : null
+    })
+    .filter((item): item is readonly [string, number] => Boolean(item))
+  if (entries.length === 0) return null
+  return {
+    dimensions: {
+      occupation: Object.fromEntries(entries),
+    },
+  }
+}
+
 function parseFirstNumber(value: string | undefined, fallback: number): number {
   const match = value?.match(/\d[\d,]*/);
   return match ? Number(match[0].replaceAll(',', '')) : fallback;
@@ -869,9 +1051,14 @@ function parseSeed(value: string | undefined): number {
 
 function formatError(err: unknown): string {
   if (err instanceof APIError) {
+    if (err.reason === 'auth_required' || err.reason === 'access_required') return err.message;
     return err.payload?.message ?? err.message;
   }
   return err instanceof Error ? err.message : String(err);
+}
+
+function isAuthRequiredMessage(message: string): boolean {
+  return message.includes('로그인이 필요합니다') || message.includes('Google 계정');
 }
 
 function navigateToResults(runId: string) {

@@ -51,8 +51,10 @@ export const chatSteps: Record<string, ChatStep[]> = {
     { id: "sample_size", type: "radio", question: "샘플 크기는?", options: ["50명 (빠른 데모)", "200명 (표준)", "500명 (정밀)"] },
   ],
   price_optimization: [
+    { id: "protocol_mode", type: "radio", question: "가격 리서치 방식은?", options: ["멀티턴 가격 리서치", "기본 가격 최적화"] },
     { id: "product", type: "text", question: "제품명·간단 설명?", placeholder: "스타벅스 자몽 에이드, 신선한 자몽 사용" },
     { id: "prices", type: "text", question: "비교할 가격대를 콤마로 구분해주세요 (3~6개).", placeholder: "4500, 5500, 6500, 7500" },
+    { id: "calibration", type: "text", question: "보정할 실제 고객 분포가 있나요? (선택)", placeholder: "마케터 0.35, 기획자 0.35, HRD 담당자 0.2, 사무직 0.1" },
     { id: "target", type: "text", question: "타겟? (연령·성별·지역)", placeholder: "20~40대 직장인, 수도권" },
     { id: "sample_size", type: "radio", question: "샘플 크기는?", options: ["100명", "300명 (표준)", "500명"] },
   ],
@@ -64,6 +66,8 @@ export const chatSteps: Record<string, ChatStep[]> = {
     { id: "sample_size", type: "radio", question: "샘플 크기는?", options: ["100명", "300명 (표준)", "500명"] },
   ],
   value_proposition: [
+    { id: "protocol_mode", type: "radio", question: "평가 방식은?", options: ["Product QA", "기본 가치 제안 비교"] },
+    { id: "artifact_type", type: "text", question: "평가할 산출물 유형은?", placeholder: "landing_copy / onboarding_copy / price_table / report_snippet" },
     { id: "context", type: "text", question: "제품 컨텍스트를 한 줄로 적어주세요.", placeholder: "한국어 데이터 AI 분석 SaaS, 월 99,000원~" },
     { id: "vps", type: "textarea", question: "비교할 가치 제안 문장을 줄바꿈으로 적어주세요.", placeholder: "10분 만에 데이터 인사이트, 가장 빠른 분석 도구\n한국어 데이터에 최적화된 유일한 AI 분석\n월 99,000원으로 시작, 첫 달 무료" },
     { id: "target", type: "text", question: "타겟?", placeholder: "30~40대 IT 관리자" },

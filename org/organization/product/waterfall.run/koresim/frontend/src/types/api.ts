@@ -39,6 +39,7 @@ export type ErrorCode =
   | 'RESULT_NOT_READY'
   | 'RUN_NOT_CANCELABLE'
   | 'QUEUE_UNAVAILABLE'
+  | 'FREE_QUOTA_EXHAUSTED'
   | 'WORKER_INTERRUPTED'
   | 'LLM_UNAVAILABLE'
   | 'LLM_TIMEOUT'
@@ -63,10 +64,12 @@ export interface CreativeTestingInput {
 }
 
 export interface PriceOptimizationInput {
+  protocol_id?: 'price_research_v2' | null
   product_name: string
   product_description: string
   price_points: number[]
   context_note?: string | null
+  calibration?: JsonObject | null
 }
 
 export interface ProductLaunchInput {
@@ -78,8 +81,11 @@ export interface ProductLaunchInput {
 }
 
 export interface ValuePropositionInput {
+  protocol_id?: 'product_qa_v1' | null
+  artifact_type?: string | null
   product_context: string
   statements: string[]
+  criteria?: string[]
 }
 
 export interface MarketSegmentationInput {
@@ -343,6 +349,7 @@ export interface RunResultEnvelope {
   trace_id?: string | null
   orchestration?: JsonObject
   safe_intake_summary?: SafeIntakeSummary | null
+  protocol?: JsonObject | null
 }
 
 export interface RunPartialResultsResponse {
@@ -371,6 +378,91 @@ export interface AuthSessionResponse {
   test_login_enabled: boolean
   login_url: string
   logout_url: string
+}
+
+export interface UserUsageResponse {
+  user_id: string
+  email: string
+  plan: string
+  free_run_limit: number
+  used_runs: number
+  remaining_runs: number
+  can_create_run: boolean
+  quota_bypass: boolean
+}
+
+export interface AnalyticsEventRequest {
+  event_name: string
+  session_id?: string | null
+  run_id?: string | null
+  page?: string | null
+  simulation_type?: SimulationType | null
+  payload?: JsonObject
+}
+
+export interface AnalyticsEventResponse {
+  event_id: string
+  event_name: string
+  created_at: string
+}
+
+export interface RunFeedbackRequest {
+  intake_session_id?: string | null
+  usefulness_score?: number | null
+  trust_score?: number | null
+  actionability_score?: number | null
+  result_expectation?: string | null
+  free_text?: string | null
+  intended_action?: string | null
+  decision_confidence_before?: number | null
+  decision_confidence_after?: number | null
+  shared_with_team?: boolean
+  exported_report?: boolean
+}
+
+export interface RunFeedbackResponse {
+  feedback_id: string
+  followup_id: string
+  run_id: string
+  created_at: string
+}
+
+export interface AdminOverviewResponse {
+  users: number
+  runs: number
+  completed_runs: number
+  failed_runs: number
+  intake_sessions: number
+  feedback: number
+  analytics_events: number
+  by_simulation: JsonObject[]
+  recent_events: JsonObject[]
+  funnel: JsonObject
+  accounts: JsonObject[]
+  policy: JsonObject
+}
+
+export interface AdminListResponse {
+  items: JsonObject[]
+}
+
+export interface AdminExportResponse {
+  schema_version: string
+  generated_at: string
+  policy: JsonObject
+  overview: JsonObject
+  funnel: JsonObject
+  accounts: JsonObject[]
+  users: JsonObject[]
+  runs: JsonObject[]
+  feedback: JsonObject[]
+}
+
+export interface AdminMutationResponse {
+  ok: boolean
+  action: string
+  dry_run: boolean
+  result: JsonObject
 }
 
 export interface RunExportResponse {

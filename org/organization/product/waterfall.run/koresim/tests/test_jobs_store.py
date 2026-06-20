@@ -57,6 +57,71 @@ def test_sqlite_store_persists_run_intake_context(tmp_path) -> None:
     assert reloaded.intake_context["safe_intake_summary"]["user_goal"] == "헤드라인 테스트"
 
 
+def test_sqlite_store_registers_user_and_tracks_free_run_usage(tmp_path) -> None:
+    store = SQLiteRunStore(tmp_path / "runs.sqlite3")
+    user = {
+        "id": "google-123",
+        "email": "new@example.com",
+        "name": "New User",
+        "provider": "google",
+    }
+
+    registered = store.upsert_user_from_auth(user, free_run_limit=5)
+    usage = store.get_user_usage(registered.user_id)
+
+    assert registered.email == "new@example.com"
+    assert registered.plan == "free"
+    assert usage.free_run_limit == 5
+    assert usage.used_runs == 0
+    assert usage.remaining_runs == 5
+    assert usage.can_create_run is True
+
+    run = store.create_run(_request(sample_size=2), run_id="quota-run-1", user=registered)
+    assert run.user_id == registered.user_id
+    assert run.user_email == "new@example.com"
+
+    store.reserve_free_run(registered.user_id, run.run_id, reason="legacy_queued")
+    usage_after_reserve = store.get_user_usage(registered.user_id)
+    assert usage_after_reserve.used_runs == 0
+    assert usage_after_reserve.remaining_runs == 5
+
+    store.complete_free_run(registered.user_id, run.run_id, reason="run_completed")
+    store.complete_free_run(registered.user_id, run.run_id, reason="run_completed_duplicate")
+    usage_after_completion = store.get_user_usage(registered.user_id)
+    assert usage_after_completion.used_runs == 1
+    assert usage_after_completion.remaining_runs == 4
+
+
+def test_sqlite_store_supports_admin_quota_adjustment_and_user_run_history(tmp_path) -> None:
+    store = SQLiteRunStore(tmp_path / "runs.sqlite3")
+    user = store.upsert_user_from_auth(
+        {
+            "id": "google-admin-target",
+            "email": "quota-target@example.com",
+            "name": "Quota Target",
+            "provider": "google",
+        },
+        free_run_limit=5,
+    )
+    first_run = store.create_run(_request(sample_size=2), run_id="quota-history-1", user=user)
+    second_run = store.create_run(_request(sample_size=2), run_id="quota-history-2", user=user)
+    store.complete_free_run(user.user_id, first_run.run_id, reason="run_completed")
+    store.complete_free_run(user.user_id, second_run.run_id, reason="run_completed")
+
+    adjusted = store.adjust_free_runs(user.user_id, delta=-1, reason="support_credit")
+    found = store.get_user_by_email("quota-target@example.com")
+    history = store.list_runs_for_user(user.user_id)
+
+    assert found == user
+    assert adjusted.used_runs == 1
+    assert adjusted.remaining_runs == 4
+    assert [run.run_id for run in history] == ["quota-history-2", "quota-history-1"]
+
+    reset = store.reset_free_run_usage(user.user_id, reason="support_reset")
+    assert reset.used_runs == 0
+    assert reset.remaining_runs == 5
+
+
 def test_sqlite_store_updates_events_partials_and_final_result(tmp_path) -> None:
     store = SQLiteRunStore(tmp_path / "runs.sqlite3")
     store.create_run(_request(sample_size=2), run_id="run-2")
@@ -143,6 +208,35 @@ def test_sqlite_store_persists_intake_session_snapshot_and_events(tmp_path) -> N
     assert reloaded is not None
     assert reloaded.snapshot["slots"]["product_description"]["value"] == "블로그 작성 프로그램"
     assert [event.event_type for event in events] == ["session_created", "session_updated"]
+
+
+def test_sqlite_store_scopes_intake_history_by_user(tmp_path) -> None:
+    store = SQLiteRunStore(tmp_path / "runs.sqlite3")
+    user_a = store.upsert_user_from_auth(
+        {"id": "user-a", "email": "a@example.com", "name": "A", "provider": "google"}
+    )
+    user_b = store.upsert_user_from_auth(
+        {"id": "user-b", "email": "b@example.com", "name": "B", "provider": "google"}
+    )
+    store.save_intake_session(
+        session_id="intake-user-a",
+        status="collecting",
+        snapshot={"messages": [{"role": "user", "content": "A의 상세페이지"}]},
+        user=user_a,
+    )
+    store.save_intake_session(
+        session_id="intake-user-b",
+        status="collecting",
+        snapshot={"messages": [{"role": "user", "content": "B의 가격"}]},
+        user=user_b,
+    )
+
+    user_a_history = store.list_intake_history(user_id=user_a.user_id)
+    user_b_history = store.list_intake_history(user_id=user_b.user_id)
+
+    assert [item.session_id for item in user_a_history] == ["intake-user-a"]
+    assert [item.session_id for item in user_b_history] == ["intake-user-b"]
+    assert store.get_intake_session("intake-user-a", user_id=user_b.user_id) is None
 
 
 def test_sqlite_store_lists_recent_intake_sessions(tmp_path) -> None:

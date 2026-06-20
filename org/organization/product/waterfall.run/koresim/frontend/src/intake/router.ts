@@ -11,7 +11,7 @@ const creativeSurfaceHints = [
   { hint: "문구", surface: "문구" },
 ];
 
-export function routeIntent(message: string): TaskFrame {
+export function routeIntent(message: string, selectedSimulationType?: SimulationType): TaskFrame {
   const normalized = normalize(message);
   const scored = Object.values(intakePackRegistry)
     .map((pack) => ({
@@ -21,18 +21,27 @@ export function routeIntent(message: string): TaskFrame {
     .filter((candidate) => candidate.score > 0)
     .sort((a, b) => b.score - a.score);
 
-  const primary = scored[0]?.simulationType ?? "creative_testing";
-  const confidence = scored[0]?.score ? Math.min(0.96, 0.58 + scored[0].score * 0.12) : 0.45;
+  const primary = selectedSimulationType ?? scored[0]?.simulationType ?? "creative_testing";
+  const confidence = selectedSimulationType
+    ? 0.99
+    : scored[0]?.score ? Math.min(0.96, 0.58 + scored[0].score * 0.12) : 0.45;
+  const likelySimulationTypes = [
+    primary,
+    ...scored.map((candidate) => candidate.simulationType).filter((simulationType) => simulationType !== primary),
+  ].slice(0, 3);
 
   return {
     taskId: buildTaskId(primary, normalized),
     userGoal: message.trim(),
     decisionQuestion: buildDecisionQuestion(primary, normalized),
-    likelySimulationTypes: scored.slice(0, 3).map((candidate) => candidate.simulationType),
+    likelySimulationTypes,
     primarySimulationType: primary,
     preSimulationActions: buildPreSimulationActions(primary, normalized),
     confidence,
-    evidence: scored.slice(0, 3).map((candidate) => `${candidate.simulationType}:${candidate.score}`),
+    evidence: [
+      ...(selectedSimulationType ? [`selected:${selectedSimulationType}`] : []),
+      ...scored.slice(0, 3).map((candidate) => `${candidate.simulationType}:${candidate.score}`),
+    ],
   };
 }
 

@@ -7,7 +7,12 @@ from urllib.parse import urlencode
 from fastapi import FastAPI, Request
 from starlette.responses import JSONResponse, RedirectResponse
 
-from src.api.auth import auth_required, read_session_user
+from src.api.auth import (
+    auth_required,
+    local_dev_auto_login_enabled,
+    read_session_user,
+    set_local_dev_session_cookie,
+)
 from src.api.routes import router
 from src.api.static import install_static_routes
 from src.jobs.queue import enqueue_run
@@ -32,6 +37,10 @@ def create_app(
             return await call_next(request)
         if read_session_user(request):
             return await call_next(request)
+        if local_dev_auto_login_enabled(request):
+            response = await call_next(request)
+            set_local_dev_session_cookie(response)
+            return response
         if request.url.path.startswith("/api/"):
             return JSONResponse(
                 status_code=401,
@@ -62,9 +71,17 @@ def _is_public_path(path: str) -> bool:
     return (
         path == "/"
         or path == "/validation"
+        or path in {"/robots.txt", "/sitemap.xml"}
+        or path.startswith("/use-cases/")
+        or path.startswith("/simulations/")
+        or path.startswith("/compare/")
         or path.startswith("/api/auth/")
         or path in {"/api/health", "/api/config"}
         or path.startswith("/assets/")
         or path.startswith("/fonts/")
-        or path in {"/favicon.ico", "/favicon.svg"}
+        or path.startswith("/landing/")
+        or path.startswith("/maps/")
+        or path.startswith("/organization/")
+        or path.startswith("/persona/")
+        or path in {"/favicon.ico", "/favicon.svg", "/OG_image.png"}
     )

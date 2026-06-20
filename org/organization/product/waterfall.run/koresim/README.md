@@ -9,6 +9,7 @@ KoreaSim is a Korean AI human-behavior simulation product built on NVIDIA Nemotr
 - Legacy/internal surface: Streamlit may remain as an operator fallback, but is no longer the primary MVP surface
 - Tunnel strategy: Cloudflare Named Tunnel to the FastAPI origin
 - Auth strategy: Cloudflare Access allowlists are not part of the current demo target. The landing/status surface is public through Cloudflare Tunnel; `/app*`, `/results*`, and run/preset/export APIs require FastAPI Google OAuth when auth is configured. Test/staging E2E can use a disabled-by-default test-login endpoint.
+- Launch quota strategy: authenticated new users receive 5 free simulation runs by default. Run creation is guarded server-side through SQLite user records and a usage ledger; admin/bypass emails can be configured by environment.
 - Runtime persistence: SQLite job/result store
 - Job execution: RQ worker backed by Redis
 - Realtime progress: Server-Sent Events, with polling fallback
@@ -45,6 +46,114 @@ flowchart LR
   LLMGateway --> Obs["Langfuse metadata tracing"]
   API --> SSE["SSE progress stream"]
   SSE --> User
+```
+
+## Agent Flow
+
+The agent system is intentionally split into two parts:
+
+- Intake before the run: understand the user's goal, ask for missing information, and build safe structured input.
+- Result agents after the run: analyze the completed aggregate result, write the report, and check the output.
+
+```text
+[사용자]
+   |
+   v
+[무엇을 알고 싶은지 입력]
+예: "가격을 얼마로 해야 할까요?"
+    "캠페인 전략을 만들고 싶어요."
+   |
+   v
+[입력 정리 단계]
+- 사용자의 목표 파악
+- 어떤 시뮬레이션이 맞는지 판단
+- 부족한 정보 확인
+   |
+   v
+[더 물어볼지 판단]
+   |
+   +--> 정보가 부족함
+   |       |
+   |       v
+   |   [질문 1개만 하기]
+   |   예: "어떤 제품인가요?"
+   |
+   +--> 여러 정보가 필요함
+   |       |
+   |       v
+   |   [짧은 입력폼 보여주기]
+   |
+   +--> 후보가 필요함
+   |       |
+   |       v
+   |   [문구/가격/채널 후보 만들기]
+   |       |
+   |       v
+   |   [사용자에게 확인받기]
+   |
+   +--> 준비 완료
+           |
+           v
+[실행용 입력 만들기]
+- 사용자가 직접 말한 정보
+- AI가 추론한 정보
+- AI가 만든 후보
+- 기본값
+을 구분해서 저장
+           |
+           v
+[시뮬레이션 실행]
+           |
+           v
+[50~200명의 가상 한국인 페르소나에게 질문]
+           |
+           v
+[응답 수집]
+           |
+           v
+[결과 집계]
+예:
+- 어떤 선택지가 가장 많이 선택됐는지
+- 연령/성별/지역별 차이가 있는지
+- 응답 품질은 괜찮은지
+           |
+           v
+[분석 AI]
+- 숫자 결과를 해석
+- 중요한 발견 정리
+           |
+           v
+[리포트 AI]
+- 사용자가 읽기 쉬운 보고서로 정리
+- 추천 행동 제안
+           |
+           v
+[검수 AI]
+- 과장된 결론이 없는지 확인
+- 표본이 작으면 "방향성 참고"로 표시
+           |
+           v
+[최종 결과 저장]
+           |
+           v
+[결과 화면에 표시]
+
+
+중요한 원칙
+--------------------------------------------------
+1. 사용자가 말한 정보와 AI가 추론한 정보는 분리해서 저장합니다.
+
+2. AI가 마음대로 가정한 내용은 결과에 몰래 섞지 않습니다.
+   필요한 경우 사용자에게 먼저 확인받습니다.
+
+3. 50~200명 응답 생성은 기존 방식 그대로 둡니다.
+   이 부분을 복잡한 agent 구조로 바꾸지 않습니다.
+
+4. Agent는 응답이 모두 끝난 뒤,
+   결과를 해석하고 보고서를 만들고 검수하는 역할입니다.
+
+5. Langfuse에는 민감한 원문 데이터가 아니라
+   실행 상태, 모델 정보, 점수 같은 메타데이터만 보냅니다.
 ```
 
 ## Repository Map

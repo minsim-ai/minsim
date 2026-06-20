@@ -77,6 +77,8 @@ def run_noop_job(run_id: str, sqlite_path: str | None = None) -> dict[str, Any]:
             done_count=run.total_count,
             completed_at=completed_at,
         )
+        if run.user_id:
+            store.complete_free_run(run.user_id, run.run_id, reason="run_completed")
         store.append_event(run_id, RunEventType.COMPLETED, {"completed_at": completed_at})
         return {"run_id": run_id, "status": RunStatusValue.COMPLETED.value}
     except Exception as exc:
@@ -206,6 +208,8 @@ def run_simulation_job(
             done_count=run.total_count,
             completed_at=completed_at,
         )
+        if run.user_id:
+            store.complete_free_run(run.user_id, run.run_id, reason="run_completed")
         store.append_event(run_id, RunEventType.COMPLETED, {"completed_at": completed_at})
         return {"run_id": run_id, "status": RunStatusValue.COMPLETED.value}
     except WorkerCanceled:

@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from src.api.main import create_app
+from src.api.main import _is_public_path, create_app
 
 
 def test_auth_session_reports_disabled_when_google_secret_is_missing(monkeypatch) -> None:
@@ -84,3 +84,45 @@ def test_auth_required_protects_app_and_api_when_google_is_configured(monkeypatc
     authorized = client.get("/api/presets")
     assert authorized.status_code == 200
     assert authorized.json()
+
+
+def test_seo_public_paths_bypass_auth_middleware() -> None:
+    assert _is_public_path("/robots.txt")
+    assert _is_public_path("/sitemap.xml")
+    assert _is_public_path("/use-cases/price-optimization/")
+    assert _is_public_path("/simulations/price-optimization/")
+    assert _is_public_path("/compare/market-research-vs-ai-simulation/")
+    assert _is_public_path("/landing/logos/nvidia.svg")
+    assert not _is_public_path("/app")
+    assert not _is_public_path("/results")
+    assert not _is_public_path("/admin")
+
+
+def test_localhost_auto_login_allows_local_development_without_google_click(monkeypatch) -> None:
+    monkeypatch.setenv("KORESIM_AUTH_SECRET", "test-secret")
+    monkeypatch.setenv("KORESIM_AUTH_COOKIE_SECURE", "false")
+    monkeypatch.setenv("GOOGLE_CLIENT_ID", "google-client")
+    monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "google-secret")
+    client = TestClient(create_app(), base_url="http://127.0.0.1")
+
+    session_response = client.get("/api/auth/session")
+    assert session_response.status_code == 200
+    session = session_response.json()
+    assert session["authenticated"] is True
+    assert session["provider"] == "local_dev"
+
+    api_response = client.get("/api/presets")
+    assert api_response.status_code == 200
+    assert "koresim_session=" in api_response.headers["set-cookie"]
+
+
+def test_localhost_auto_login_can_be_disabled(monkeypatch) -> None:
+    monkeypatch.setenv("KORESIM_AUTH_SECRET", "test-secret")
+    monkeypatch.setenv("KORESIM_AUTH_COOKIE_SECURE", "false")
+    monkeypatch.setenv("GOOGLE_CLIENT_ID", "google-client")
+    monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "google-secret")
+    monkeypatch.setenv("KORESIM_AUTH_LOCAL_DEV_AUTO_LOGIN", "false")
+    client = TestClient(create_app(), base_url="http://127.0.0.1")
+
+    api_response = client.get("/api/presets")
+    assert api_response.status_code == 401

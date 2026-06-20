@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Any, Self
+from typing import Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -43,6 +43,7 @@ class ErrorCode(StrEnum):
     RESULT_NOT_READY = "RESULT_NOT_READY"
     RUN_NOT_CANCELABLE = "RUN_NOT_CANCELABLE"
     QUEUE_UNAVAILABLE = "QUEUE_UNAVAILABLE"
+    FREE_QUOTA_EXHAUSTED = "FREE_QUOTA_EXHAUSTED"
     WORKER_INTERRUPTED = "WORKER_INTERRUPTED"
     LLM_UNAVAILABLE = "LLM_UNAVAILABLE"
     LLM_TIMEOUT = "LLM_TIMEOUT"
@@ -94,10 +95,12 @@ class CreativeTestingInput(APIModel):
 
 
 class PriceOptimizationInput(APIModel):
+    protocol_id: Literal["price_research_v2"] | None = None
     product_name: str = Field(min_length=1, max_length=120)
     product_description: str = Field(min_length=1, max_length=1200)
     price_points: list[int] = Field(min_length=3, max_length=6)
     context_note: str | None = Field(default=None, max_length=1000)
+    calibration: dict[str, Any] | None = None
 
     @field_validator("price_points")
     @classmethod
@@ -118,8 +121,11 @@ class ProductLaunchInput(APIModel):
 
 
 class ValuePropositionInput(APIModel):
+    protocol_id: Literal["product_qa_v1"] | None = None
+    artifact_type: str | None = Field(default=None, max_length=80)
     product_context: str = Field(min_length=1, max_length=1000)
     statements: list[str] = Field(min_length=2, max_length=5)
+    criteria: list[str] = Field(default_factory=list, max_length=8)
 
     @field_validator("statements")
     @classmethod
@@ -437,6 +443,7 @@ class RunResultEnvelope(APIModel):
     trace_id: str | None = None
     orchestration: dict[str, Any] = Field(default_factory=dict)
     safe_intake_summary: SafeIntakeSummary | None = None
+    protocol: dict[str, Any] | None = None
 
 
 class RunPartialResultsResponse(APIModel):
@@ -465,6 +472,101 @@ class AuthSessionResponse(APIModel):
     test_login_enabled: bool
     login_url: str
     logout_url: str
+
+
+class UserUsageResponse(APIModel):
+    user_id: str
+    email: str
+    plan: str
+    free_run_limit: int = Field(ge=0)
+    used_runs: int = Field(ge=0)
+    remaining_runs: int = Field(ge=0)
+    can_create_run: bool
+    quota_bypass: bool = False
+
+
+class AnalyticsEventRequest(APIModel):
+    event_name: str = Field(min_length=1, max_length=80)
+    session_id: str | None = Field(default=None, max_length=160)
+    run_id: str | None = Field(default=None, max_length=160)
+    page: str | None = Field(default=None, max_length=120)
+    simulation_type: SimulationType | None = None
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class AnalyticsEventResponse(APIModel):
+    event_id: str
+    event_name: str
+    created_at: str
+
+
+class RunFeedbackRequest(APIModel):
+    intake_session_id: str | None = Field(default=None, max_length=160)
+    usefulness_score: int | None = Field(default=None, ge=1, le=5)
+    trust_score: int | None = Field(default=None, ge=1, le=5)
+    actionability_score: int | None = Field(default=None, ge=1, le=5)
+    result_expectation: str | None = Field(default=None, max_length=80)
+    free_text: str | None = Field(default=None, max_length=1200)
+    intended_action: str | None = Field(default=None, max_length=240)
+    decision_confidence_before: int | None = Field(default=None, ge=1, le=5)
+    decision_confidence_after: int | None = Field(default=None, ge=1, le=5)
+    shared_with_team: bool = False
+    exported_report: bool = False
+
+
+class RunFeedbackResponse(APIModel):
+    feedback_id: str
+    followup_id: str
+    run_id: str
+    created_at: str
+
+
+class AdminOverviewResponse(APIModel):
+    users: int
+    runs: int
+    completed_runs: int
+    failed_runs: int
+    intake_sessions: int
+    feedback: int
+    analytics_events: int
+    by_simulation: list[dict[str, Any]]
+    recent_events: list[dict[str, Any]]
+    funnel: dict[str, Any] = Field(default_factory=dict)
+    accounts: list[dict[str, Any]] = Field(default_factory=list)
+    policy: dict[str, Any] = Field(default_factory=dict)
+
+
+class AdminListResponse(APIModel):
+    items: list[dict[str, Any]]
+
+
+class AdminExportResponse(APIModel):
+    schema_version: str
+    generated_at: str
+    policy: dict[str, Any]
+    overview: dict[str, Any]
+    funnel: dict[str, Any]
+    accounts: list[dict[str, Any]]
+    users: list[dict[str, Any]]
+    runs: list[dict[str, Any]]
+    feedback: list[dict[str, Any]]
+
+
+class AdminRetentionPruneRequest(APIModel):
+    retention_days: int = Field(default=180, ge=1, le=3650)
+    dry_run: bool = True
+    confirm: bool = False
+
+
+class AdminDeleteUserRequest(APIModel):
+    confirm_user_id: str = Field(min_length=1, max_length=200)
+
+
+class AdminMutationResponse(APIModel):
+    ok: bool = True
+    action: str
+    dry_run: bool = False
+    result: dict[str, Any]
 
 
 class RunExportResponse(APIModel):

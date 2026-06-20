@@ -3,7 +3,7 @@ title: KoreaSim — 프로젝트 진행 트래커
 type: protocol
 tags: [koresim, project-tracker, roadmap]
 created: 2026-04-30
-updated: 2026-05-03
+updated: 2026-06-03
 status: stable
 ---
 
@@ -19,9 +19,10 @@ status: stable
 - **공식 외부 데모**: React + FastAPI
 - **Fallback**: Streamlit `app.py`는 내부 운영/백업용
 - **배포 도메인**: `https://arabesque.cc`
-- **외부 노출**: Cloudflare Named Tunnel
+- **외부 노출**: Mac Studio local FastAPI origin + Cloudflare Named Tunnel
 - **인증/외부 접근**: Cloudflare Tunnel은 공개 경로를 제공하지만 Cloudflare Access allowlist 보호는 현재 데모 요구사항에서 제거되었다. `/app*`, `/results*`, and run/preset/export APIs are protected by app-level auth when Google OAuth is configured.
 - **앱 레벨 인증**: React+FastAPI 구조에서는 Better Auth를 직접 붙이지 않고 FastAPI Google OAuth + signed HTTP-only session cookie를 사용한다. Routine E2E는 Google OAuth UI를 클릭하지 않고 test/staging 전용 `/api/auth/test-login`을 사용한다.
+- **출시용 무료 실행권**: 신규 인증 사용자는 기본 5회 무료 시뮬레이션 실행권을 받는다. `/api/runs`는 서버에서 SQLite usage ledger를 확인해 강제하며, 운영/테스트 계정은 env allowlist로 quota를 우회할 수 있다.
 - **진행률**: SSE, polling fallback
 - **영속화**: SQLite job/result store
 - **작업 큐**: Redis + RQ worker
@@ -34,6 +35,34 @@ status: stable
 - **세션 초기화 후 다음 구현 지시서**: [[docs/runbooks/next-autonomous-implementation]]
 - **Data Governance**: [[docs/design/data-governance-and-io-boundary]] — 제품 저장소의 full raw와 외부 provider/observability payload 정책을 분리한다.
 - **Evaluation Framework**: [[docs/design/evaluation-framework]] — schema/import, deterministic fixture, live local run, provider comparison eval을 gate별로 분리한다.
+- **Persona Simulation Protocol Engine**: [[docs/design/persona-simulation-protocol-engine]] — `price_optimization` 안에서 versioned protocol로 `price_research_v2`를 확장한다.
+
+## 현재 배포 방식
+
+`arabesque.cc`는 Vercel 배포가 아니다. Mac Studio 로컬 origin을 FastAPI가 띄우고, Cloudflare Named Tunnel이 외부 도메인으로 전달한다.
+
+- Origin: `uv run uvicorn src.api.main:app --host 127.0.0.1 --port 8000`
+- React build: `frontend/dist`
+- Static serving: `src/api/static.py`가 `frontend/dist`를 FastAPI에서 서빙한다.
+- Tunnel config: `/Users/qts/.cloudflared/koresim-arabesque.yml`
+- Runtime path: `/Users/qts/koresim-runtime`
+- launchd services:
+  - `com.koresim.api` — FastAPI origin
+  - `com.koresim.worker` — RQ worker
+  - `com.koresim.tunnel` — Cloudflare tunnel
+
+배포 업데이트 순서:
+
+```bash
+npm --prefix frontend run build
+launchctl kickstart -k gui/$(id -u)/com.koresim.api
+launchctl kickstart -k gui/$(id -u)/com.koresim.worker
+uv run python scripts/check_mac_studio_production.py --external --timeout-seconds 15
+```
+
+일반적인 UI/API 코드 변경은 tunnel 재시작이 필요 없다. Cloudflare 설정이나 터널 연결 상태를 바꿀 때만 `com.koresim.tunnel`을 재시작한다.
+
+주의: 로그인 전 공개 랜딩에서 필요한 정적 asset 폴더를 새로 추가하면 `src/api/static.py` mount와 `src/api/main.py`의 `_is_public_path()`를 함께 업데이트한다.
 
 ## 디자인 시스템
 
@@ -94,6 +123,10 @@ Current status:
 - App-level auth is implemented for the current React+FastAPI architecture: `GET /api/auth/session`, Google OAuth login/callback/logout, signed session cookie, disabled-by-default test login for E2E, and login enforcement for `/app*`, `/results*`, and run/preset/export APIs when auth is configured.
 - Run cancellation and human-review JSON export are implemented as post-demo product controls. Export excludes `raw_results` and requires human review before external sharing.
 - Agentic Intake Layer V2 is implemented for productization: `IntakeContextEnvelope`, `safe_intake_summary`, `/api/intake/advance`, 9-simulation intake regression fixtures, and result-agent safe context propagation are complete.
+- Persona Simulation Performance Upgrade V1 is in progress: slices now include `price_research_v2` as a versioned `price_optimization` protocol, `product_qa_v1` as a versioned `value_proposition` protocol, aggregate calibration metadata, deterministic interview guide generation, result envelope `protocol` metadata, React metric rendering, and fake LLM benchmark artifact generation.
+- Admin Analytics and Feedback V1 is complete: `analytics_events`, `user_feedback`, `result_followups`, and `admin_audit_events` back the product-improvement data loop, with masked `/api/admin/*` APIs, React `/admin`, funnel/account-domain proxy views, masked admin export, retention dry-run/confirmed prune, confirmed user deletion, and result feedback collection. Design source: [[docs/design/admin-analytics-data-layer]], execution plan: [[docs/execution/admin-analytics-feedback-mvp]].
+- SEO Foundation V1 is complete for the public landing surface and programmatic SEO expansion: public robots/sitemap/use-case pages, 9 simulation pages, 3 comparison pages, canonical/JSON-LD/root fallback content, protected route disallow rules, directory static pages, HEAD support, long static cache headers, landing nav/footer internal links, image alt fixes, and compressed OG/social images. Execution plan: [[docs/execution/seo-foundation-v1]].
+- Small external Price Research V2 benchmark passed on 2026-05-14: `sample_size=10`, 10 responses, 0 parse failures, 100.0% parse success, 33.162 seconds, artifact `docs/verification/benchmarks/persona-simulation-benchmark-external-20260514T032811Z.json`.
 - Deterministic 50/200-person validation artifact: `docs/verification/phase-5-phase-7-deterministic-validation.json`.
 - Live external Gemini 9-simulation 200-person validation passed through `https://arabesque.cc/api/runs`: 1,800 total responses, 3 parse failures, no failed runs, artifact `docs/verification/external-gemini-9-simulations-200-2026-05-03.json`.
 - Public `arabesque.cc` route gate passed with `/`, `/app`, `/results`, `/api/health`, and `/api/config` returning origin responses without Cloudflare Access markers. External SSE replay returned snapshot/progress events for a completed 200-person run.

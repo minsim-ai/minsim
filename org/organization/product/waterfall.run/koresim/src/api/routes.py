@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
@@ -15,6 +16,14 @@ from src.api.schemas import (
     DemoPreset,
     ErrorCode,
     ErrorResponse,
+    AdminDeleteUserRequest,
+    AdminExportResponse,
+    AdminListResponse,
+    AdminMutationResponse,
+    AdminOverviewResponse,
+    AdminRetentionPruneRequest,
+    AnalyticsEventRequest,
+    AnalyticsEventResponse,
     AuthSessionResponse,
     IntakeAssumption,
     IntakeAdvanceRequest,
@@ -32,18 +41,25 @@ from src.api.schemas import (
     RunCreateRequest,
     RunCreateResponse,
     RunExportResponse,
+    RunFeedbackRequest,
+    RunFeedbackResponse,
     RunPartialResultsResponse,
     RunResultEnvelope,
     RunSnapshot,
     RunStatus,
     SimulationType,
+    UserUsageResponse,
 )
 from src.intake import advance_intake
 from src.api.auth import (
+    auth_required,
     build_google_callback_response,
     build_google_login_response,
     build_logout_response,
     build_test_login_response,
+    local_dev_auto_login_enabled,
+    local_dev_user,
+    read_session_user,
     session_summary,
 )
 from src.api.presets import list_demo_presets
@@ -60,6 +76,7 @@ from src.config import (
 )
 from src.jobs.events import format_heartbeat, format_snapshot, format_sse_event
 from src.jobs.models import RunEventType, RunRecord, RunStatusValue
+from src.jobs.models import UserRecord
 from src.jobs.store import SQLiteRunStore
 from src.llm.base import LLMClientProtocol, LLMMessage, LLMRequest
 from src.llm.factory import create_llm_client
@@ -87,6 +104,93 @@ def _llm_client(request: Request) -> LLMClientProtocol:
 
 def _error(status_code: int, response: ErrorResponse) -> HTTPException:
     return HTTPException(status_code=status_code, detail=response.model_dump(mode="json"))
+
+
+def _free_run_limit() -> int:
+    raw_value = os.getenv("KORESIM_FREE_RUN_LIMIT", "5")
+    try:
+        return max(0, int(raw_value))
+    except ValueError:
+        return 5
+
+
+def _quota_bypass_emails() -> set[str]:
+    raw_values = [
+        os.getenv("KORESIM_ADMIN_EMAILS", ""),
+        os.getenv("KORESIM_QUOTA_BYPASS_EMAILS", ""),
+    ]
+    emails: set[str] = set()
+    for raw_value in raw_values:
+        for item in raw_value.split(","):
+            email = item.strip().lower()
+            if email:
+                emails.add(email)
+    return emails
+
+
+def _quota_bypass(email: str) -> bool:
+    return email.strip().lower() in _quota_bypass_emails()
+
+
+def _admin_emails() -> set[str]:
+    return {
+        email.strip().lower()
+        for email in os.getenv("KORESIM_ADMIN_EMAILS", "").split(",")
+        if email.strip()
+    }
+
+
+def _is_admin(email: str) -> bool:
+    return email.strip().lower() in _admin_emails()
+
+
+def _admin_retention_days() -> int:
+    raw_value = os.getenv("KORESIM_DATA_RETENTION_DAYS", "180")
+    try:
+        return max(1, min(int(raw_value), 3650))
+    except ValueError:
+        return 180
+
+
+def _authenticated_user(request: Request) -> dict[str, Any] | None:
+    user = read_session_user(request)
+    if user is None and auth_required() and local_dev_auto_login_enabled(request):
+        user = local_dev_user()
+    return user
+
+
+def _user_record_for_request(request: Request) -> UserRecord | None:
+    user = _authenticated_user(request)
+    if user is None:
+        return None
+    return _store(request).upsert_user_from_auth(user, free_run_limit=_free_run_limit())
+
+
+def _require_admin_user(request: Request) -> UserRecord:
+    user = _user_record_for_request(request)
+    if user is None or not _is_admin(user.email):
+        raise _error(
+            403,
+            ErrorResponse(
+                code=ErrorCode.INVALID_REQUEST,
+                message="관리자 권한이 필요합니다.",
+            ),
+        )
+    return user
+
+
+def _usage_response(store: SQLiteRunStore, user: UserRecord) -> UserUsageResponse:
+    usage = store.get_user_usage(user.user_id, quota_bypass=_quota_bypass(user.email))
+    return UserUsageResponse(
+        user_id=usage.user_id,
+        email=usage.email,
+        plan=usage.plan,
+        free_run_limit=usage.free_run_limit,
+        used_runs=usage.used_runs,
+        remaining_runs=usage.remaining_runs,
+        can_create_run=usage.can_create_run,
+        quota_bypass=usage.quota_bypass,
+    )
 
 
 def _run_snapshot(store: SQLiteRunStore, run: RunRecord) -> RunSnapshot:
@@ -131,6 +235,79 @@ def _run_rate_and_eta(run: RunRecord) -> tuple[float | None, int | None]:
 
 def _utc_now() -> str:
     return datetime.now(UTC).isoformat()
+
+
+def _mask_email(value: Any) -> Any:
+    if not isinstance(value, str) or "@" not in value:
+        return value
+    name, domain = value.split("@", 1)
+    if not name or not domain:
+        return "***"
+    visible = name[:2] if len(name) > 2 else name[:1]
+    return f"{visible}{'*' * max(3, len(name) - len(visible))}@{domain}"
+
+
+def _mask_text(value: Any, *, keep_prefix: int = 24) -> Any:
+    if not isinstance(value, str):
+        return value
+    if len(value) <= keep_prefix:
+        return "[masked]"
+    return f"{value[:keep_prefix]}... [masked]"
+
+
+def _mask_admin_value(key: str, value: Any) -> Any:
+    if value is None:
+        return None
+    normalized_key = key.lower()
+    if "email" in normalized_key:
+        return _mask_email(value)
+    if normalized_key in {"name", "free_text", "result_expectation", "intended_action"}:
+        return _mask_text(value)
+    if normalized_key in {"input", "payload", "intake_context", "target_filter", "error"}:
+        return _mask_nested(value)
+    if isinstance(value, dict):
+        return {child_key: _mask_admin_value(child_key, child_value) for child_key, child_value in value.items()}
+    if isinstance(value, list):
+        return [_mask_nested(item) for item in value]
+    return value
+
+
+def _mask_nested(value: Any) -> Any:
+    if isinstance(value, dict):
+        masked: dict[str, Any] = {}
+        for key, child_value in value.items():
+            normalized_key = key.lower()
+            if any(token in normalized_key for token in ("email", "name", "description", "context", "text", "message", "creative", "product")):
+                masked[key] = _mask_text(child_value)
+            else:
+                masked[key] = _mask_admin_value(key, child_value)
+        return masked
+    if isinstance(value, list):
+        return [_mask_nested(item) for item in value]
+    if isinstance(value, str):
+        return _mask_text(value)
+    return value
+
+
+def _mask_admin_items(items: list[dict[str, Any]], *, include_sensitive: bool = False) -> list[dict[str, Any]]:
+    if include_sensitive:
+        return items
+    return [
+        {key: _mask_admin_value(key, value) for key, value in item.items()}
+        for item in items
+    ]
+
+
+def _mask_admin_payload(payload: dict[str, Any], *, include_sensitive: bool = False) -> dict[str, Any]:
+    if include_sensitive:
+        return payload
+    masked = {key: _mask_admin_value(key, value) for key, value in payload.items()}
+    for key in ("recent_events", "users", "runs", "feedback", "accounts"):
+        if isinstance(masked.get(key), list):
+            masked[key] = _mask_admin_items(masked[key], include_sensitive=False)
+    if isinstance(masked.get("overview"), dict):
+        masked["overview"] = _mask_admin_payload(masked["overview"], include_sensitive=False)
+    return masked
 
 
 def _export_response(result: RunResultEnvelope) -> RunExportResponse:
@@ -254,6 +431,38 @@ async def auth_session(request: Request) -> AuthSessionResponse:
     return AuthSessionResponse.model_validate(session_summary(request))
 
 
+@router.get("/api/me/usage")
+async def my_usage(request: Request) -> UserUsageResponse:
+    user = _user_record_for_request(request)
+    if user is None:
+        raise _error(
+            401,
+            ErrorResponse(
+                code=ErrorCode.INVALID_REQUEST,
+                message="로그인이 필요합니다.",
+            ),
+        )
+    return _usage_response(_store(request), user)
+
+
+@router.post("/api/analytics/events")
+async def record_analytics_event(
+    request: Request,
+    payload: AnalyticsEventRequest,
+) -> AnalyticsEventResponse:
+    user = _user_record_for_request(request)
+    record = _store(request).record_analytics_event(
+        event_name=payload.event_name,
+        user=user,
+        session_id=payload.session_id,
+        run_id=payload.run_id,
+        page=payload.page,
+        simulation_type=payload.simulation_type.value if payload.simulation_type else None,
+        payload=payload.payload,
+    )
+    return AnalyticsEventResponse.model_validate(record)
+
+
 @router.get("/api/auth/google/login")
 async def auth_google_login(request: Request, next: str = "/app") -> RedirectResponse:
     return build_google_login_response(request, next_url=next)
@@ -284,24 +493,174 @@ async def api_presets() -> list[DemoPreset]:
     return list_demo_presets()
 
 
+@router.get("/api/admin/overview")
+async def admin_overview(request: Request, include_sensitive: bool = False) -> AdminOverviewResponse:
+    admin = _require_admin_user(request)
+    store = _store(request)
+    store.append_admin_audit_event(
+        admin=admin,
+        action="view_admin_overview",
+        payload={"include_sensitive": include_sensitive},
+    )
+    overview = store.admin_overview()
+    overview["funnel"] = store.admin_funnel()
+    overview["accounts"] = store.admin_accounts(limit=20)
+    overview["policy"] = store.admin_policy(retention_days=_admin_retention_days())
+    return AdminOverviewResponse.model_validate(_mask_admin_payload(overview, include_sensitive=include_sensitive))
+
+
+@router.get("/api/admin/users")
+async def admin_users(request: Request, limit: int = 50, include_sensitive: bool = False) -> AdminListResponse:
+    admin = _require_admin_user(request)
+    store = _store(request)
+    store.append_admin_audit_event(
+        admin=admin,
+        action="view_admin_users",
+        payload={"limit": limit, "include_sensitive": include_sensitive},
+    )
+    return AdminListResponse(items=_mask_admin_items(store.admin_users(limit=limit), include_sensitive=include_sensitive))
+
+
+@router.get("/api/admin/runs")
+async def admin_runs(request: Request, limit: int = 50, include_sensitive: bool = False) -> AdminListResponse:
+    admin = _require_admin_user(request)
+    store = _store(request)
+    store.append_admin_audit_event(
+        admin=admin,
+        action="view_admin_runs",
+        payload={"limit": limit, "include_sensitive": include_sensitive},
+    )
+    return AdminListResponse(items=_mask_admin_items(store.admin_runs(limit=limit), include_sensitive=include_sensitive))
+
+
+@router.get("/api/admin/feedback")
+async def admin_feedback(request: Request, limit: int = 50, include_sensitive: bool = False) -> AdminListResponse:
+    admin = _require_admin_user(request)
+    store = _store(request)
+    store.append_admin_audit_event(
+        admin=admin,
+        action="view_admin_feedback",
+        payload={"limit": limit, "include_sensitive": include_sensitive},
+    )
+    return AdminListResponse(items=_mask_admin_items(store.admin_feedback(limit=limit), include_sensitive=include_sensitive))
+
+
+@router.get("/api/admin/export")
+async def admin_export(request: Request, include_sensitive: bool = False) -> AdminExportResponse:
+    admin = _require_admin_user(request)
+    store = _store(request)
+    store.append_admin_audit_event(
+        admin=admin,
+        action="export_admin_data",
+        payload={"include_sensitive": include_sensitive},
+    )
+    export_data = store.admin_export(retention_days=_admin_retention_days())
+    return AdminExportResponse.model_validate(_mask_admin_payload(export_data, include_sensitive=include_sensitive))
+
+
+@router.get("/api/admin/policy")
+async def admin_policy(request: Request) -> dict[str, Any]:
+    admin = _require_admin_user(request)
+    store = _store(request)
+    store.append_admin_audit_event(admin=admin, action="view_admin_policy")
+    return store.admin_policy(retention_days=_admin_retention_days())
+
+
+@router.post("/api/admin/retention/prune")
+async def admin_retention_prune(
+    request: Request,
+    payload: AdminRetentionPruneRequest,
+) -> AdminMutationResponse:
+    admin = _require_admin_user(request)
+    if not payload.dry_run and not payload.confirm:
+        raise _error(
+            400,
+            ErrorResponse(
+                code=ErrorCode.INVALID_REQUEST,
+                message="실제 보존 정책 삭제에는 confirm=true가 필요합니다.",
+            ),
+        )
+    store = _store(request)
+    result = store.prune_retention(retention_days=payload.retention_days, dry_run=payload.dry_run)
+    store.append_admin_audit_event(
+        admin=admin,
+        action="retention_prune_dry_run" if payload.dry_run else "retention_prune_execute",
+        payload={
+            "retention_days": payload.retention_days,
+            "dry_run": payload.dry_run,
+            "counts": result.get("counts", {}),
+        },
+    )
+    return AdminMutationResponse(action="retention_prune", dry_run=payload.dry_run, result=result)
+
+
+@router.post("/api/admin/users/{user_id}/delete")
+async def admin_delete_user(
+    request: Request,
+    user_id: str,
+    payload: AdminDeleteUserRequest,
+) -> AdminMutationResponse:
+    admin = _require_admin_user(request)
+    if payload.confirm_user_id != user_id:
+        raise _error(
+            400,
+            ErrorResponse(
+                code=ErrorCode.INVALID_REQUEST,
+                message="삭제하려면 confirm_user_id가 대상 user_id와 정확히 같아야 합니다.",
+            ),
+        )
+    if admin.user_id == user_id:
+        raise _error(
+            400,
+            ErrorResponse(
+                code=ErrorCode.INVALID_REQUEST,
+                message="현재 로그인한 관리자 계정은 이 화면에서 삭제할 수 없습니다.",
+            ),
+        )
+    store = _store(request)
+    result = store.delete_user_data(user_id=user_id)
+    masked_result = _mask_admin_payload(result, include_sensitive=False)
+    store.append_admin_audit_event(
+        admin=admin,
+        action="delete_user_data",
+        target_type="user",
+        target_id=user_id,
+        payload=masked_result,
+    )
+    return AdminMutationResponse(action="delete_user_data", result=masked_result)
+
+
 @router.post("/api/intake/sessions")
 async def save_intake_session(
     request: Request,
     payload: IntakeSessionSaveRequest,
 ) -> IntakeSessionResponse:
     session_id = payload.session_id or f"intake-{uuid4()}"
+    user = _user_record_for_request(request)
     record = _store(request).save_intake_session(
         session_id=session_id,
         status=payload.status,
         snapshot=payload.snapshot,
         event_type="session_saved",
+        user=user,
+    )
+    _store(request).record_analytics_event(
+        event_name="intake_session_saved",
+        user=user,
+        session_id=session_id,
+        page="/app",
+        payload={"status": payload.status},
     )
     return _intake_session_response(record)
 
 
 @router.get("/api/intake/sessions")
 async def list_intake_sessions(request: Request, limit: int = 20) -> IntakeSessionListResponse:
-    records = _store(request).list_intake_sessions(limit=limit)
+    user = _user_record_for_request(request)
+    records = _store(request).list_intake_sessions(
+        limit=limit,
+        user_id=user.user_id if user else None,
+    )
     return IntakeSessionListResponse(
         sessions=[_intake_session_response(record) for record in records],
     )
@@ -309,7 +668,11 @@ async def list_intake_sessions(request: Request, limit: int = 20) -> IntakeSessi
 
 @router.get("/api/intake/history")
 async def list_intake_history(request: Request, limit: int = 20) -> IntakeHistoryResponse:
-    records = _store(request).list_intake_history(limit=limit)
+    user = _user_record_for_request(request)
+    records = _store(request).list_intake_history(
+        limit=limit,
+        user_id=user.user_id if user else None,
+    )
     return IntakeHistoryResponse(items=[_intake_history_response(record) for record in records])
 
 
@@ -324,11 +687,23 @@ async def advance_intake_session(
         snapshot=payload.snapshot,
         event=payload.event,
     )
+    user = _user_record_for_request(request)
     _store(request).save_intake_session(
         session_id=session_id,
         status=str(advanced["status"]),
         snapshot=advanced["snapshot"],
         event_type="advance",
+        user=user,
+    )
+    _store(request).record_analytics_event(
+        event_name="intake_advanced",
+        user=user,
+        session_id=session_id,
+        page="/app",
+        payload={
+            "status": str(advanced["status"]),
+            "event_type": payload.event.get("type"),
+        },
     )
     return IntakeAdvanceResponse.model_validate(advanced)
 
@@ -339,11 +714,20 @@ async def update_intake_session(
     session_id: str,
     payload: IntakeSessionSaveRequest,
 ) -> IntakeSessionResponse:
+    user = _user_record_for_request(request)
     record = _store(request).save_intake_session(
         session_id=session_id,
         status=payload.status,
         snapshot=payload.snapshot,
         event_type="session_updated",
+        user=user,
+    )
+    _store(request).record_analytics_event(
+        event_name="intake_session_updated",
+        user=user,
+        session_id=session_id,
+        page="/app",
+        payload={"status": payload.status},
     )
     return _intake_session_response(record)
 
@@ -354,8 +738,13 @@ async def link_intake_session_run(
     session_id: str,
     payload: IntakeSessionRunLinkRequest,
 ) -> IntakeSessionResponse:
+    user = _user_record_for_request(request)
     try:
-        record = _store(request).attach_intake_run(session_id=session_id, run_id=payload.run_id)
+        record = _store(request).attach_intake_run(
+            session_id=session_id,
+            run_id=payload.run_id,
+            user_id=user.user_id if user else None,
+        )
     except KeyError as exc:
         raise _error(
             404,
@@ -365,12 +754,24 @@ async def link_intake_session_run(
                 details={"session_id": session_id},
             ),
         ) from exc
+    _store(request).record_analytics_event(
+        event_name="intake_run_linked",
+        user=user,
+        session_id=session_id,
+        run_id=payload.run_id,
+        page="/app",
+        payload={},
+    )
     return _intake_session_response(record)
 
 
 @router.get("/api/intake/sessions/{session_id}")
 async def get_intake_session(request: Request, session_id: str) -> IntakeSessionResponse:
-    record = _store(request).get_intake_session(session_id)
+    user = _user_record_for_request(request)
+    record = _store(request).get_intake_session(
+        session_id,
+        user_id=user.user_id if user else None,
+    )
     if record is None:
         raise _error(
             404,
@@ -432,8 +833,36 @@ async def generate_intake_candidates(
 @router.post("/api/runs")
 async def create_run(request: Request, payload: RunCreateRequest) -> RunCreateResponse:
     store = _store(request)
-    run = store.create_run(payload)
+    user = _user_record_for_request(request)
+    bypass_quota = bool(user and _quota_bypass(user.email))
+    if user and not bypass_quota:
+        usage = store.get_user_usage(user.user_id)
+        if not usage.can_create_run:
+            raise _error(
+                403,
+                ErrorResponse(
+                    code=ErrorCode.FREE_QUOTA_EXHAUSTED,
+                    message="무료 실행 5회를 모두 사용했습니다.",
+                    details={
+                        "free_run_limit": usage.free_run_limit,
+                        "used_runs": usage.used_runs,
+                        "remaining_runs": usage.remaining_runs,
+                    },
+                ),
+            )
 
+    run = store.create_run(payload, user=user)
+    store.record_analytics_event(
+        event_name="run_created",
+        user=user,
+        run_id=run.run_id,
+        page="/app",
+        simulation_type=payload.simulation_type.value,
+        payload={
+            "sample_size": payload.sample_size,
+            "has_intake_context": payload.intake_context is not None,
+        },
+    )
     try:
         job_id = _enqueue_run(request)(run.run_id)
         store.append_event(run.run_id, RunEventType.QUEUED, {"job_id": job_id})
@@ -684,7 +1113,64 @@ async def get_run_result(request: Request, run_id: str) -> RunResultEnvelope:
             ),
         )
 
+    user = _user_record_for_request(request)
+    store.record_analytics_event(
+        event_name="result_viewed",
+        user=user,
+        run_id=run_id,
+        page="/results",
+        simulation_type=run.simulation_type,
+        payload={"status": run.status.value},
+    )
     return RunResultEnvelope.model_validate(result.result)
+
+
+@router.post("/api/runs/{run_id}/feedback")
+async def save_run_feedback(
+    request: Request,
+    run_id: str,
+    payload: RunFeedbackRequest,
+) -> RunFeedbackResponse:
+    store = _store(request)
+    run = store.get_run(run_id)
+    if run is None:
+        raise _error(
+            404,
+            ErrorResponse(
+                code=ErrorCode.RUN_NOT_FOUND,
+                message="Run was not found.",
+                details={"run_id": run_id},
+            ),
+        )
+    user = _user_record_for_request(request)
+    record = store.save_user_feedback(
+        run_id=run_id,
+        user=user,
+        intake_session_id=payload.intake_session_id,
+        usefulness_score=payload.usefulness_score,
+        trust_score=payload.trust_score,
+        actionability_score=payload.actionability_score,
+        result_expectation=payload.result_expectation,
+        free_text=payload.free_text,
+        intended_action=payload.intended_action,
+        decision_confidence_before=payload.decision_confidence_before,
+        decision_confidence_after=payload.decision_confidence_after,
+        shared_with_team=payload.shared_with_team,
+        exported_report=payload.exported_report,
+    )
+    store.record_analytics_event(
+        event_name="feedback_submitted",
+        user=user,
+        run_id=run_id,
+        page="/results",
+        simulation_type=run.simulation_type,
+        payload={
+            "usefulness_score": payload.usefulness_score,
+            "trust_score": payload.trust_score,
+            "actionability_score": payload.actionability_score,
+        },
+    )
+    return RunFeedbackResponse.model_validate(record)
 
 
 @router.get("/api/runs/{run_id}/export")

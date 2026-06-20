@@ -1,28 +1,38 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { generateIntakeCandidates, getIntakeSession, listIntakeHistory, saveIntakeSession } from "../../api/intake";
 import { advanceIntakeSession, createInitialIntakeSession } from "../../intake/planner";
-import { asString, asStringArray } from "../../intake/slotUtils";
+import { buildCreativeTestingPayload, buildGenericSimulationPayload, buildIntakeRunProvenance } from "../../intake/payloadBuilder";
+import { asString, asStringArray, createSlot, upsertSlot } from "../../intake/slotUtils";
 import type { CreativeCandidate, CreativeCandidateAngle, IntakeSession, IntakeSlotValue } from "../../intake/types";
-import type { IntakeCreativeCandidate, IntakeHistoryItem, IntakeSessionResponse, JsonObject, RunCreateRequest } from "../../types/api";
+import type { IntakeCreativeCandidate, IntakeHistoryItem, IntakeSessionResponse, JsonObject, RunCreateRequest, SimulationType } from "../../types/api";
 import { AssumptionReviewMessage } from "./AssumptionReviewMessage";
 import { CandidateReviewMessage } from "./CandidateReviewMessage";
 import { DynamicFormMessage } from "./DynamicFormMessage";
-
-const savedSessionKey = "koresim:lastIntakeSessionId";
+import { ThinkingIndicator } from "./ThinkingIndicator";
 
 export function GoalFirstChatFlow({
   onStart,
+  selectedSimulationType,
   startFresh = false,
+  runDisabled = false,
+  runDisabledMessage,
+  storageNamespace = "anonymous",
 }: {
   onStart: (payload: RunCreateRequest, intakeSessionId: string) => void;
+  selectedSimulationType: SimulationType;
   startFresh?: boolean;
+  runDisabled?: boolean;
+  runDisabledMessage?: string;
+  storageNamespace?: string;
 }) {
   const [session, setSession] = useState<IntakeSession>(() => createInitialIntakeSession());
   const [input, setInput] = useState("");
   const [history, setHistory] = useState<IntakeHistoryItem[]>([]);
   const [historyError, setHistoryError] = useState<string | null>(null);
+  const [revealedAssistantKey, setRevealedAssistantKey] = useState<string | null>(null);
   const restoreCompletedRef = useRef(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const savedSessionKey = `koresim:lastIntakeSessionId:${storageNamespace}:${selectedSimulationType}`;
 
   const refreshHistory = useCallback(() => {
     listIntakeHistory(8)
@@ -46,6 +56,8 @@ export function GoalFirstChatFlow({
 
     const savedSessionId = window.localStorage.getItem(savedSessionKey);
     if (!savedSessionId) {
+      setInput("");
+      setSession(createInitialIntakeSession());
       restoreCompletedRef.current = true;
       refreshHistory();
       return;
@@ -69,7 +81,7 @@ export function GoalFirstChatFlow({
     return () => {
       cancelled = true;
     };
-  }, [refreshHistory, startFresh]);
+  }, [refreshHistory, savedSessionKey, startFresh]);
 
   useEffect(() => {
     if (!restoreCompletedRef.current) return;
@@ -87,25 +99,72 @@ export function GoalFirstChatFlow({
       });
     }, 350);
     return () => window.clearTimeout(timeout);
-  }, [session]);
+  }, [savedSessionKey, session]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [session.messages.length, session.action?.type]);
+  }, [revealedAssistantKey, session.messages.length, session.action?.type]);
 
   const submitText = () => {
     if (!input.trim()) return;
-    setSession((prev) => advanceIntakeSession(prev, { type: "user_message", content: input.trim() }));
+    setSession((prev) => advanceIntakeSession(prev, {
+      type: "user_message",
+      content: input.trim(),
+      selectedSimulationType,
+    }));
     setInput("");
+  };
+
+  const updateReadySampleSize = (sampleSize: number) => {
+    const clamped = clampRunSampleSize(sampleSize);
+    setSession((prev) => {
+      if (prev.action?.type !== "run_ready") return prev;
+      const nextSlots = upsertSlot(
+        prev.slots,
+        createSlot("sample_size", clamped, "user", 0.99, "run_ready_sample_control", false),
+      );
+      const nextSession = { ...prev, slots: nextSlots };
+      const payload = prev.action.payload.simulation_type === "creative_testing"
+        ? buildCreativeTestingPayload(nextSession)
+        : buildGenericSimulationPayload(nextSession);
+      return {
+        ...nextSession,
+        action: {
+          ...prev.action,
+          payload,
+          provenance: buildIntakeRunProvenance(nextSession),
+        },
+      };
+    });
   };
 
   const action = session.action;
   const inputPlaceholder = action?.type === "ask_question" ? placeholderForQuestion(action.slotIds) : "";
+  const lastAssistantMessageIndex = findLastAssistantMessageIndex(session.messages);
+  const lastAssistantMessage = lastAssistantMessageIndex >= 0 ? session.messages[lastAssistantMessageIndex] : null;
+  const lastAssistantMessageKey = lastAssistantMessage
+    ? `${session.id}:${lastAssistantMessageIndex}:${lastAssistantMessage.content}`
+    : null;
+  const shouldDelayLatestAssistant = session.turnCount > 0;
+  const isLatestAssistantRevealed = !shouldDelayLatestAssistant || !lastAssistantMessageKey || revealedAssistantKey === lastAssistantMessageKey;
+
+  useEffect(() => {
+    if (!lastAssistantMessageKey) return;
+    if (!shouldDelayLatestAssistant) {
+      setRevealedAssistantKey(lastAssistantMessageKey);
+      return;
+    }
+    setRevealedAssistantKey(null);
+    const timeout = window.setTimeout(() => {
+      setRevealedAssistantKey(lastAssistantMessageKey);
+    }, randomThinkingDelayMs());
+    return () => window.clearTimeout(timeout);
+  }, [lastAssistantMessageKey, shouldDelayLatestAssistant]);
 
   return (
     <section className="ks-chat-box ks-goal-chat" aria-label="목표 기반 시뮬레이션">
       <div className="ks-goal-chat-head">
-        <span className="ks-preset-kicker">Goal-first intake</span>
+        <span className="ks-preset-kicker">목표 먼저 입력</span>
         <h2>원하는 결정을 먼저 말해주세요</h2>
       </div>
       <IntakeHistoryPanel
@@ -138,13 +197,15 @@ export function GoalFirstChatFlow({
               <div className="ks-msg-body">{message.content}</div>
             </div>
           ) : (
-            <p className="ks-msg-system" key={`${message.role}-${index}`}>{message.content}</p>
+            <AssistantMessage key={`${message.role}-${index}`} thinking={index === lastAssistantMessageIndex && !isLatestAssistantRevealed}>
+              {message.content}
+            </AssistantMessage>
           )
         ))}
       </div>
 
       <div className="ks-chat-active">
-        {action?.type === "ask_question" && (
+        {isLatestAssistantRevealed && action?.type === "ask_question" && (
           <div className="ks-input-wrap">
             <textarea
               className="ks-chat-textarea"
@@ -175,16 +236,16 @@ export function GoalFirstChatFlow({
           </div>
         )}
 
-        {action?.type === "show_form" && (
+        {isLatestAssistantRevealed && action?.type === "show_form" && (
           <DynamicFormMessage
             form={action.form}
             onSubmit={(values) => setSession((prev) => advanceIntakeSession(prev, { type: "form_submit", values }))}
           />
         )}
 
-        {action?.type === "candidate_review" && (
+        {isLatestAssistantRevealed && action?.type === "candidate_review" && (
           <>
-            <p className="ks-msg-system">{action.message}</p>
+            <AssistantMessage>{action.message}</AssistantMessage>
             <LlmCandidateReview
               session={session}
               fallbackCandidates={action.candidates}
@@ -196,9 +257,9 @@ export function GoalFirstChatFlow({
           </>
         )}
 
-        {action?.type === "confirm_assumptions" && (
+        {isLatestAssistantRevealed && action?.type === "confirm_assumptions" && (
           <>
-            <p className="ks-msg-system">{action.message}</p>
+            <AssistantMessage>{action.message}</AssistantMessage>
             <AssumptionReviewMessage
               assumptions={action.assumptions}
               onConfirm={() => setSession((prev) => advanceIntakeSession(prev, { type: "confirm_assumptions" }))}
@@ -206,31 +267,42 @@ export function GoalFirstChatFlow({
           </>
         )}
 
-        {action?.type === "repair_input" && (
+        {isLatestAssistantRevealed && action?.type === "repair_input" && (
           <div className="ks-intake-repair">
-            <p className="ks-msg-system">{action.message}</p>
+            <AssistantMessage>{action.message}</AssistantMessage>
             <button className="ks-chat-btn ks-chat-btn--secondary" type="button" onClick={() => setSession(createInitialIntakeSession())}>
               처음부터 다시
             </button>
           </div>
         )}
 
-        {action?.type === "run_ready" && (
+        {isLatestAssistantRevealed && action?.type === "run_ready" && (
           <div className="ks-run-ready">
-            <p className="ks-msg-system">{action.message}</p>
+            <AssistantMessage>{action.message}</AssistantMessage>
             <RunSummary
               payload={action.payload}
               assumptionCount={action.assumptions.length}
               generatedCount={Object.keys(action.provenance.generated).length}
               inferredCount={Object.keys(action.provenance.inferred).length}
+              onSampleSizeChange={updateReadySampleSize}
             />
             <div className="ks-chat-actions">
               <button className="ks-chat-btn ks-chat-btn--secondary" type="button" onClick={() => setSession(createInitialIntakeSession())}>
                 새로 시작
               </button>
-              <button className="ks-chat-btn ks-chat-btn--primary" type="button" onClick={() => onStart(action.payload, session.id)}>
+              <div className="ks-run-start-stack">
+                {runDisabled && runDisabledMessage && (
+                  <p className="ks-quota-inline">{runDisabledMessage}</p>
+                )}
+                <button
+                  className="ks-chat-btn ks-chat-btn--primary"
+                  disabled={runDisabled}
+                  type="button"
+                  onClick={() => onStart(action.payload, session.id)}
+                >
                 시뮬레이션 시작
-              </button>
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -247,6 +319,32 @@ function placeholderForQuestion(slotIds: string[]): string {
   if (slotIds.includes("product_description")) return "예: 블로그를 자동으로 작성해주는 윈도우 프로그램이에요";
   if (slotIds.includes("goal")) return "예: 제 상품 상세페이지 헤드라인을 만들고 싶어요";
   return "답변을 입력해주세요";
+}
+
+function AssistantMessage({ children, thinking = false }: { children: string; thinking?: boolean }) {
+  return (
+    <div className="ks-msg-system">
+      {thinking ? (
+        <>
+          <span className="ks-thinking-copy">생각중입니다..</span>
+          <ThinkingIndicator />
+        </>
+      ) : (
+        <span>{children}</span>
+      )}
+    </div>
+  );
+}
+
+function findLastAssistantMessageIndex(messages: IntakeSession["messages"]): number {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index]?.role === "assistant") return index;
+  }
+  return -1;
+}
+
+function randomThinkingDelayMs(): number {
+  return Math.floor(3000 + Math.random() * 2000);
 }
 
 function IntakeHistoryPanel({
@@ -416,13 +514,13 @@ function LlmCandidateReview({
   }, [fallbackAssumptions, fallbackCandidates, session.id, session.slots, session.taskFrame?.userGoal]);
 
   if (status === "loading") {
-    return <p className="ks-msg-system">LLM으로 후보를 생성하는 중입니다. 잠시만 기다려주세요.</p>;
+    return <AssistantMessage>LLM으로 후보를 생성하는 중입니다. 잠시만 기다려주세요.</AssistantMessage>;
   }
 
   return (
     <>
       {status === "fallback" && (
-        <p className="ks-msg-system">LLM 후보 생성이 지연되어 우선 로컬 후보를 보여드립니다. 수정 후 그대로 진행할 수 있습니다.</p>
+        <AssistantMessage>LLM 후보 생성이 지연되어 우선 로컬 후보를 보여드립니다. 수정 후 그대로 진행할 수 있습니다.</AssistantMessage>
       )}
       <CandidateReviewMessage
         candidates={candidates}
@@ -488,23 +586,98 @@ function RunSummary({
   assumptionCount,
   generatedCount,
   inferredCount,
+  onSampleSizeChange,
 }: {
   payload: RunCreateRequest;
   assumptionCount: number;
   generatedCount: number;
   inferredCount: number;
+  onSampleSizeChange: (sampleSize: number) => void;
 }) {
   const input = payload.input;
   const creatives = typeof input === "object" && "creatives" in input && Array.isArray(input.creatives)
     ? input.creatives
     : [];
+  const sampleSize = clampRunSampleSize(payload.sample_size ?? 50);
+  const [sampleInput, setSampleInput] = useState(String(sampleSize));
+
+  useEffect(() => {
+    setSampleInput(String(sampleSize));
+  }, [sampleSize]);
+
+  const commitSampleInput = () => {
+    const parsed = Number(sampleInput);
+    const next = Number.isFinite(parsed) ? parsed : sampleSize;
+    onSampleSizeChange(next);
+    setSampleInput(String(clampRunSampleSize(next)));
+  };
+
   return (
-    <div className="ks-run-summary">
-      <span>목적: 크리에이티브 비교</span>
-      <span>후보: {creatives.length}개</span>
-      <span>표본: {payload.sample_size ?? 200}명</span>
-      <span>가정: {assumptionCount}개 기록</span>
-      <span>출처: 추론 {inferredCount} · 생성 {generatedCount}</span>
-    </div>
+    <>
+      <div className="ks-run-summary">
+        <span>목적: {simulationLabel(payload.simulation_type)}</span>
+        <span>{creatives.length > 0 ? `후보: ${creatives.length}개` : "입력: 준비됨"}</span>
+        <span>표본: {sampleSize}명</span>
+        <span>가정: {assumptionCount}개 기록</span>
+        <span>출처: 추론 {inferredCount} · 생성 {generatedCount}</span>
+      </div>
+      <div className="ks-run-sample-control">
+        <div>
+          <strong>표본 수</strong>
+          <p>빠른 확인은 50명, 더 안정적인 비교는 200명으로 실행하세요.</p>
+        </div>
+        <div className="ks-run-sample-inputs">
+          <input
+            aria-label="표본 수"
+            max={200}
+            min={50}
+            step={10}
+            type="range"
+            value={sampleSize}
+            onChange={(event) => {
+              const next = Number(event.currentTarget.value);
+              setSampleInput(String(next));
+              onSampleSizeChange(next);
+            }}
+          />
+          <input
+            aria-label="표본 수 직접 입력"
+            max={200}
+            min={50}
+            step={10}
+            type="number"
+            value={sampleInput}
+            onBlur={commitSampleInput}
+            onChange={(event) => setSampleInput(event.currentTarget.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.currentTarget.blur();
+              }
+            }}
+          />
+          <span>명</span>
+        </div>
+      </div>
+    </>
   );
+}
+
+function clampRunSampleSize(value: number): number {
+  if (!Number.isFinite(value)) return 50;
+  return Math.max(50, Math.min(Math.round(value), 200));
+}
+
+function simulationLabel(simulationType: RunCreateRequest["simulation_type"]): string {
+  const labels: Record<RunCreateRequest["simulation_type"], string> = {
+    creative_testing: "크리에이티브 비교",
+    price_optimization: "가격 최적화",
+    product_launch: "신제품 반응",
+    value_proposition: "가치 제안",
+    market_segmentation: "시장 세분화",
+    competitive_positioning: "경쟁 포지셔닝",
+    brand_perception: "브랜드 인식",
+    churn_prediction: "이탈 예측",
+    campaign_strategy: "캠페인 전략",
+  };
+  return labels[simulationType] ?? simulationType;
 }

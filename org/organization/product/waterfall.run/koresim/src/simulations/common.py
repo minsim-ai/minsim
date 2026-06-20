@@ -25,6 +25,7 @@ class GenericSimulationResult:
     insights: list[dict[str, Any]]
     raw_results: list[SimResult]
     parsed_results: list[dict[str, Any] | None]
+    protocol: dict[str, Any] | None = None
 
 
 PromptBuilder = Callable[[dict[str, Any]], str]

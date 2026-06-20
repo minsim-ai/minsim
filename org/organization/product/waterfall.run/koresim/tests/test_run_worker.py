@@ -1,7 +1,15 @@
 from types import SimpleNamespace
 
+from rq.utils import import_attribute
+
 from scripts.run_worker import handle_failed_job
 from src.jobs.models import RunStatusValue
+
+
+def test_rq_can_import_worker_callable_by_dotted_path() -> None:
+    imported = import_attribute("src.jobs.worker.run_simulation_job")
+
+    assert imported.__name__ == "run_simulation_job"
 
 
 def test_handle_failed_job_does_not_overwrite_existing_failed_error(monkeypatch) -> None:

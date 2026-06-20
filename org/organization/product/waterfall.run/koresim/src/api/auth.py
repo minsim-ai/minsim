@@ -35,8 +35,26 @@ def test_login_enabled() -> bool:
     return os.getenv("KORESIM_AUTH_TEST_LOGIN_ENABLED", "").lower() in {"1", "true", "yes"}
 
 
+def local_dev_auto_login_enabled(request: Request) -> bool:
+    configured = os.getenv("KORESIM_AUTH_LOCAL_DEV_AUTO_LOGIN")
+    enabled = configured.lower() in {"1", "true", "yes"} if configured is not None else True
+    return enabled and _is_local_dev_host(request.url.hostname)
+
+
+def local_dev_user() -> dict[str, Any]:
+    return {
+        "id": "local-dev-user",
+        "email": os.getenv("KORESIM_AUTH_LOCAL_DEV_EMAIL", "local-dev@arabesque.test"),
+        "name": os.getenv("KORESIM_AUTH_LOCAL_DEV_NAME", "Local Dev User"),
+        "picture": None,
+        "provider": "local_dev",
+    }
+
+
 def session_summary(request: Request) -> dict[str, Any]:
     user = read_session_user(request)
+    if user is None and auth_required() and local_dev_auto_login_enabled(request):
+        user = local_dev_user()
     return {
         "authenticated": user is not None,
         "user": user,
@@ -69,6 +87,10 @@ def build_test_login_response(next_url: str = "/app") -> RedirectResponse:
     response = RedirectResponse(url=_safe_next(next_url), status_code=303)
     _set_session_cookie(response, user)
     return response
+
+
+def set_local_dev_session_cookie(response: Response) -> None:
+    _set_session_cookie(response, local_dev_user())
 
 
 def build_google_login_response(request: Request, next_url: str = "/app") -> RedirectResponse:
@@ -267,6 +289,10 @@ def _google_client_secret() -> str:
 
 def _secure_cookies() -> bool:
     return os.getenv("KORESIM_AUTH_COOKIE_SECURE", "true").lower() not in {"0", "false", "no"}
+
+
+def _is_local_dev_host(hostname: str | None) -> bool:
+    return hostname in {"localhost", "127.0.0.1", "::1"}
 
 
 def _max_age_for_purpose(purpose: str) -> int:

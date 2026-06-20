@@ -68,10 +68,12 @@ export type DynamicFormField = {
   type: IntakeFieldType;
   required: boolean;
   value?: string | string[] | number;
+  source?: IntakeSlotSource;
   placeholder?: string;
   helperText?: string;
   options?: string[];
   minItems?: number;
+  maxItems?: number;
   recommendedItems?: number;
   allowAutoFill?: boolean;
 };
@@ -137,7 +139,7 @@ export type IntakeSession = {
 };
 
 export type IntakeEvent =
-  | { type: "user_message"; content: string }
+  | { type: "user_message"; content: string; selectedSimulationType?: SimulationType }
   | { type: "form_submit"; values: Record<string, string | string[] | number> }
   | { type: "candidate_accept"; candidates: CreativeCandidate[]; assumptions?: IntakeSlotValue[] }
   | { type: "confirm_assumptions" }
