@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Disallow: /app
+Disallow: /app/
+Disallow: /results
+Disallow: /results/
+Disallow: /admin
+Disallow: /admin/
+Disallow: /api/
+
+Sitemap: https://arabesque.cc/sitemap.xml

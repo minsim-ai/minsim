@@ -6,12 +6,13 @@
   "scripts": {
     "dev": "vite",
     "dev:grab": "vite --host 127.0.0.1 --port 5173 --strictPort",
-    "build": "tsc && vite build",
+    "build": "node scripts/generate-seo-pages.mjs && tsc && vite build",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "check:intake": "node scripts/check-intake-fixtures.mjs",
+    "check:landing": "node scripts/check-landing-demo-pdf-cta.mjs",
     "preview": "vite preview",
-    "verify": "npm run lint && npm run typecheck && npm run check:intake && npm run build"
+    "verify": "npm run lint && npm run typecheck && npm run check:intake && npm run check:landing && npm run build"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { ArrowLeft, GenderFemale, GenderMale, WarningCircle, X } from '@phosphor-icons/react'
 import { Download, Info } from 'lucide-react'
+import { recordAnalyticsEvent } from './api/analytics'
 import { APIError } from './api/client'
-import { getRun, getRunExport, getRunPartials, getRunResult } from './api/runs'
+import { getRun, getRunExport, getRunPartials, getRunResult, submitRunFeedback } from './api/runs'
 import { AuthStatus } from './components/AuthStatus'
 import { runStateFixtures } from './data/runStateFixtures'
 import {
@@ -1258,6 +1259,90 @@ function InsightList({ insights }: { insights: JsonObject[] }) {
   )
 }
 
+function ResultFeedback({ result }: { result: RunResultEnvelope }) {
+  const [usefulnessScore, setUsefulnessScore] = useState(4)
+  const [trustScore, setTrustScore] = useState(4)
+  const [actionabilityScore, setActionabilityScore] = useState(4)
+  const [intendedAction, setIntendedAction] = useState('')
+  const [freeText, setFreeText] = useState('')
+  const [submitted, setSubmitted] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const submit = () => {
+    setError(null)
+    submitRunFeedback(result.run_id, {
+      usefulness_score: usefulnessScore,
+      trust_score: trustScore,
+      actionability_score: actionabilityScore,
+      result_expectation: 'result_viewed',
+      intended_action: intendedAction.trim() || null,
+      free_text: freeText.trim() || null,
+    })
+      .then(() => setSubmitted(true))
+      .catch((err) => setError(err instanceof Error ? err.message : String(err)))
+  }
+
+  return (
+    <Section title="결과 피드백">
+      <div className="ks-feedback-card">
+        {submitted ? (
+          <p className="ks-feedback-done">피드백을 저장했습니다. 이 데이터는 결과 품질과 제품 개선에 사용됩니다.</p>
+        ) : (
+          <>
+            <div className="ks-feedback-scores">
+              <ScoreControl label="유용성" value={usefulnessScore} onChange={setUsefulnessScore} />
+              <ScoreControl label="신뢰도" value={trustScore} onChange={setTrustScore} />
+              <ScoreControl label="실행성" value={actionabilityScore} onChange={setActionabilityScore} />
+            </div>
+            <label className="ks-feedback-field">
+              <span>이 결과로 무엇을 할 예정인가요?</span>
+              <input
+                value={intendedAction}
+                onChange={(event) => setIntendedAction(event.target.value)}
+                placeholder="예: 19,900원은 보류하고 14,900원 trial을 먼저 테스트"
+              />
+            </label>
+            <label className="ks-feedback-field">
+              <span>부족했던 점</span>
+              <textarea
+                rows={3}
+                value={freeText}
+                onChange={(event) => setFreeText(event.target.value)}
+                placeholder="결과 해석, 질문 흐름, 보고서에서 아쉬웠던 점을 적어주세요."
+              />
+            </label>
+            {error && <p className="ks-feedback-error">{error}</p>}
+            <button className="ks-chat-btn ks-chat-btn--primary" type="button" onClick={submit}>
+              피드백 저장
+            </button>
+          </>
+        )}
+      </div>
+    </Section>
+  )
+}
+
+function ScoreControl({
+  label,
+  value,
+  onChange,
+}: {
+  label: string
+  value: number
+  onChange: (value: number) => void
+}) {
+  return (
+    <label>
+      <span>{label}</span>
+      <select value={value} onChange={(event) => onChange(Number(event.target.value))}>
+        {[1, 2, 3, 4, 5].map((score) => (
+          <option key={score} value={score}>{score}점</option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
 function ReportHero({
   result,
   analysis,
@@ -2100,6 +2185,15 @@ function ApiReport({
   const [exportError, setExportError] = useState<string | null>(null)
   const handleExport = () => {
     setExportError(null)
+    recordAnalyticsEvent({
+      event_name: 'export_clicked',
+      page: '/results',
+      run_id: result.run_id,
+      simulation_type: result.simulation_type,
+      payload: {},
+    }).catch(() => {
+      // Export should not depend on analytics collection.
+    })
     downloadExport(result.run_id).catch((err) => {
       setExportError(err instanceof Error ? err.message : String(err))
     })
@@ -2139,6 +2233,7 @@ function ApiReport({
         )}
 
         <SegmentHeatmaps matrices={analysis.segmentMatrices} />
+        <ResultFeedback result={result} />
         <EvidenceBoard quotes={analysis.evidenceQuotes} />
         <SegmentBreakdown matrices={analysis.segmentMatrices} />
         <TrustLayer analysis={analysis} result={result} snapshot={snapshot} />

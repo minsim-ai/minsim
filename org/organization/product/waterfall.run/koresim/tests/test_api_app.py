@@ -1,9 +1,11 @@
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from src.llm.base import LLMRequest, LLMResponse
 from src.api.schemas import RunCreateRequest
 from src.api.schemas import SimulationType
 from src.api.main import create_app
+from src.api.static import install_static_routes
 from src.jobs.models import RunEventType, RunStatusValue
 from src.jobs.store import SQLiteRunStore
 
@@ -56,6 +58,48 @@ def test_api_config_exposes_contract_metadata() -> None:
         "report_default",
         "schema_repair",
     }
+
+
+def test_static_seo_files_directory_index_head_and_cache(tmp_path) -> None:
+    dist = tmp_path / "dist"
+    (dist / "use-cases" / "price-optimization").mkdir(parents=True)
+    (dist / "simulations" / "price-optimization").mkdir(parents=True)
+    (dist / "compare" / "market-research-vs-ai-simulation").mkdir(parents=True)
+    (dist / "assets").mkdir()
+    (dist / "index.html").write_text("<html>app</html>")
+    (dist / "robots.txt").write_text("User-agent: *")
+    (dist / "sitemap.xml").write_text("<urlset />")
+    (dist / "use-cases" / "price-optimization" / "index.html").write_text("<html>price</html>")
+    (dist / "simulations" / "price-optimization" / "index.html").write_text("<html>simulation</html>")
+    (dist / "compare" / "market-research-vs-ai-simulation" / "index.html").write_text("<html>compare</html>")
+    (dist / "assets" / "index-test.js").write_text("console.log('ok')")
+    app = FastAPI()
+    install_static_routes(app, dist_dir=dist)
+    client = TestClient(app)
+
+    robots = client.get("/robots.txt")
+    assert robots.status_code == 200
+    assert robots.text == "User-agent: *"
+    assert robots.headers["cache-control"] == "public, max-age=3600"
+
+    use_case = client.get("/use-cases/price-optimization/")
+    assert use_case.status_code == 200
+    assert "price" in use_case.text
+
+    simulation = client.get("/simulations/price-optimization/")
+    assert simulation.status_code == 200
+    assert "simulation" in simulation.text
+
+    compare = client.get("/compare/market-research-vs-ai-simulation/")
+    assert compare.status_code == 200
+    assert "compare" in compare.text
+
+    head_response = client.head("/validation")
+    assert head_response.status_code == 200
+
+    asset = client.get("/assets/index-test.js")
+    assert asset.status_code == 200
+    assert "immutable" in asset.headers["cache-control"]
 
 
 def test_api_presets_returns_executable_enterprise_safe_presets() -> None:
@@ -243,6 +287,132 @@ def test_intake_candidate_api_uses_llm_client(tmp_path) -> None:
     assert data["trace_id"] == "trace-intake"
     assert len(data["candidates"]) == 3
     assert data["candidates"][0]["angle"] == "automation"
+
+
+def test_analytics_feedback_and_admin_api(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("KORESIM_AUTH_SECRET", "test-secret")
+    monkeypatch.setenv("KORESIM_AUTH_COOKIE_SECURE", "false")
+    monkeypatch.setenv("GOOGLE_CLIENT_ID", "google-client")
+    monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "google-secret")
+    monkeypatch.setenv("KORESIM_AUTH_TEST_LOGIN_ENABLED", "true")
+    monkeypatch.setenv("KORESIM_AUTH_TEST_EMAIL", "admin@example.com")
+    monkeypatch.setenv("KORESIM_ADMIN_EMAILS", "admin@example.com")
+    store = SQLiteRunStore(tmp_path / "runs.sqlite3")
+    client = TestClient(create_app(store=store, enqueue_run_func=lambda run_id: "job-1"))
+    client.get("/api/auth/test-login", follow_redirects=False)
+
+    analytics_response = client.post(
+        "/api/analytics/events",
+        json={
+            "event_name": "page_view",
+            "page": "/app",
+            "simulation_type": "creative_testing",
+            "payload": {"source": "test"},
+        },
+    )
+    assert analytics_response.status_code == 200
+    assert analytics_response.json()["event_name"] == "page_view"
+
+    run_response = client.post(
+        "/api/runs",
+        json={
+            "simulation_type": "creative_testing",
+            "input": {"creatives": ["concept A", "concept B"]},
+            "sample_size": 3,
+        },
+    )
+    assert run_response.status_code == 200
+    run_id = run_response.json()["run_id"]
+
+    feedback_response = client.post(
+        f"/api/runs/{run_id}/feedback",
+        json={
+            "usefulness_score": 5,
+            "trust_score": 4,
+            "actionability_score": 5,
+            "intended_action": "가격 후보를 다시 테스트",
+            "free_text": "세그먼트별 해석이 더 필요합니다.",
+        },
+    )
+    assert feedback_response.status_code == 200
+    assert feedback_response.json()["run_id"] == run_id
+
+    overview_response = client.get("/api/admin/overview")
+    assert overview_response.status_code == 200
+    overview = overview_response.json()
+    assert overview["users"] == 1
+    assert overview["runs"] == 1
+    assert overview["feedback"] == 1
+    assert overview["analytics_events"] >= 3
+    assert overview["recent_events"][0]["user_email"] != "admin@example.com"
+    assert overview["funnel"]["steps"]
+    assert overview["accounts"][0]["account_domain"] == "example.com"
+    assert overview["policy"]["default_masking"] is True
+
+    runs_response = client.get("/api/admin/runs")
+    assert runs_response.status_code == 200
+    assert runs_response.json()["items"][0]["run_id"] == run_id
+    assert runs_response.json()["items"][0]["user_email"] != "admin@example.com"
+
+    sensitive_runs_response = client.get("/api/admin/runs?include_sensitive=true")
+    assert sensitive_runs_response.status_code == 200
+    assert sensitive_runs_response.json()["items"][0]["user_email"] == "admin@example.com"
+
+    feedback_list_response = client.get("/api/admin/feedback")
+    assert feedback_list_response.status_code == 200
+    assert feedback_list_response.json()["items"][0]["usefulness_score"] == 5
+    assert "세그먼트별 해석" not in feedback_list_response.json()["items"][0]["free_text"]
+
+    export_response = client.get("/api/admin/export")
+    assert export_response.status_code == 200
+    export_data = export_response.json()
+    assert export_data["schema_version"] == "arabesque-admin-export/v1"
+    assert export_data["feedback"][0]["free_text"] != "세그먼트별 해석이 더 필요합니다."
+
+    prune_dry_run_response = client.post(
+        "/api/admin/retention/prune",
+        json={"retention_days": 180, "dry_run": True, "confirm": False},
+    )
+    assert prune_dry_run_response.status_code == 200
+    assert prune_dry_run_response.json()["dry_run"] is True
+
+    prune_without_confirm_response = client.post(
+        "/api/admin/retention/prune",
+        json={"retention_days": 180, "dry_run": False, "confirm": False},
+    )
+    assert prune_without_confirm_response.status_code == 400
+
+    other_user = store.upsert_user_from_auth(
+        {"email": "customer@example.com", "provider": "test"},
+        free_run_limit=5,
+    )
+    delete_mismatch_response = client.post(
+        f"/api/admin/users/{other_user.user_id}/delete",
+        json={"confirm_user_id": "wrong-user"},
+    )
+    assert delete_mismatch_response.status_code == 400
+    delete_response = client.post(
+        f"/api/admin/users/{other_user.user_id}/delete",
+        json={"confirm_user_id": other_user.user_id},
+    )
+    assert delete_response.status_code == 200
+    assert store.get_user(other_user.user_id) is None
+
+
+def test_admin_api_requires_admin_email(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("KORESIM_AUTH_SECRET", "test-secret")
+    monkeypatch.setenv("KORESIM_AUTH_COOKIE_SECURE", "false")
+    monkeypatch.setenv("GOOGLE_CLIENT_ID", "google-client")
+    monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "google-secret")
+    monkeypatch.setenv("KORESIM_AUTH_TEST_LOGIN_ENABLED", "true")
+    monkeypatch.setenv("KORESIM_AUTH_TEST_EMAIL", "user@example.com")
+    monkeypatch.setenv("KORESIM_ADMIN_EMAILS", "admin@example.com")
+    client = TestClient(create_app(store=SQLiteRunStore(tmp_path / "runs.sqlite3")))
+    client.get("/api/auth/test-login", follow_redirects=False)
+
+    response = client.get("/api/admin/overview")
+
+    assert response.status_code == 403
 
 
 def test_create_run_persists_queued_snapshot(tmp_path) -> None:

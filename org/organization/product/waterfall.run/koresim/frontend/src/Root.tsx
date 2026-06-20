@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { AdminPage } from "./AdminPage";
 import App from "./App";
 import { LandingPage } from "./LandingPage";
 import { ResultsPage, ResultsStoryPage } from "./ResultsPage";
@@ -7,6 +8,7 @@ import { ValidationPage } from "./ValidationPage";
 type RouteState =
   | { page: "landing" }
   | { page: "app" }
+  | { page: "admin" }
   | { page: "results" }
   | { page: "results-story"; storyId: string }
   | { page: "validation" };
@@ -23,6 +25,7 @@ function getRouteState(): RouteState {
 
   const path = window.location.pathname.replace(/\/+$/, "") || "/";
   if (path === "/app") return { page: "app" };
+  if (path === "/admin") return { page: "admin" };
   if (path === "/results") return { page: "results" };
   if (path === "/validation") return { page: "validation" };
   if (path.startsWith("/results/story/")) {
@@ -49,6 +52,7 @@ export function Root() {
   }, []);
 
   if (route.page === "app") return <App />;
+  if (route.page === "admin") return <AdminPage />;
   if (route.page === "results") return <ResultsPage />;
   if (route.page === "results-story") return <ResultsStoryPage storyId={route.storyId} />;
   if (route.page === "validation") return <ValidationPage />;

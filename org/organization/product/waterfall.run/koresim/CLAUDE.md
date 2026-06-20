@@ -3,7 +3,7 @@ title: KoreaSim — 프로젝트 진행 트래커
 type: protocol
 tags: [koresim, project-tracker, roadmap]
 created: 2026-04-30
-updated: 2026-05-14
+updated: 2026-06-03
 status: stable
 ---
 
@@ -124,6 +124,8 @@ Current status:
 - Run cancellation and human-review JSON export are implemented as post-demo product controls. Export excludes `raw_results` and requires human review before external sharing.
 - Agentic Intake Layer V2 is implemented for productization: `IntakeContextEnvelope`, `safe_intake_summary`, `/api/intake/advance`, 9-simulation intake regression fixtures, and result-agent safe context propagation are complete.
 - Persona Simulation Performance Upgrade V1 is in progress: slices now include `price_research_v2` as a versioned `price_optimization` protocol, `product_qa_v1` as a versioned `value_proposition` protocol, aggregate calibration metadata, deterministic interview guide generation, result envelope `protocol` metadata, React metric rendering, and fake LLM benchmark artifact generation.
+- Admin Analytics and Feedback V1 is complete: `analytics_events`, `user_feedback`, `result_followups`, and `admin_audit_events` back the product-improvement data loop, with masked `/api/admin/*` APIs, React `/admin`, funnel/account-domain proxy views, masked admin export, retention dry-run/confirmed prune, confirmed user deletion, and result feedback collection. Design source: [[docs/design/admin-analytics-data-layer]], execution plan: [[docs/execution/admin-analytics-feedback-mvp]].
+- SEO Foundation V1 is complete for the public landing surface and programmatic SEO expansion: public robots/sitemap/use-case pages, 9 simulation pages, 3 comparison pages, canonical/JSON-LD/root fallback content, protected route disallow rules, directory static pages, HEAD support, long static cache headers, landing nav/footer internal links, image alt fixes, and compressed OG/social images. Execution plan: [[docs/execution/seo-foundation-v1]].
 - Small external Price Research V2 benchmark passed on 2026-05-14: `sample_size=10`, 10 responses, 0 parse failures, 100.0% parse success, 33.162 seconds, artifact `docs/verification/benchmarks/persona-simulation-benchmark-external-20260514T032811Z.json`.
 - Deterministic 50/200-person validation artifact: `docs/verification/phase-5-phase-7-deterministic-validation.json`.
 - Live external Gemini 9-simulation 200-person validation passed through `https://arabesque.cc/api/runs`: 1,800 total responses, 3 parse failures, no failed runs, artifact `docs/verification/external-gemini-9-simulations-200-2026-05-03.json`.

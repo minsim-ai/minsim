@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useMemo, useCallback, useLayoutEffect } from "react";
 import { APIError } from "./api/client";
+import { recordAnalyticsEvent } from "./api/analytics";
 import { getUserUsage, googleLogin } from "./api/auth";
 import { linkIntakeSessionRun } from "./api/intake";
 import { cancelRun, createRun, getPresets, getRun } from "./api/runs";
@@ -547,6 +548,17 @@ function App() {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
   }, []);
 
+  useEffect(() => {
+    recordAnalyticsEvent({
+      event_name: 'page_view',
+      page: '/app',
+      simulation_type: selectedSim,
+      payload: {},
+    }).catch(() => {
+      // Analytics must not block the simulation workflow.
+    });
+  }, [selectedSim]);
+
   const handleSimChange = (key: string) => {
     setSelectedSim(key as SimulationType);
     setPhase('chat');
@@ -734,6 +746,7 @@ function App() {
             <a href="/">공개 랜딩</a>
             <a href="/results">최근 결과</a>
             <a href="/validation">검증 사례</a>
+            <a href="/admin">어드민</a>
             <a href="/app" className="ks-cta">데모 실행</a>
             <QuotaPill usage={usage} loading={usageLoading} />
             <AuthStatus compact />

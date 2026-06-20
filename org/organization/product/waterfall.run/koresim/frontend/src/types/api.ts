@@ -391,6 +391,80 @@ export interface UserUsageResponse {
   quota_bypass: boolean
 }
 
+export interface AnalyticsEventRequest {
+  event_name: string
+  session_id?: string | null
+  run_id?: string | null
+  page?: string | null
+  simulation_type?: SimulationType | null
+  payload?: JsonObject
+}
+
+export interface AnalyticsEventResponse {
+  event_id: string
+  event_name: string
+  created_at: string
+}
+
+export interface RunFeedbackRequest {
+  intake_session_id?: string | null
+  usefulness_score?: number | null
+  trust_score?: number | null
+  actionability_score?: number | null
+  result_expectation?: string | null
+  free_text?: string | null
+  intended_action?: string | null
+  decision_confidence_before?: number | null
+  decision_confidence_after?: number | null
+  shared_with_team?: boolean
+  exported_report?: boolean
+}
+
+export interface RunFeedbackResponse {
+  feedback_id: string
+  followup_id: string
+  run_id: string
+  created_at: string
+}
+
+export interface AdminOverviewResponse {
+  users: number
+  runs: number
+  completed_runs: number
+  failed_runs: number
+  intake_sessions: number
+  feedback: number
+  analytics_events: number
+  by_simulation: JsonObject[]
+  recent_events: JsonObject[]
+  funnel: JsonObject
+  accounts: JsonObject[]
+  policy: JsonObject
+}
+
+export interface AdminListResponse {
+  items: JsonObject[]
+}
+
+export interface AdminExportResponse {
+  schema_version: string
+  generated_at: string
+  policy: JsonObject
+  overview: JsonObject
+  funnel: JsonObject
+  accounts: JsonObject[]
+  users: JsonObject[]
+  runs: JsonObject[]
+  feedback: JsonObject[]
+}
+
+export interface AdminMutationResponse {
+  ok: boolean
+  action: string
+  dry_run: boolean
+  result: JsonObject
+}
+
 export interface RunExportResponse {
   schema_version: 'koresim-export/v1'
   run_id: string

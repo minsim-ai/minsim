@@ -4,6 +4,8 @@ import type {
   RunCreateRequest,
   RunCreateResponse,
   RunExportResponse,
+  RunFeedbackRequest,
+  RunFeedbackResponse,
   RunPartialResultsResponse,
   RunResultEnvelope,
   RunSnapshot,
@@ -40,4 +42,11 @@ export function cancelRun(runId: string): Promise<RunSnapshot> {
 
 export function getRunExport(runId: string): Promise<RunExportResponse> {
   return requestJson<RunExportResponse>(`/api/runs/${encodeURIComponent(runId)}/export`)
+}
+
+export function submitRunFeedback(runId: string, payload: RunFeedbackRequest): Promise<RunFeedbackResponse> {
+  return requestJson<RunFeedbackResponse>(`/api/runs/${encodeURIComponent(runId)}/feedback`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
 }

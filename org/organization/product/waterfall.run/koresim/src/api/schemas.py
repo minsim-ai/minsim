@@ -485,6 +485,90 @@ class UserUsageResponse(APIModel):
     quota_bypass: bool = False
 
 
+class AnalyticsEventRequest(APIModel):
+    event_name: str = Field(min_length=1, max_length=80)
+    session_id: str | None = Field(default=None, max_length=160)
+    run_id: str | None = Field(default=None, max_length=160)
+    page: str | None = Field(default=None, max_length=120)
+    simulation_type: SimulationType | None = None
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class AnalyticsEventResponse(APIModel):
+    event_id: str
+    event_name: str
+    created_at: str
+
+
+class RunFeedbackRequest(APIModel):
+    intake_session_id: str | None = Field(default=None, max_length=160)
+    usefulness_score: int | None = Field(default=None, ge=1, le=5)
+    trust_score: int | None = Field(default=None, ge=1, le=5)
+    actionability_score: int | None = Field(default=None, ge=1, le=5)
+    result_expectation: str | None = Field(default=None, max_length=80)
+    free_text: str | None = Field(default=None, max_length=1200)
+    intended_action: str | None = Field(default=None, max_length=240)
+    decision_confidence_before: int | None = Field(default=None, ge=1, le=5)
+    decision_confidence_after: int | None = Field(default=None, ge=1, le=5)
+    shared_with_team: bool = False
+    exported_report: bool = False
+
+
+class RunFeedbackResponse(APIModel):
+    feedback_id: str
+    followup_id: str
+    run_id: str
+    created_at: str
+
+
+class AdminOverviewResponse(APIModel):
+    users: int
+    runs: int
+    completed_runs: int
+    failed_runs: int
+    intake_sessions: int
+    feedback: int
+    analytics_events: int
+    by_simulation: list[dict[str, Any]]
+    recent_events: list[dict[str, Any]]
+    funnel: dict[str, Any] = Field(default_factory=dict)
+    accounts: list[dict[str, Any]] = Field(default_factory=list)
+    policy: dict[str, Any] = Field(default_factory=dict)
+
+
+class AdminListResponse(APIModel):
+    items: list[dict[str, Any]]
+
+
+class AdminExportResponse(APIModel):
+    schema_version: str
+    generated_at: str
+    policy: dict[str, Any]
+    overview: dict[str, Any]
+    funnel: dict[str, Any]
+    accounts: list[dict[str, Any]]
+    users: list[dict[str, Any]]
+    runs: list[dict[str, Any]]
+    feedback: list[dict[str, Any]]
+
+
+class AdminRetentionPruneRequest(APIModel):
+    retention_days: int = Field(default=180, ge=1, le=3650)
+    dry_run: bool = True
+    confirm: bool = False
+
+
+class AdminDeleteUserRequest(APIModel):
+    confirm_user_id: str = Field(min_length=1, max_length=200)
+
+
+class AdminMutationResponse(APIModel):
+    ok: bool = True
+    action: str
+    dry_run: bool = False
+    result: dict[str, Any]
+
+
 class RunExportResponse(APIModel):
     schema_version: str = "koresim-export/v1"
     run_id: str

@@ -3,9 +3,10 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from hashlib import sha256
 from collections.abc import Iterator
 from contextlib import contextmanager
+from datetime import UTC, datetime, timedelta
+from hashlib import sha256
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -224,6 +225,79 @@ class SQLiteRunStore:
 
                 CREATE INDEX IF NOT EXISTS idx_intake_events_session_created
                     ON intake_events (session_id, created_at);
+
+                CREATE TABLE IF NOT EXISTS analytics_events (
+                    event_id TEXT PRIMARY KEY,
+                    user_id TEXT,
+                    user_email TEXT,
+                    session_id TEXT,
+                    run_id TEXT,
+                    event_name TEXT NOT NULL,
+                    page TEXT,
+                    simulation_type TEXT,
+                    payload_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (user_id) REFERENCES users (user_id),
+                    FOREIGN KEY (run_id) REFERENCES runs (run_id)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_analytics_events_name_created
+                    ON analytics_events (event_name, created_at);
+
+                CREATE INDEX IF NOT EXISTS idx_analytics_events_user_created
+                    ON analytics_events (user_id, created_at);
+
+                CREATE TABLE IF NOT EXISTS user_feedback (
+                    feedback_id TEXT PRIMARY KEY,
+                    user_id TEXT,
+                    user_email TEXT,
+                    run_id TEXT NOT NULL,
+                    intake_session_id TEXT,
+                    usefulness_score INTEGER,
+                    trust_score INTEGER,
+                    actionability_score INTEGER,
+                    result_expectation TEXT,
+                    free_text TEXT,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (user_id) REFERENCES users (user_id),
+                    FOREIGN KEY (run_id) REFERENCES runs (run_id)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_user_feedback_run_created
+                    ON user_feedback (run_id, created_at);
+
+                CREATE TABLE IF NOT EXISTS result_followups (
+                    followup_id TEXT PRIMARY KEY,
+                    user_id TEXT,
+                    user_email TEXT,
+                    run_id TEXT NOT NULL,
+                    intended_action TEXT,
+                    decision_confidence_before INTEGER,
+                    decision_confidence_after INTEGER,
+                    shared_with_team INTEGER NOT NULL DEFAULT 0,
+                    exported_report INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (user_id) REFERENCES users (user_id),
+                    FOREIGN KEY (run_id) REFERENCES runs (run_id)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_result_followups_run_created
+                    ON result_followups (run_id, created_at);
+
+                CREATE TABLE IF NOT EXISTS admin_audit_events (
+                    event_id TEXT PRIMARY KEY,
+                    admin_user_id TEXT,
+                    admin_email TEXT,
+                    action TEXT NOT NULL,
+                    target_type TEXT,
+                    target_id TEXT,
+                    payload_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (admin_user_id) REFERENCES users (user_id)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_admin_audit_events_admin_created
+                    ON admin_audit_events (admin_user_id, created_at);
                 """
             )
             self._ensure_column(conn, "intake_sessions", "title", "TEXT")
@@ -240,6 +314,545 @@ class SQLiteRunStore:
                 """
             )
             self._backfill_intake_history_with_conn(conn)
+
+    def record_analytics_event(
+        self,
+        *,
+        event_name: str,
+        user: UserRecord | None = None,
+        session_id: str | None = None,
+        run_id: str | None = None,
+        page: str | None = None,
+        simulation_type: str | None = None,
+        payload: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        self.init_db()
+        now = _utc_now()
+        event_id = str(uuid4())
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO analytics_events (
+                    event_id, user_id, user_email, session_id, run_id, event_name,
+                    page, simulation_type, payload_json, created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    event_id,
+                    user.user_id if user else None,
+                    user.email if user else None,
+                    session_id,
+                    run_id,
+                    event_name,
+                    page,
+                    simulation_type,
+                    _json_dumps(payload or {}),
+                    now,
+                ),
+            )
+        return {
+            "event_id": event_id,
+            "event_name": event_name,
+            "created_at": now,
+        }
+
+    def save_user_feedback(
+        self,
+        *,
+        run_id: str,
+        user: UserRecord | None = None,
+        intake_session_id: str | None = None,
+        usefulness_score: int | None = None,
+        trust_score: int | None = None,
+        actionability_score: int | None = None,
+        result_expectation: str | None = None,
+        free_text: str | None = None,
+        intended_action: str | None = None,
+        decision_confidence_before: int | None = None,
+        decision_confidence_after: int | None = None,
+        shared_with_team: bool = False,
+        exported_report: bool = False,
+    ) -> dict[str, Any]:
+        self.init_db()
+        now = _utc_now()
+        feedback_id = str(uuid4())
+        followup_id = str(uuid4())
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO user_feedback (
+                    feedback_id, user_id, user_email, run_id, intake_session_id,
+                    usefulness_score, trust_score, actionability_score,
+                    result_expectation, free_text, created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    feedback_id,
+                    user.user_id if user else None,
+                    user.email if user else None,
+                    run_id,
+                    intake_session_id,
+                    usefulness_score,
+                    trust_score,
+                    actionability_score,
+                    result_expectation,
+                    free_text,
+                    now,
+                ),
+            )
+            conn.execute(
+                """
+                INSERT INTO result_followups (
+                    followup_id, user_id, user_email, run_id, intended_action,
+                    decision_confidence_before, decision_confidence_after,
+                    shared_with_team, exported_report, created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    followup_id,
+                    user.user_id if user else None,
+                    user.email if user else None,
+                    run_id,
+                    intended_action,
+                    decision_confidence_before,
+                    decision_confidence_after,
+                    int(shared_with_team),
+                    int(exported_report),
+                    now,
+                ),
+            )
+        return {
+            "feedback_id": feedback_id,
+            "followup_id": followup_id,
+            "run_id": run_id,
+            "created_at": now,
+        }
+
+    def append_admin_audit_event(
+        self,
+        *,
+        admin: UserRecord | None,
+        action: str,
+        target_type: str | None = None,
+        target_id: str | None = None,
+        payload: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        self.init_db()
+        now = _utc_now()
+        event_id = str(uuid4())
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO admin_audit_events (
+                    event_id, admin_user_id, admin_email, action, target_type,
+                    target_id, payload_json, created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    event_id,
+                    admin.user_id if admin else None,
+                    admin.email if admin else None,
+                    action,
+                    target_type,
+                    target_id,
+                    _json_dumps(payload or {}),
+                    now,
+                ),
+            )
+        return {"event_id": event_id, "created_at": now}
+
+    def admin_overview(self) -> dict[str, Any]:
+        self.init_db()
+        with self._connect() as conn:
+            user_count = conn.execute("SELECT COUNT(*) AS value FROM users").fetchone()["value"]
+            run_count = conn.execute("SELECT COUNT(*) AS value FROM runs").fetchone()["value"]
+            completed_runs = conn.execute("SELECT COUNT(*) AS value FROM runs WHERE status = 'completed'").fetchone()["value"]
+            failed_runs = conn.execute("SELECT COUNT(*) AS value FROM runs WHERE status = 'failed'").fetchone()["value"]
+            intake_count = conn.execute("SELECT COUNT(*) AS value FROM intake_sessions").fetchone()["value"]
+            feedback_count = conn.execute("SELECT COUNT(*) AS value FROM user_feedback").fetchone()["value"]
+            event_count = conn.execute("SELECT COUNT(*) AS value FROM analytics_events").fetchone()["value"]
+            by_simulation = [
+                dict(row)
+                for row in conn.execute(
+                    """
+                    SELECT simulation_type, COUNT(*) AS count
+                    FROM runs
+                    GROUP BY simulation_type
+                    ORDER BY count DESC
+                    """
+                ).fetchall()
+            ]
+            recent_events = [
+                self._row_to_json_dict(row, ("payload_json",))
+                for row in conn.execute(
+                    """
+                    SELECT event_id, event_name, user_email, session_id, run_id, page,
+                           simulation_type, payload_json, created_at
+                    FROM analytics_events
+                    ORDER BY created_at DESC
+                    LIMIT 20
+                    """
+                ).fetchall()
+            ]
+        return {
+            "users": user_count,
+            "runs": run_count,
+            "completed_runs": completed_runs,
+            "failed_runs": failed_runs,
+            "intake_sessions": intake_count,
+            "feedback": feedback_count,
+            "analytics_events": event_count,
+            "by_simulation": by_simulation,
+            "recent_events": recent_events,
+        }
+
+    def admin_funnel(self) -> dict[str, Any]:
+        self.init_db()
+        steps = [
+            ("app_viewed", ("page_view",)),
+            ("intake_started", ("intake_session_saved", "intake_advanced")),
+            ("run_created", ("run_created",)),
+            ("result_viewed", ("result_viewed",)),
+            ("export_clicked", ("export_clicked",)),
+            ("feedback_submitted", ("feedback_submitted",)),
+        ]
+        with self._connect() as conn:
+            funnel_steps: list[dict[str, Any]] = []
+            previous_count: int | None = None
+            for step_name, event_names in steps:
+                placeholders = ",".join("?" for _ in event_names)
+                row = conn.execute(
+                    f"""
+                    SELECT
+                        COUNT(*) AS events,
+                        COUNT(DISTINCT COALESCE(user_id, user_email, session_id, run_id, event_id)) AS actors
+                    FROM analytics_events
+                    WHERE event_name IN ({placeholders})
+                    """,
+                    event_names,
+                ).fetchone()
+                count = int(row["actors"] if row else 0)
+                conversion = None
+                if previous_count is not None:
+                    conversion = round((count / previous_count) * 100, 1) if previous_count > 0 else 0.0
+                funnel_steps.append(
+                    {
+                        "step": step_name,
+                        "actors": count,
+                        "events": int(row["events"] if row else 0),
+                        "conversion_from_previous": conversion,
+                    }
+                )
+                previous_count = count
+
+            by_simulation = [
+                dict(row)
+                for row in conn.execute(
+                    """
+                    SELECT
+                        COALESCE(simulation_type, 'unknown') AS simulation_type,
+                        SUM(CASE WHEN event_name = 'run_created' THEN 1 ELSE 0 END) AS run_created,
+                        SUM(CASE WHEN event_name = 'result_viewed' THEN 1 ELSE 0 END) AS result_viewed,
+                        SUM(CASE WHEN event_name = 'feedback_submitted' THEN 1 ELSE 0 END) AS feedback_submitted,
+                        SUM(CASE WHEN event_name = 'export_clicked' THEN 1 ELSE 0 END) AS export_clicked
+                    FROM analytics_events
+                    GROUP BY COALESCE(simulation_type, 'unknown')
+                    ORDER BY run_created DESC, result_viewed DESC
+                    LIMIT 12
+                    """
+                ).fetchall()
+            ]
+        return {"steps": funnel_steps, "by_simulation": by_simulation}
+
+    def admin_accounts(self, *, limit: int = 50) -> list[dict[str, Any]]:
+        self.init_db()
+        safe_limit = max(1, min(limit, 200))
+        with self._connect() as conn:
+            return [
+                dict(row)
+                for row in conn.execute(
+                    """
+                    SELECT
+                        CASE
+                            WHEN instr(u.email, '@') > 0 THEN lower(substr(u.email, instr(u.email, '@') + 1))
+                            ELSE 'unknown'
+                        END AS account_domain,
+                        COUNT(DISTINCT u.user_id) AS users,
+                        COUNT(DISTINCT r.run_id) AS runs,
+                        SUM(CASE WHEN r.status = 'completed' THEN 1 ELSE 0 END) AS completed_runs,
+                        COUNT(DISTINCT f.feedback_id) AS feedback,
+                        MAX(u.last_seen_at) AS last_seen_at,
+                        SUM(CASE WHEN u.plan != 'free' THEN 1 ELSE 0 END) AS paid_users,
+                        SUM(CASE WHEN u.free_run_limit <= COALESCE(usage.used_runs, 0) THEN 1 ELSE 0 END) AS quota_exhausted_users
+                    FROM users u
+                    LEFT JOIN runs r ON r.user_id = u.user_id
+                    LEFT JOIN user_feedback f ON f.user_id = u.user_id
+                    LEFT JOIN (
+                        SELECT user_id, COALESCE(SUM(delta), 0) AS used_runs
+                        FROM usage_ledger
+                        WHERE event_type IN ('run_completed', 'admin_adjustment')
+                        GROUP BY user_id
+                    ) usage ON usage.user_id = u.user_id
+                    GROUP BY account_domain
+                    ORDER BY runs DESC, users DESC, last_seen_at DESC
+                    LIMIT ?
+                    """,
+                    (safe_limit,),
+                ).fetchall()
+            ]
+
+    def admin_policy(self, *, retention_days: int) -> dict[str, Any]:
+        self.init_db()
+        cutoff = _days_ago(retention_days)
+        with self._connect() as conn:
+            old_runs = conn.execute(
+                """
+                SELECT COUNT(*) AS value
+                FROM runs
+                WHERE created_at < ?
+                    AND status IN ('completed', 'failed', 'canceled', 'interrupted')
+                """,
+                (cutoff,),
+            ).fetchone()["value"]
+            old_events = conn.execute(
+                """
+                SELECT COUNT(*) AS value
+                FROM analytics_events
+                WHERE created_at < ?
+                """,
+                (cutoff,),
+            ).fetchone()["value"]
+            audit_events = conn.execute("SELECT COUNT(*) AS value FROM admin_audit_events").fetchone()["value"]
+        return {
+            "schema_version": "admin-data-policy/v1",
+            "retention_days": retention_days,
+            "cutoff": cutoff,
+            "default_masking": True,
+            "raw_persona_export": False,
+            "human_review_required_for_exports": True,
+            "deletable": {
+                "runs": int(old_runs),
+                "analytics_events": int(old_events),
+                "admin_audit_events": int(audit_events),
+            },
+        }
+
+    def admin_users(self, *, limit: int = 50) -> list[dict[str, Any]]:
+        self.init_db()
+        safe_limit = max(1, min(limit, 200))
+        with self._connect() as conn:
+            return [
+                dict(row)
+                for row in conn.execute(
+                    """
+                    SELECT
+                        u.user_id,
+                        u.email,
+                        u.name,
+                        u.provider,
+                        u.plan,
+                        u.free_run_limit,
+                        u.created_at,
+                        u.last_seen_at,
+                        COUNT(DISTINCT r.run_id) AS run_count,
+                        COUNT(DISTINCT i.session_id) AS intake_count,
+                        COUNT(DISTINCT f.feedback_id) AS feedback_count
+                    FROM users u
+                    LEFT JOIN runs r ON r.user_id = u.user_id
+                    LEFT JOIN intake_sessions i ON i.user_id = u.user_id
+                    LEFT JOIN user_feedback f ON f.user_id = u.user_id
+                    GROUP BY u.user_id
+                    ORDER BY u.last_seen_at DESC
+                    LIMIT ?
+                    """,
+                    (safe_limit,),
+                ).fetchall()
+            ]
+
+    def admin_runs(self, *, limit: int = 50) -> list[dict[str, Any]]:
+        self.init_db()
+        safe_limit = max(1, min(limit, 200))
+        with self._connect() as conn:
+            return [
+                self._row_to_json_dict(row, ("input_json", "target_filter_json", "intake_context_json", "error_json"))
+                for row in conn.execute(
+                    """
+                    SELECT
+                        r.run_id,
+                        r.user_email,
+                        r.simulation_type,
+                        r.status,
+                        r.sample_size,
+                        r.done_count,
+                        r.total_count,
+                        r.input_json,
+                        r.target_filter_json,
+                        r.intake_context_json,
+                        r.created_at,
+                        r.started_at,
+                        r.completed_at,
+                        r.error_json,
+                        i.session_id AS intake_session_id
+                    FROM runs r
+                    LEFT JOIN intake_sessions i ON i.run_id = r.run_id
+                    ORDER BY r.created_at DESC
+                    LIMIT ?
+                    """,
+                    (safe_limit,),
+                ).fetchall()
+            ]
+
+    def admin_feedback(self, *, limit: int = 50) -> list[dict[str, Any]]:
+        self.init_db()
+        safe_limit = max(1, min(limit, 200))
+        with self._connect() as conn:
+            return [
+                dict(row)
+                for row in conn.execute(
+                    """
+                    SELECT
+                        f.feedback_id,
+                        f.user_email,
+                        f.run_id,
+                        f.intake_session_id,
+                        f.usefulness_score,
+                        f.trust_score,
+                        f.actionability_score,
+                        f.result_expectation,
+                        f.free_text,
+                        fo.intended_action,
+                        fo.decision_confidence_before,
+                        fo.decision_confidence_after,
+                        fo.shared_with_team,
+                        fo.exported_report,
+                        f.created_at
+                    FROM user_feedback f
+                    LEFT JOIN result_followups fo
+                        ON fo.run_id = f.run_id
+                        AND COALESCE(fo.user_id, '') = COALESCE(f.user_id, '')
+                    ORDER BY f.created_at DESC
+                    LIMIT ?
+                    """,
+                    (safe_limit,),
+                ).fetchall()
+            ]
+
+    def admin_export(self, *, retention_days: int) -> dict[str, Any]:
+        return {
+            "schema_version": "arabesque-admin-export/v1",
+            "generated_at": _utc_now(),
+            "policy": self.admin_policy(retention_days=retention_days),
+            "overview": self.admin_overview(),
+            "funnel": self.admin_funnel(),
+            "accounts": self.admin_accounts(limit=200),
+            "users": self.admin_users(limit=200),
+            "runs": self.admin_runs(limit=200),
+            "feedback": self.admin_feedback(limit=200),
+        }
+
+    def delete_user_data(self, *, user_id: str) -> dict[str, Any]:
+        self.init_db()
+        with self._connect() as conn:
+            user = conn.execute("SELECT user_id, email FROM users WHERE user_id = ?", (user_id,)).fetchone()
+            if user is None:
+                raise KeyError(user_id)
+            run_ids = [
+                row["run_id"]
+                for row in conn.execute("SELECT run_id FROM runs WHERE user_id = ?", (user_id,)).fetchall()
+            ]
+            session_ids = [
+                row["session_id"]
+                for row in conn.execute(
+                    "SELECT session_id FROM intake_sessions WHERE user_id = ?",
+                    (user_id,),
+                ).fetchall()
+            ]
+            counts: dict[str, int] = {}
+            if run_ids:
+                placeholders = ",".join("?" for _ in run_ids)
+                for table in (
+                    "run_partial_results",
+                    "run_results",
+                    "run_events",
+                    "agent_runs",
+                    "orchestration_checkpoints",
+                ):
+                    cursor = conn.execute(f"DELETE FROM {table} WHERE run_id IN ({placeholders})", run_ids)
+                    counts[table] = cursor.rowcount
+            if session_ids:
+                placeholders = ",".join("?" for _ in session_ids)
+                for table in ("intake_messages", "intake_events"):
+                    cursor = conn.execute(f"DELETE FROM {table} WHERE session_id IN ({placeholders})", session_ids)
+                    counts[table] = cursor.rowcount
+            for table in ("analytics_events", "user_feedback", "result_followups", "usage_ledger", "intake_sessions", "runs"):
+                cursor = conn.execute(f"DELETE FROM {table} WHERE user_id = ?", (user_id,))
+                counts[table] = counts.get(table, 0) + cursor.rowcount
+            cursor = conn.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
+            counts["users"] = cursor.rowcount
+        return {
+            "deleted": True,
+            "user_id": user_id,
+            "user_email": user["email"],
+            "counts": counts,
+        }
+
+    def prune_retention(self, *, retention_days: int, dry_run: bool = True) -> dict[str, Any]:
+        self.init_db()
+        cutoff = _days_ago(retention_days)
+        deletable_statuses = ("completed", "failed", "canceled", "interrupted")
+        with self._connect() as conn:
+            run_ids = [
+                row["run_id"]
+                for row in conn.execute(
+                    """
+                    SELECT run_id
+                    FROM runs
+                    WHERE created_at < ?
+                        AND status IN (?, ?, ?, ?)
+                    """,
+                    (cutoff, *deletable_statuses),
+                ).fetchall()
+            ]
+            counts: dict[str, int] = {"runs": len(run_ids)}
+            for table in ("analytics_events", "admin_audit_events"):
+                row = conn.execute(
+                    f"SELECT COUNT(*) AS value FROM {table} WHERE created_at < ?",
+                    (cutoff,),
+                ).fetchone()
+                counts[table] = int(row["value"] if row else 0)
+            if dry_run:
+                return {
+                    "dry_run": True,
+                    "retention_days": retention_days,
+                    "cutoff": cutoff,
+                    "counts": counts,
+                }
+            if run_ids:
+                placeholders = ",".join("?" for _ in run_ids)
+                for table in (
+                    "run_partial_results",
+                    "run_results",
+                    "run_events",
+                    "agent_runs",
+                    "orchestration_checkpoints",
+                ):
+                    cursor = conn.execute(f"DELETE FROM {table} WHERE run_id IN ({placeholders})", run_ids)
+                    counts[table] = cursor.rowcount
+                cursor = conn.execute(f"DELETE FROM runs WHERE run_id IN ({placeholders})", run_ids)
+                counts["runs"] = cursor.rowcount
+            for table in ("analytics_events", "admin_audit_events"):
+                cursor = conn.execute(f"DELETE FROM {table} WHERE created_at < ?", (cutoff,))
+                counts[table] = cursor.rowcount
+        return {
+            "dry_run": False,
+            "retention_days": retention_days,
+            "cutoff": cutoff,
+            "counts": counts,
+        }
 
     def create_run(
         self,
@@ -1377,6 +1990,13 @@ class SQLiteRunStore:
             created_at=row["created_at"],
         )
 
+    def _row_to_json_dict(self, row: sqlite3.Row, json_columns: tuple[str, ...]) -> dict[str, Any]:
+        data = dict(row)
+        for column in json_columns:
+            if column in data:
+                data[column.removesuffix("_json")] = _json_loads(data.pop(column), None)
+        return data
+
     def _ensure_column(
         self,
         conn: sqlite3.Connection,
@@ -1440,3 +2060,8 @@ def _auth_user_id(user: dict[str, Any]) -> str:
 
 def _json_digest(value: dict[str, Any]) -> str:
     return sha256(_json_dumps(value).encode("utf-8")).hexdigest()
+
+
+def _days_ago(days: int) -> str:
+    safe_days = max(1, min(days, 3650))
+    return (datetime.now(UTC) - timedelta(days=safe_days)).isoformat()

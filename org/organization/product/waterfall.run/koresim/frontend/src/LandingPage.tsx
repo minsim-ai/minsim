@@ -1,12 +1,12 @@
 import {
   ArrowRight,
-  CaretRight,
   ChartBar,
   ChartPie,
   CheckCircle,
   Clock,
   CurrencyDollar,
   Eye,
+  FilePdf,
   Lightning,
   Megaphone,
   Play,
@@ -27,6 +27,8 @@ import { AuthStatus } from './components/AuthStatus'
 const HeroScene = lazy(() =>
   import('./components/heroParticles/HeroParticleField').then((m) => ({ default: m.HeroParticleField }))
 )
+
+const DEMO_PDF_PREVIEW_URL = 'https://drive.google.com/file/d/1cm-ydOpcMi6rslJOnmBaGoRp-eGarOgW/view?usp=sharing'
 
 /* ─── util ─── */
 function useInView(threshold = 0.15) {
@@ -200,10 +202,10 @@ function Nav() {
 
         <div style={{ display: isMobile ? 'none' : 'flex', alignItems: 'center', gap: 28 }}>
           {[
-            { label: '제품', href: '#' },
-            { label: '사용 사례', href: '#' },
+            { label: '제품', href: '#product' },
+            { label: '사용 사례', href: '/use-cases/market-research/' },
             { label: '검증', href: '/validation' },
-            { label: '비교', href: '#' },
+            { label: '비교', href: '#comparison' },
           ].map((item) => (
             <a key={item.label} href={item.href} style={{ color: 'var(--color-fg-subtle)', fontSize: 14, fontWeight: 500, textDecoration: 'none', transition: `color var(--duration-1)` }}
               onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-fg)')}
@@ -263,7 +265,7 @@ function PersonaCard({
       <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
         <img
           src={imageSrc}
-          alt=""
+          alt={`${name} AI 페르소나 프로필`}
           style={{
             width: 46,
             height: 46,
@@ -344,11 +346,11 @@ function HeroSection() {
               onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'var(--color-primary)' }}>
               <Play size={16} weight="fill" /> 무료 데모 시작하기
             </button>
-            <button style={{ background: 'transparent', color: 'var(--color-fg)', border: '1px solid var(--color-border-strong)', borderRadius: 'var(--radius-pill)', padding: '14px 26px', fontSize: 15, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7 }}
+            <a href={DEMO_PDF_PREVIEW_URL} target="_blank" rel="noreferrer" style={{ background: 'transparent', color: 'var(--color-fg)', border: '1px solid var(--color-border-strong)', borderRadius: 'var(--radius-pill)', padding: '14px 26px', fontSize: 15, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, textDecoration: 'none' }}
               onMouseEnter={e => ((e.currentTarget as HTMLElement).style.borderColor = 'var(--color-fg-muted)')}
               onMouseLeave={e => ((e.currentTarget as HTMLElement).style.borderColor = 'var(--color-border-strong)')}>
-              영업팀 문의 <CaretRight size={16} weight="bold" />
-            </button>
+              <FilePdf size={16} weight="bold" /> 데모 pdf 미리보기
+            </a>
           </div>
 
           <div style={{ marginTop: 28, display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
@@ -447,7 +449,7 @@ function PainSection() {
     { icon: <Target size={28} weight="duotone" color="var(--color-primary)" />, title: '샘플이 너무 적습니다', highlight: '1,000~3,000명', desc: '1,000~3,000명의 응답으로 5,100만 명의 다양한 한국인을 대변할 수 있을까요? 오차 범위와 신뢰도의 한계가 있습니다.' },
   ]
   return (
-    <section style={{ padding: '120px 24px', background: 'var(--color-bg)' }}>
+    <section id="market-research-problem" style={{ padding: '120px 24px', background: 'var(--color-bg)' }}>
       <div ref={ref} style={{ maxWidth: 1200, margin: '0 auto' }}>
         <SectionHeader en="Problem Recognition" ko={<>기존 시장조사가<br />망가진 이유</>} />
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 24 }}>
@@ -475,7 +477,7 @@ function SolutionSection() {
     { icon: <Users size={24} weight="duotone" color="var(--color-accent-violet)" />, iconBg: 'var(--color-accent-violet-bg)', title: '100만 한국인', desc: 'NVIDIA Nemotron-Personas-Korea. 26개 필드로 구성된 현실적인 한국인 페르소나 100만 명.' },
   ]
   return (
-    <section style={{ padding: '120px 24px', background: 'var(--color-bg-alt)' }}>
+    <section id="product" style={{ padding: '120px 24px', background: 'var(--color-bg-alt)' }}>
       <div ref={ref} style={{ maxWidth: 1200, margin: '0 auto' }}>
         <SectionHeader en="Arabesque Solution" ko={<>모든 것을<br />바꿉니다</>} />
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 24 }}>
@@ -513,7 +515,7 @@ function FeaturesSection() {
   ]
 
   return (
-    <section style={{ padding: '120px 24px', background: 'var(--color-bg)' }}>
+    <section id="use-cases" style={{ padding: '120px 24px', background: 'var(--color-bg)' }}>
       <div ref={ref} style={{ maxWidth: 1200, margin: '0 auto' }}>
         <SectionHeader en="9 Simulation Types" ko={<>9가지 시뮬레이션으로<br />모든 것을 검증하세요</>} />
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 14 }}>
@@ -557,7 +559,7 @@ function FeaturesSection() {
 function ProductScreenshotSection() {
   const isMobile = useIsMobile()
   return (
-    <section style={{ padding: '120px 24px', background: 'var(--color-bg-alt)' }}>
+    <section id="product-preview" style={{ padding: '120px 24px', background: 'var(--color-bg-alt)' }}>
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
         <SectionHeader en="Product in Action" ko={<>결과를 한눈에</>} />
 
@@ -675,7 +677,7 @@ function HowItWorksSection() {
     { num: '04', title: '인사이트 확인', desc: '시각화된 결과와 페르소나별 응답으로 명확한 인사이트를 얻습니다.' },
   ]
   return (
-    <section style={{ padding: '120px 24px', background: 'var(--color-bg)' }}>
+    <section id="how-it-works" style={{ padding: '120px 24px', background: 'var(--color-bg)' }}>
       <div ref={ref} style={{ maxWidth: 1200, margin: '0 auto' }}>
         <SectionHeader en="How It Works" ko="어떻게 작동하나요?" />
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, minmax(0, 1fr))', gap: isMobile ? 28 : 0, position: 'relative' }}>
@@ -716,7 +718,7 @@ function ComparisonSection() {
     return <span>{value}</span>
   }
   return (
-    <section style={{ padding: '120px 24px', background: 'var(--color-bg-alt)' }}>
+    <section id="comparison" style={{ padding: '120px 24px', background: 'var(--color-bg-alt)' }}>
       <div ref={ref} style={{ maxWidth: 900, margin: '0 auto', opacity: inView ? 1 : 0, transition: 'opacity 0.7s ease' }}>
         <SectionHeader en="Clear Comparison" ko={<>명확한 비교</>} />
         <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-20)', overflowX: isMobile ? 'auto' : 'hidden', overflowY: 'hidden' }}>
@@ -752,7 +754,7 @@ function ComparisonSection() {
 function CtaSection() {
   const isMobile = useIsMobile()
   return (
-    <section style={{ padding: '120px 24px', background: 'rgb(20,25,30)', position: 'relative', overflow: 'hidden' }}>
+    <section id="app" style={{ padding: '120px 24px', background: 'rgb(20,25,30)', position: 'relative', overflow: 'hidden' }}>
       <div style={{ maxWidth: 640, margin: '0 auto', textAlign: 'center', position: 'relative' }}>
         <div style={{ marginBottom: 14, fontSize: 12, fontWeight: 600, color: 'var(--color-primary)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Get Started</div>
         <h2 style={{ fontSize: isMobile ? 36 : 48, fontWeight: 700, color: 'white', margin: 0, letterSpacing: '-0.025em', lineHeight: 1.15, fontFamily: 'var(--font-display)' }}>
@@ -767,9 +769,9 @@ function CtaSection() {
             onMouseLeave={e => ((e.currentTarget as HTMLElement).style.transform = 'translateY(0)')}>
             무료 데모 시작하기 <ArrowRight size={18} weight="bold" />
           </button>
-          <button style={{ background: 'transparent', color: 'rgba(255,255,255,0.75)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 'var(--radius-pill)', padding: '15px 30px', fontSize: 15, fontWeight: 500, cursor: 'pointer' }}>
-            영업팀에 문의하기
-          </button>
+          <a href={DEMO_PDF_PREVIEW_URL} target="_blank" rel="noreferrer" style={{ background: 'transparent', color: 'rgba(255,255,255,0.75)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 'var(--radius-pill)', padding: '15px 30px', fontSize: 15, fontWeight: 500, cursor: 'pointer', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <FilePdf size={17} weight="bold" /> 데모 pdf 미리보기
+          </a>
         </div>
         <div style={{ marginTop: 32, color: 'rgba(255,255,255,0.25)', fontSize: 13 }}>
           문의: <a href="mailto:qudtnrh@gmail.com" style={{ color: 'rgba(255,255,255,0.72)', textDecoration: 'none' }}>qudtnrh@gmail.com</a>
@@ -840,10 +842,22 @@ function FlickeringGridBackground() {
 /* ─── FOOTER ─── */
 function Footer() {
   const isMobile = useIsMobile()
+  const simulationLinks = [
+    ['가격 최적화', '/simulations/price-optimization/'],
+    ['크리에이티브 비교', '/simulations/creative-testing/'],
+    ['신제품 반응', '/simulations/product-launch/'],
+    ['시장 세분화', '/simulations/market-segmentation/'],
+    ['캠페인 전략', '/simulations/campaign-strategy/'],
+  ]
+  const compareLinks = [
+    ['시장조사 vs AI', '/compare/market-research-vs-ai-simulation/'],
+    ['설문조사 vs 페르소나', '/compare/survey-vs-persona-simulation/'],
+    ['인터뷰 vs AI', '/compare/user-interview-vs-ai-simulation/'],
+  ]
   return (
     <footer style={{ background: 'var(--color-bg)', borderTop: '1px solid var(--color-border)', padding: '56px 24px', position: 'relative', overflow: 'hidden', minHeight: 160 }}>
       <FlickeringGridBackground />
-      <div style={{ maxWidth: 1200, margin: '0 auto', position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexDirection: isMobile ? 'column' : 'row', flexWrap: 'wrap', gap: 20 }}>
+      <div style={{ maxWidth: 1200, margin: '0 auto', position: 'relative', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.2fr 1fr 1fr 1fr', gap: 24, alignItems: 'start' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 7 }}>
             <img src="/organization/logo-a.png" alt="Arabesque 로고" style={{ width: 30, height: 30, objectFit: 'contain', display: 'block' }} />
@@ -853,12 +867,27 @@ function Footer() {
             powered by <a href="https://waterfall.run" style={{ color: 'var(--color-primary)', textDecoration: 'none' }}>waterfall.run</a>
           </div>
         </div>
-        <div style={{ color: 'var(--color-fg-subtle)', fontSize: 12, textAlign: isMobile ? 'left' : 'right' }}>
+        <FooterLinkGroup title="시뮬레이션" links={simulationLinks} />
+        <FooterLinkGroup title="비교" links={compareLinks} />
+        <div style={{ color: 'var(--color-fg-subtle)', fontSize: 12, textAlign: 'left' }}>
           <div>NVIDIA Nemotron-Personas-Korea 기반</div>
           <div style={{ marginTop: 4 }}>© 2026 Arabesque. All rights reserved.</div>
         </div>
       </div>
     </footer>
+  )
+}
+
+function FooterLinkGroup({ title, links }: { title: string; links: string[][] }) {
+  return (
+    <nav aria-label={title} style={{ display: 'grid', gap: 7 }}>
+      <strong style={{ color: 'var(--color-fg-muted)', fontSize: 12 }}>{title}</strong>
+      {links.map(([label, href]) => (
+        <a key={href} href={href} style={{ color: 'var(--color-fg-subtle)', fontSize: 12, textDecoration: 'none' }}>
+          {label}
+        </a>
+      ))}
+    </nav>
   )
 }
 

@@ -71,10 +71,15 @@ def _is_public_path(path: str) -> bool:
     return (
         path == "/"
         or path == "/validation"
+        or path in {"/robots.txt", "/sitemap.xml"}
+        or path.startswith("/use-cases/")
+        or path.startswith("/simulations/")
+        or path.startswith("/compare/")
         or path.startswith("/api/auth/")
         or path in {"/api/health", "/api/config"}
         or path.startswith("/assets/")
         or path.startswith("/fonts/")
+        or path.startswith("/landing/")
         or path.startswith("/maps/")
         or path.startswith("/organization/")
         or path.startswith("/persona/")
