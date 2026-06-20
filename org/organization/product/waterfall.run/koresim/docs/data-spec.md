@@ -31,45 +31,45 @@ related: \[\[prd\]\], \[\[functional/overview\]\]
 
 ### 인구통계 (12)
 
-| 필드 | 타입 | 값 예시 | 분포 (상위) |
-| --- | --- | --- | --- |
-| `sex` | String | 남자 / 여자 | 남자 49.6%, 여자 50.4% |
-| `age` | Int64 | 19~99 | 평균 50.66, 중앙값 51 |
-| `marital_status` | String | 미혼 / 배우자 있음 / 이혼 / 사별 | — |
-| `military_status` | String | 군필 / 미필 / 면제 / 해당 없음 | — |
-| `family_type` | String | 혼자 거주 / 배우자와 거주 / 자녀와 거주 등 | — |
-| `housing_type` | String | 아파트 / 단독주택 / 빌라 / 오피스텔 등 | — |
-| `education_level` | String | 무학 / 초등학교 / 중학교 / 고등학교 / 2~3년제 전문대학 / 4년제 대학교 / 대학원 | 고졸 33.1%, 4년제 27.1% |
-| `bachelors_field` | String | 전공 (예: 경영학, 컴퓨터공학) | — |
-| `occupation` | String | 직업 (한국표준직업분류 기준) | **무직 36.7%**, 건물 청소원 1.8%, ... |
-| `district` | String | 시군구 (예: "서울-강남구") | — |
-| `province` | String | 광역시도 (17개) | 경기 26.2%, 서울 18.5%, 부산 6.5% |
-| `country` | String | 한국 (전부 동일) | — |
+| 필드                | 타입     | 값 예시                                                | 분포 (상위)                        |
+| ----------------- | ------ | --------------------------------------------------- | ------------------------------ |
+| `sex`             | String | 남자 / 여자                                             | 남자 49.6%, 여자 50.4%             |
+| `age`             | Int64  | 19~99                                               | 평균 50.66, 중앙값 51               |
+| `marital_status`  | String | 미혼 / 배우자 있음 / 이혼 / 사별                               | —                              |
+| `military_status` | String | 군필 / 미필 / 면제 / 해당 없음                                | —                              |
+| `family_type`     | String | 혼자 거주 / 배우자와 거주 / 자녀와 거주 등                          | —                              |
+| `housing_type`    | String | 아파트 / 단독주택 / 빌라 / 오피스텔 등                            | —                              |
+| `education_level` | String | 무학 / 초등학교 / 중학교 / 고등학교 / 2~3년제 전문대학 / 4년제 대학교 / 대학원 | 고졸 33.1%, 4년제 27.1%            |
+| `bachelors_field` | String | 전공 (예: 경영학, 컴퓨터공학)                                  | —                              |
+| `occupation`      | String | 직업 (한국표준직업분류 기준)                                    | **무직 36.7%**, 건물 청소원 1.8%, ... |
+| `district`        | String | 시군구 (예: "서울-강남구")                                   | —                              |
+| `province`        | String | 광역시도 (17개)                                          | 경기 26.2%, 서울 18.5%, 부산 6.5%    |
+| `country`         | String | 한국 (전부 동일)                                          | —                              |
 
 ### Persona Narrative (7) — 핵심 자산
 
 각 페르소나마다 **7개의 다른 관점에서 작성된 한국어 narrative** (각 130~170자):
 
-| 필드 | 의미 | 시뮬레이션 활용 |
-| --- | --- | --- |
-| `persona` | 통합 인물 묘사 (가장 짧음, ~80자) | 모든 시뮬레이션 기본 포함 |
-| `professional_persona` | 직업·일터에서의 모습 | marketing, b2b |
-| `family_persona` | 가족·가정에서의 모습 | marketing, lifestyle |
-| `culinary_persona` | 음식·식습관 | marketing (식음료) |
-| `sports_persona` | 운동·여가 활동 | lifestyle, sports brand |
-| `arts_persona` | 예술·문화 취향 | lifestyle, media |
-| `travel_persona` | 여행·이동 패턴 | lifestyle, travel |
+| 필드                     | 의미                     | 시뮬레이션 활용                |
+| ---------------------- | ---------------------- | ----------------------- |
+| `persona`              | 통합 인물 묘사 (가장 짧음, ~80자) | 모든 시뮬레이션 기본 포함          |
+| `professional_persona` | 직업·일터에서의 모습            | marketing, b2b          |
+| `family_persona`       | 가족·가정에서의 모습            | marketing, lifestyle    |
+| `culinary_persona`     | 음식·식습관                 | marketing (식음료)         |
+| `sports_persona`       | 운동·여가 활동               | lifestyle, sports brand |
+| `arts_persona`         | 예술·문화 취향               | lifestyle, media        |
+| `travel_persona`       | 여행·이동 패턴               | lifestyle, travel       |
 
 ### 추가 속성 (6)
 
-| 필드 | 타입 | 의미 |
-| --- | --- | --- |
-| `cultural_background` | String | 문화·세대적 배경 narrative |
-| `skills_and_expertise` | String | 보유 기술 narrative |
-| `skills_and_expertise_list` | String | 기술 리스트 (콤마 구분) |
-| `hobbies_and_interests` | String | 취미·관심사 narrative |
-| `hobbies_and_interests_list` | String | 취미 리스트 (콤마 구분) |
-| `career_goals_and_ambitions` | String | 커리어 목표 narrative |
+| 필드                           | 타입     | 의미                  |
+| ---------------------------- | ------ | ------------------- |
+| `cultural_background`        | String | 문화·세대적 배경 narrative |
+| `skills_and_expertise`       | String | 보유 기술 narrative     |
+| `skills_and_expertise_list`  | String | 기술 리스트 (콤마 구분)      |
+| `hobbies_and_interests`      | String | 취미·관심사 narrative    |
+| `hobbies_and_interests_list` | String | 취미 리스트 (콤마 구분)      |
+| `career_goals_and_ambitions` | String | 커리어 목표 narrative    |
 
 ---
 
@@ -140,7 +140,7 @@ related: \[\[prd\]\], \[\[functional/overview\]\]
 편의점 점원:                   0.9%
 주방보조원:                    0.8%
 영업 사원:                     0.8%
-... (이후 long tail)
+... (이후 long tail.. 많음)
 ```
 
 ---
