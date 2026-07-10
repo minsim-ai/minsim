@@ -10,10 +10,18 @@ from src.api.schemas import (
     ProjectResponse,
     ProjectRunCreateRequest,
     ProjectRunCreateResponse,
+    ProjectRunFollowupRequest,
+    ProjectRunFollowupResponse,
+    ProjectRunInterviewRequest,
+    ProjectRunInterviewResponse,
     ProjectRunItem,
     ProjectRunListResponse,
     ProjectUpdateRequest,
     RunCreateRequest,
+    RunExportResponse,
+    RunFeedbackRequest,
+    RunFeedbackResponse,
+    RunResultEnvelope,
     RunSnapshot,
     RunStatus,
     SimulationType,
@@ -21,6 +29,8 @@ from src.api.schemas import (
 from src.jobs.models import ProjectRecord, RunRecord, UserRecord
 from src.jobs.store import SQLiteRunStore
 from src.services.errors import ServiceError, require_authenticated_user
+from src.services.export_service import build_run_export_response
+from src.services.followup_service import run_followup
 from src.services.run_service import create_run_for_user
 
 
@@ -135,12 +145,132 @@ class ProjectService:
         )
         return ProjectRunCreateResponse(project_id=project_id, run=run)
 
+    def get_project_run_result(self, user: UserRecord | None, project_id: str, run_id: str) -> RunResultEnvelope:
+        run = self._owned_project_run(user, project_id, run_id)
+        result = self.store.get_result(run.run_id)
+        if result is None:
+            raise ServiceError(
+                status_code=409,
+                code=ErrorCode.RESULT_NOT_READY,
+                message="Run result is not ready yet.",
+                details={"run_id": run_id, "status": run.status.value},
+            )
+        return RunResultEnvelope.model_validate(result.result)
+
+    def export_project_run(self, user: UserRecord | None, project_id: str, run_id: str) -> RunExportResponse:
+        return build_run_export_response(self.get_project_run_result(user, project_id, run_id))
+
+    def submit_project_run_feedback(
+        self,
+        user: UserRecord | None,
+        project_id: str,
+        run_id: str,
+        payload: RunFeedbackRequest,
+    ) -> RunFeedbackResponse:
+        user = require_authenticated_user(user)
+        run = self._owned_project_run(user, project_id, run_id)
+        record = self.store.save_user_feedback(
+            run_id=run_id,
+            user=user,
+            intake_session_id=payload.intake_session_id,
+            usefulness_score=payload.usefulness_score,
+            trust_score=payload.trust_score,
+            actionability_score=payload.actionability_score,
+            result_expectation=payload.result_expectation,
+            free_text=payload.free_text,
+            intended_action=payload.intended_action,
+            decision_confidence_before=payload.decision_confidence_before,
+            decision_confidence_after=payload.decision_confidence_after,
+            shared_with_team=payload.shared_with_team,
+            exported_report=payload.exported_report,
+        )
+        self.store.record_analytics_event(
+            event_name="feedback_submitted",
+            user=user,
+            run_id=run_id,
+            page="/projects/results",
+            simulation_type=run.simulation_type,
+            payload={"project_id": project_id},
+        )
+        return RunFeedbackResponse.model_validate(record)
+
+    def ask_followup(
+        self,
+        user: UserRecord | None,
+        project_id: str,
+        run_id: str,
+        payload: ProjectRunFollowupRequest,
+        llm_client: object | None = None,
+    ) -> ProjectRunFollowupResponse:
+        run = self._owned_project_run(user, project_id, run_id)
+        result = self.store.get_result(run_id)
+        if result is None:
+            raise ServiceError(
+                status_code=409,
+                code=ErrorCode.RESULT_NOT_READY,
+                message="Run result is not ready yet.",
+                details={"run_id": run_id, "status": run.status.value},
+            )
+        body = run_followup(
+            original_run={
+                "seed": run.seed,
+                "sample_size": run.sample_size,
+                "target_filter": run.target_filter,
+            },
+            question=payload.question,
+            cohort=payload.cohort,
+            raw_results=result.result.get("raw_results") or [],
+            sample_size=payload.sample_size,
+            llm_client=llm_client,
+        )
+        return ProjectRunFollowupResponse.model_validate(body)
+
+    def ask_interview_question(
+        self,
+        user: UserRecord | None,
+        project_id: str,
+        run_id: str,
+        payload: ProjectRunInterviewRequest,
+        llm_client: object | None = None,
+    ) -> ProjectRunInterviewResponse:
+        followup = self.ask_followup(
+            user,
+            project_id,
+            run_id,
+            ProjectRunFollowupRequest(
+                question=payload.question,
+                cohort=payload.subject_uuid or "all",
+                sample_size=payload.sample_size,
+            ),
+            llm_client=llm_client,
+        )
+        return ProjectRunInterviewResponse(
+            subject_uuid=payload.subject_uuid,
+            question=payload.question,
+            answers=followup.answers,
+            summary=followup.summary,
+        )
+
     def _owned_project(self, user: UserRecord | None, project_id: str) -> ProjectRecord:
         user = require_authenticated_user(user)
         project = self.store.get_project(project_id)
         if project is None or project.user_id != user.user_id or project.archived_at is not None:
             raise self._not_found(project_id)
         return project
+
+    def _owned_project_run(self, user: UserRecord | None, project_id: str, run_id: str) -> RunRecord:
+        user = require_authenticated_user(user)
+        self._owned_project(user, project_id)
+        link = self.store.get_project_run(project_id, run_id)
+        run = self.store.get_run(run_id)
+        if link is None or run is None or run.user_id != user.user_id:
+            raise ServiceError(
+                status_code=404,
+                code=ErrorCode.RUN_NOT_FOUND,
+                message="Run was not found.",
+                details={"project_id": project_id, "run_id": run_id},
+            )
+        return run
 
     @staticmethod
     def _not_found(project_id: str) -> ServiceError:

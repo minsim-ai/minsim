@@ -43,6 +43,10 @@ from src.api.schemas import (
     ProjectResponse,
     ProjectRunCreateRequest,
     ProjectRunCreateResponse,
+    ProjectRunFollowupRequest,
+    ProjectRunFollowupResponse,
+    ProjectRunInterviewRequest,
+    ProjectRunInterviewResponse,
     ProjectRunListResponse,
     ProjectUpdateRequest,
     RunCreateRequest,
@@ -89,6 +93,7 @@ from src.llm.base import LLMClientProtocol, LLMMessage, LLMRequest
 from src.llm.factory import create_llm_client
 from src.runtime.health import collect_runtime_health
 from src.services.errors import ServiceError
+from src.services.export_service import build_run_export_response
 from src.services.project_service import ProjectService
 from src.services.run_service import create_run_for_user
 from src.simulations.registry import enabled_simulation_types, simulation_metadata
@@ -330,35 +335,6 @@ def _mask_admin_payload(payload: dict[str, Any], *, include_sensitive: bool = Fa
     if isinstance(masked.get("overview"), dict):
         masked["overview"] = _mask_admin_payload(masked["overview"], include_sensitive=False)
     return masked
-
-
-def _export_response(result: RunResultEnvelope) -> RunExportResponse:
-    return RunExportResponse(
-        run_id=result.run_id,
-        simulation_type=result.simulation_type,
-        status=result.status,
-        seed=result.seed,
-        sample_size=result.sample_size,
-        total_responses=result.total_responses,
-        parse_failed=result.parse_failed,
-        target_filter=result.target_filter,
-        sample_summary=result.sample_summary,
-        quality=result.quality,
-        warnings=result.warnings,
-        metrics=result.metrics,
-        segments=result.segments,
-        insights=result.insights,
-        model_alias=result.model_alias,
-        provider=result.provider,
-        provider_model=result.provider_model,
-        llm_backend=result.llm_backend,
-        trace_id=result.trace_id,
-        disclaimer=(
-            "This export is a synthetic persona simulation report. It is not a real survey, "
-            "market-share proof, demand forecast, or legally reviewed customer deliverable. "
-            "Human review is required before external sharing."
-        ),
-    )
 
 
 def _intake_session_response(record) -> IntakeSessionResponse:
@@ -912,6 +888,78 @@ async def create_project_run(
         raise _service_error(exc) from exc
 
 
+@router.get("/api/projects/{project_id}/runs/{run_id}/result")
+async def get_project_run_result(request: Request, project_id: str, run_id: str) -> RunResultEnvelope:
+    try:
+        return _project_service(request).get_project_run_result(_user_record_for_request(request), project_id, run_id)
+    except ServiceError as exc:
+        raise _service_error(exc) from exc
+
+
+@router.get("/api/projects/{project_id}/runs/{run_id}/export")
+async def export_project_run(request: Request, project_id: str, run_id: str) -> RunExportResponse:
+    try:
+        return _project_service(request).export_project_run(_user_record_for_request(request), project_id, run_id)
+    except ServiceError as exc:
+        raise _service_error(exc) from exc
+
+
+@router.post("/api/projects/{project_id}/runs/{run_id}/feedback")
+async def submit_project_run_feedback(
+    request: Request,
+    project_id: str,
+    run_id: str,
+    payload: RunFeedbackRequest,
+) -> RunFeedbackResponse:
+    try:
+        return _project_service(request).submit_project_run_feedback(
+            _user_record_for_request(request),
+            project_id,
+            run_id,
+            payload,
+        )
+    except ServiceError as exc:
+        raise _service_error(exc) from exc
+
+
+@router.post("/api/projects/{project_id}/runs/{run_id}/followup")
+def ask_project_run_followup(
+    request: Request,
+    project_id: str,
+    run_id: str,
+    payload: ProjectRunFollowupRequest,
+) -> ProjectRunFollowupResponse:
+    try:
+        return _project_service(request).ask_followup(
+            _user_record_for_request(request),
+            project_id,
+            run_id,
+            payload,
+            llm_client=request.app.state.llm_client,
+        )
+    except ServiceError as exc:
+        raise _service_error(exc) from exc
+
+
+@router.post("/api/projects/{project_id}/runs/{run_id}/interview")
+def ask_project_run_interview(
+    request: Request,
+    project_id: str,
+    run_id: str,
+    payload: ProjectRunInterviewRequest,
+) -> ProjectRunInterviewResponse:
+    try:
+        return _project_service(request).ask_interview_question(
+            _user_record_for_request(request),
+            project_id,
+            run_id,
+            payload,
+            llm_client=request.app.state.llm_client,
+        )
+    except ServiceError as exc:
+        raise _service_error(exc) from exc
+
+
 @router.post("/api/runs")
 async def create_run(request: Request, payload: RunCreateRequest) -> RunCreateResponse:
     try:
@@ -1212,7 +1260,7 @@ async def save_run_feedback(
 @router.get("/api/runs/{run_id}/export")
 async def export_run_result(request: Request, run_id: str) -> RunExportResponse:
     result = await get_run_result(request, run_id)
-    return _export_response(result)
+    return build_run_export_response(result)
 
 
 @router.get("/api/runs/{run_id}/partials")

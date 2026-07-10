@@ -577,6 +577,42 @@ class RunFeedbackResponse(APIModel):
     created_at: str
 
 
+class ProjectRunFollowupRequest(APIModel):
+    question: str = Field(min_length=1, max_length=500)
+    cohort: str = Field(default="all", max_length=80)
+    sample_size: int = Field(default=12, ge=1, le=50)
+
+
+class FollowupAnswer(APIModel):
+    uuid: str
+    name: str
+    age: int | None = None
+    sex: str = ""
+    province: str | None = None
+    answer: str
+
+
+class ProjectRunFollowupResponse(APIModel):
+    question: str
+    cohort: str
+    panel_seed: int
+    answers: list[FollowupAnswer]
+    summary: str
+
+
+class ProjectRunInterviewRequest(APIModel):
+    subject_uuid: str | None = Field(default=None, max_length=160)
+    question: str = Field(min_length=1, max_length=500)
+    sample_size: int = Field(default=1, ge=1, le=10)
+
+
+class ProjectRunInterviewResponse(APIModel):
+    subject_uuid: str | None = None
+    question: str
+    answers: list[FollowupAnswer]
+    summary: str
+
+
 class AdminOverviewResponse(APIModel):
     users: int
     runs: int
