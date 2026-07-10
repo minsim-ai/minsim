@@ -6,6 +6,8 @@ import { ResultsPage as ClassicResultsPage, ResultsStoryPage } from "./ResultsPa
 import { ValidationPage } from "./ValidationPage";
 import type { SimulationType } from "./types/api";
 import { MinsimIntakeFlow } from "./v2/MinsimIntakeFlow";
+import { MinsimLoadingPage } from "./v2/MinsimLoadingPage";
+import { MinsimResultsPage } from "./v2/MinsimResultsPage";
 import { ProjectDetailPage } from "./v2/ProjectDetailPage";
 import { ProjectsPage } from "./v2/ProjectsPage";
 import { SimulationTypePage } from "./v2/SimulationTypePage";
@@ -51,15 +53,8 @@ export function Root() {
       />
     );
   }
-  if (route.page === "loading" || route.page === "results") {
-    content = (
-      <section className="v2-empty-state">
-        <p className="v2-kicker">V2</p>
-        <h1>{route.page === "loading" ? "실행 중" : "결과"}</h1>
-        <p>결과 화면을 준비하고 있습니다.</p>
-      </section>
-    );
-  }
+  if (route.page === "loading") content = <MinsimLoadingPage projectId={route.projectId} runId={route.runId} />;
+  if (route.page === "results") content = <MinsimResultsPage projectId={route.projectId} runId={route.runId} />;
 
   return <V2AppShell route={route}>{content}</V2AppShell>;
 }
