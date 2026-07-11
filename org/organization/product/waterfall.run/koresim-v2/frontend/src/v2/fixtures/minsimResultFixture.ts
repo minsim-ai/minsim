@@ -1,5 +1,6 @@
 import type { RunResultEnvelope } from '../../types/api'
 import { adaptRunResult } from '../resultAdapter'
+import { buildMinsimReport } from '../minsimReport'
 
 export type MinsimResultFixtureCheck = {
   ok: boolean
@@ -91,6 +92,7 @@ export const minsimResultFixture: RunResultEnvelope = {
 
 export function runMinsimResultFixtureCheck(): MinsimResultFixtureCheck {
   const view = adaptRunResult(minsimResultFixture)
+  const report = buildMinsimReport(minsimResultFixture)
   const failures: string[] = []
 
   if (view.winnerLabel !== 'B안') failures.push(`expected B안 winner, got ${view.winnerLabel}`)
@@ -98,6 +100,21 @@ export function runMinsimResultFixtureCheck(): MinsimResultFixtureCheck {
   if (view.evidenceQuotes.length < 2) failures.push('expected evidence quotes from raw results')
   if (view.recommendations.length === 0) failures.push('expected recommendations')
   if (!view.methodology.some((item) => item.includes('seed 42'))) failures.push('expected seed in methodology')
+
+  if (!report.oppRisk) {
+    failures.push('expected opportunity/risk map')
+  } else {
+    if (report.oppRisk.cols.length !== 5) failures.push('expected 5 opportunity/risk columns')
+    if (report.oppRisk.rows.length < 2) failures.push('expected opportunity/risk rows for age segments')
+    if (!report.oppRisk.rows.every((row) => row.v.length === 5)) failures.push('expected 5 metrics per opportunity/risk row')
+    if (!report.oppRisk.rows.every((row) => row.v.every((value) => value >= 0 && value <= 100))) {
+      failures.push('expected opportunity/risk values within 0-100')
+    }
+    if (!report.oppRisk.rows.some((row) => row.sweet)) failures.push('expected one sweet-spot segment')
+  }
+  if (!report.objections.some((item) => item.reason.includes('가격') && item.pct > 0)) {
+    failures.push('expected price objection derived from persona reasons')
+  }
 
   return {
     ok: failures.length === 0,
