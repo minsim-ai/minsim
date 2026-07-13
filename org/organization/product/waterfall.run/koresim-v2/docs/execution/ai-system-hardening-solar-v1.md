@@ -4,7 +4,7 @@ type: execution-plan
 tags: [ai-system, solar, security, intake, orchestration, trust]
 created: 2026-07-13
 updated: 2026-07-13
-status: solar-isolated-passed-live-pending
+status: solar-live-gate-remediation
 related: [[../design/llm-gateway-orchestration]], [[ai-agent-improvement-loop-v1]], [[agentic-intake-layer-v2]]
 ---
 
@@ -15,7 +15,7 @@ related: [[../design/llm-gateway-orchestration]], [[ai-agent-improvement-loop-v1
 - [x] Execution plan id: `ai-system-hardening-solar-v1`
 - [x] Target phase: Phase 5/7 post-demo productization
 - [x] Owner: Codex
-- [x] Status: solar-isolated-passed-live-pending
+- [x] Status: solar-live-gate-remediation
 - [x] Created/updated: 2026-07-13
 
 ## 1. Objective
@@ -121,3 +121,11 @@ related: [[../design/llm-gateway-orchestration]], [[ai-agent-improvement-loop-v1
 - 2026-07-13: the post-credential repository gate passed: 205 tests, 89.30%
   backend coverage, frontend lint/typecheck/production build. Production restart
   and external 10 → 50 → 200 validation remain pending.
+- 2026-07-13: production restart/readiness passed with `upstage` / `solar-pro2`.
+  External MCP 10-person and 50-person runs completed with 0 parse failures and
+  LLM-backed Analysis/Report/QA nodes.
+- 2026-07-13: the first external 200-person run completed all requests, but 43
+  responses were provider rate-limit errors. The 157 successful responses all
+  contained the required choice label, isolating the failure from parser format.
+  A failing regression test reproduced the immediate-retry bug; the implementation
+  now honors provider retry headers and otherwise uses bounded exponential backoff.

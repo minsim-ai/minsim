@@ -168,6 +168,11 @@ current provider policy.
   against `upstage` / `solar-pro2` with 10 responses, 0 parse failures, and LLM
   Analysis → Report → QA execution. The post-credential full gate passed with
   205 tests and 89.30% coverage; production 10 → 50 → 200 remains pending.
+- 2026-07-13: production readiness passed on `upstage` / `solar-pro2`. External
+  MCP 10/50-person runs passed with 0 parse failures. The first 200-person run
+  completed but recorded 43 provider rate-limit errors; all 157 successful
+  responses matched the required format. Provider-aware bounded backoff was added
+  under a regression test before rerunning the 200-person gate.
 
 ## Risks
 

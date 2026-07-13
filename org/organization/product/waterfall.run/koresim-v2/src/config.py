@@ -11,6 +11,8 @@ CONCURRENCY = int(os.getenv("CONCURRENCY", "8"))
 MAX_SAMPLE_SIZE = int(os.getenv("MAX_SAMPLE_SIZE", "200"))
 LLM_TIMEOUT_SECONDS = float(os.getenv("LLM_TIMEOUT_SECONDS", "60"))
 LLM_RETRY_ATTEMPTS = int(os.getenv("LLM_RETRY_ATTEMPTS", "1"))
+LLM_RETRY_BACKOFF_SECONDS = float(os.getenv("LLM_RETRY_BACKOFF_SECONDS", "1"))
+LLM_RETRY_MAX_BACKOFF_SECONDS = float(os.getenv("LLM_RETRY_MAX_BACKOFF_SECONDS", "30"))
 PARQUET_PATH = Path(
     os.getenv("PARQUET_PATH", str(PROJECT_ROOT / "data" / "nemotron_korea_personas.parquet"))
 )

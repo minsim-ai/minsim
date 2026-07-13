@@ -31,6 +31,27 @@ class BorrowedLLM(SlowThenSuccessfulLLM):
         self.closed = True
 
 
+class RateLimitResponse:
+    headers = {"retry-after": "2"}
+
+
+class RateLimitError(Exception):
+    response = RateLimitResponse()
+
+
+class RateLimitedThenSuccessfulLLM(SlowThenSuccessfulLLM):
+    async def generate(self, request: LLMRequest) -> LLMResponse:
+        self.calls += 1
+        self.model_aliases.append(request.model_alias)
+        if self.calls == 1:
+            raise RateLimitError("rate limited")
+        return LLMResponse(
+            content="선택: A\n이유: 재시도 후 성공했습니다.",
+            provider="fake",
+            provider_model="fake-model",
+        )
+
+
 def _persona() -> dict:
     return {
         "uuid": "persona-1",
@@ -53,6 +74,7 @@ def _persona() -> dict:
 def test_batch_simulator_retries_once_after_timeout(monkeypatch) -> None:
     monkeypatch.setattr(simulator_module, "LLM_TIMEOUT_SECONDS", 0.01)
     monkeypatch.setattr(simulator_module, "LLM_RETRY_ATTEMPTS", 1)
+    monkeypatch.setattr(simulator_module, "LLM_RETRY_BACKOFF_SECONDS", 0)
     llm = SlowThenSuccessfulLLM()
     partials = []
     progress = []
@@ -83,3 +105,22 @@ def test_batch_simulator_does_not_close_injected_client(monkeypatch) -> None:
 
     assert results[0].error is None
     assert llm.closed is False
+
+
+def test_batch_simulator_respects_provider_retry_after(monkeypatch) -> None:
+    """As an operator, provider throttling should recover instead of failing a large run."""
+    monkeypatch.setattr(simulator_module, "LLM_RETRY_ATTEMPTS", 1)
+    monkeypatch.setattr(simulator_module, "LLM_RETRY_BACKOFF_SECONDS", 0.5, raising=False)
+    sleeps: list[float] = []
+
+    async def record_sleep(delay: float) -> None:
+        sleeps.append(delay)
+
+    monkeypatch.setattr(simulator_module.asyncio, "sleep", record_sleep)
+    llm = RateLimitedThenSuccessfulLLM()
+
+    results = asyncio.run(BatchSimulator(concurrency=1, llm_client=llm).run([_persona()], "테스트"))
+
+    assert results[0].error is None
+    assert llm.calls == 2
+    assert sleeps == [2.0]

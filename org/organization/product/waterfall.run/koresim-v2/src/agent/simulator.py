@@ -6,7 +6,13 @@ from dataclasses import dataclass, replace
 from typing import Callable, Optional
 
 from src.agent.prompt_builder import build_system_prompt
-from src.config import CONCURRENCY, LLM_RETRY_ATTEMPTS, LLM_TIMEOUT_SECONDS
+from src.config import (
+    CONCURRENCY,
+    LLM_RETRY_ATTEMPTS,
+    LLM_RETRY_BACKOFF_SECONDS,
+    LLM_RETRY_MAX_BACKOFF_SECONDS,
+    LLM_TIMEOUT_SECONDS,
+)
 from src.llm.base import LLMClientProtocol, LLMMessage, LLMRequest, LLMResponse
 from src.llm.factory import create_llm_client
 from src.llm.router import resolve_model_route
@@ -23,6 +29,25 @@ class SimResult:
     trace_id: str | None = None
     model_alias: str | None = None
     metadata: dict[str, object] | None = None
+
+
+def _retry_delay_seconds(exc: Exception, attempt: int) -> float:
+    response = getattr(exc, "response", None)
+    headers = getattr(response, "headers", None)
+    if headers is not None:
+        retry_after_ms = headers.get("retry-after-ms")
+        retry_after = headers.get("retry-after")
+        try:
+            if retry_after_ms is not None:
+                return max(0.0, float(retry_after_ms) / 1000)
+            if retry_after is not None:
+                return max(0.0, float(retry_after))
+        except (TypeError, ValueError):
+            pass
+    return min(
+        max(0.0, LLM_RETRY_BACKOFF_SECONDS) * (2**attempt),
+        max(0.0, LLM_RETRY_MAX_BACKOFF_SECONDS),
+    )
 
 
 class BatchSimulator:
@@ -132,7 +157,7 @@ class BatchSimulator:
             except Exception as exc:
                 last_exc = exc
             if attempt + 1 < attempts:
-                await asyncio.sleep(0)
+                await asyncio.sleep(_retry_delay_seconds(last_exc, attempt))
         if last_exc is None:
             raise RuntimeError("LLM request failed without an exception.")
         raise last_exc

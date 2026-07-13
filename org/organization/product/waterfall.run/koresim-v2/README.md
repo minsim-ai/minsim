@@ -15,7 +15,7 @@ KoreaSim is a Korean AI human-behavior simulation product built on NVIDIA Nemotr
 - Realtime progress: Server-Sent Events, with polling fallback
 - Remote MCP: `https://arabesque.cc/mcp` is exposed through the same Cloudflare Tunnel. The current private pilot accepts a dedicated KoreaSim MCP Bearer API key; browser Google login remains available, while standards-complete OAuth is tracked as follow-up hardening.
 - Result trust layer: quality indicators, sample summary, seed, and disclaimer are part of the common result schema from the start
-- LLM strategy: Upstage `solar-pro2` is the production target behind a provider-agnostic `LLMClient`. The server-side credential is installed and an isolated 10-person Solar run passed; the production process remains on the previous Gemini configuration until the ordered 10 → 50 → 200 live activation gate completes. LiteLLM is optional, Ollama is not a supported runtime fallback, and observability is metadata-only.
+- LLM strategy: Upstage `solar-pro2` is the production target behind a provider-agnostic `LLMClient`. The server-side credential is installed and production now routes to Solar. External 10/50-person gates passed; the first 200-person gate exposed provider rate limiting and remains in bounded-backoff remediation. LiteLLM is optional, Gemini is explicit rollback compatibility, Ollama is not a supported runtime fallback, and observability is metadata-only.
 - Agentic intake strategy: React planner v3 is the V2 planning source-of-truth. Natural-language goals become provenance-tagged slots, `IntakeContextEnvelope`, and `safe_intake_summary`; FastAPI persists sessions and rejects unreviewed assumptions.
 - Data governance: full `raw_results` can be stored/returned in the protected product, but external provider and observability payloads default to minimal metadata
 
@@ -339,7 +339,7 @@ plane과 제한된 LLM 역할, human checkpoint, 결과 품질 게이트를 결�
 - Keep optional LiteLLM `koresim/solar-*` aliases; do not use Ollama as runtime fallback
 - Add metadata observability first
 - Run Analysis → Report → QA as the actual LangGraph result workflow while RQ/async batch owns persona fan-out
-- Current code gate includes strict backend/alias validation, QA quality gates, Solar aliases, and metadata telemetry. The credential and isolated 10-person gate passed on 2026-07-13; production activation and external 10 → 50 → 200 validation remain pending.
+- Current code gate includes strict backend/alias validation, QA quality gates, Solar aliases, metadata telemetry, and bounded provider-aware retry backoff. Production Solar 10/50-person gates passed on 2026-07-13; the first 200-person run completed but hit 43 rate-limit errors, so the final 200-person acceptance gate remains pending remediation and rerun.
 
 ## Engineering Method
 
@@ -460,10 +460,9 @@ the web application.
 - `KORESIM_MCP_API_KEY` is the separate Bearer credential issued to a remote MCP
   client. It does not grant direct access to Upstage.
 
-The server-side `UPSTAGE_API_KEY` is installed outside Git, and an isolated
-10-person Solar run passed. The currently running production processes stay on
-their previous Gemini configuration until restart and the 10 → 50 → 200 persona
-validation sequence in
+The server-side `UPSTAGE_API_KEY` is installed outside Git, and production routes
+to Solar Pro 2. The 10/50-person gates passed; the 200-person gate must also pass
+after the provider-aware rate-limit remediation described in
 `docs/runbooks/llm-solar-langfuse-operations.md`.
 
 ### Server-side private pilot configuration

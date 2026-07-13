@@ -4,7 +4,7 @@ type: runbook
 tags: [llm, solar, upstage, litellm, langfuse, observability]
 created: 2026-07-13
 updated: 2026-07-13
-status: credentialed-isolated-passed-live-pending
+status: solar-live-gate-remediation
 related: [[../design/llm-gateway-orchestration]], [[../execution/ai-system-hardening-solar-v1]], [[../design/data-governance-and-io-boundary]]
 ---
 
@@ -14,15 +14,15 @@ related: [[../design/llm-gateway-orchestration]], [[../execution/ai-system-harde
 
 | 항목 | AS-IS | TO-BE |
 | --- | --- | --- |
-| live backend | 실행 중 프로세스는 Gemini | Upstage direct 설정 완료; 재시작/live gate 대기 |
-| target model | 실행 중 프로세스는 Gemini model | `solar-pro2` 격리 10명 통과 |
+| live backend | Upstage direct (`LLM_BACKEND=upstage`) | 200-person rate-limit remediation 후 최종 승인 |
+| target model | `solar-pro2`; live 10/50 통과 | live 200 재검증 |
 | Solar credential | ignored local `.env`에 설치 | secret manager 또는 local `.env`에만 유지 |
 | local fallback | 과거 Ollama 검증 기록 존재 | 운영 fallback 없음; Ollama backend 비지원 |
 | tracing | Langfuse metadata-only | 동일 정책 + latency/usage/retry metadata |
 
-Solar 코드, 설정, 자격증명, 격리 10명 검증은 준비됐다. 현재 Gemini 실행은
-명시적 임시 운영 상태이며, 아래 production restart와 10 → 50 → 200 gate를
-순서대로 통과한 뒤에만 전환 완료로 기록한다.
+Solar 코드, 설정, 자격증명, 격리 10명 검증과 production 10/50 검증은 통과했다.
+첫 200명 실행은 rate limit으로 실패했으므로 bounded backoff 보완 후 200명을
+재검증한 뒤에만 전환 완료로 기록한다. Gemini는 명시적 rollback 경로다.
 
 ## 2. Required Secrets
 
@@ -178,5 +178,12 @@ API와 worker를 재시작하고 readiness를 다시 실행한다. 미지원 bac
   remained visible.
 - 2026-07-13: `uv run python scripts/verify.py` passed with 205 tests, 89.30%
   backend coverage, and frontend lint/typecheck/production build.
+- 2026-07-13: production readiness reported `upstage` / `solar-pro2`. External
+  MCP run `1bff6a38-b126-42ad-becd-fb5935712201` passed 10/10 with 0 parse
+  failures; run `bef71b41-fb64-4c55-9181-bb359c35de3a` passed 50/50 with 0.
+- 2026-07-13: run `68a6d391-fcad-4c67-ba5e-f2738c562550` completed 200 responses
+  but 43 were provider rate-limit errors. All 157 provider successes contained the
+  required choice label. Immediate retry was replaced with provider-header-aware,
+  bounded exponential backoff; final 200-person rerun remains required.
 
 실제 Solar 명령/API/browser 검증이 통과하기 전에는 live 항목을 완료 처리하지 않는다.

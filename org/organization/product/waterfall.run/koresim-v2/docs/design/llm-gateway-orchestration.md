@@ -93,7 +93,7 @@ Supported runtime modes:
 
 | `LLM_BACKEND` | Purpose | Release status |
 | --- | --- | --- |
-| `upstage` | direct Solar Pro 2 production target | credential + isolated validation passed; production live gate pending |
+| `upstage` | direct Solar Pro 2 production target | live 10/50 passed; 200 rate-limit remediation pending |
 | `litellm` | optional server-side routing to Solar aliases | config ready; live validation pending |
 | `gemini` | temporary live compatibility and rollback | active only until Solar production restart/live gate |
 | `fake` | deterministic tests/evals | supported only for non-live validation |
@@ -208,6 +208,10 @@ is intentionally operated. Do not add an implicit second gateway.
 5. Change the live `.env` backend/aliases, restart API and worker, and run the
    production readiness check.
 6. Validate 10, then 50, then 200 personas. Do not skip directly to the largest run.
+
+Transient provider failures use bounded exponential backoff and prefer a valid
+provider `Retry-After`/`Retry-After-Ms` header. Retry count and latency remain
+metadata-only; exception bodies are not added to observability payloads.
 
 Steps 1–4 passed on 2026-07-13. Gemini remains the explicit temporary live backend
 only until steps 5–6 complete; this is a visible transition state, not a hidden fallback.
