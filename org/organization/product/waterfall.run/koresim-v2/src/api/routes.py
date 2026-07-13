@@ -38,6 +38,10 @@ from src.api.schemas import (
     IntakeSessionResponse,
     IntakeSessionRunLinkRequest,
     IntakeSessionSaveRequest,
+    InterviewThreadCreateRequest,
+    InterviewThreadListResponse,
+    InterviewThreadMessageRequest,
+    InterviewThreadResponse,
     ProjectCreateRequest,
     ProjectListResponse,
     ProjectResponse,
@@ -934,6 +938,61 @@ def ask_project_run_followup(
             _user_record_for_request(request),
             project_id,
             run_id,
+            payload,
+            llm_client=request.app.state.llm_client,
+        )
+    except ServiceError as exc:
+        raise _service_error(exc) from exc
+
+
+@router.get("/api/projects/{project_id}/runs/{run_id}/interview-threads")
+def list_project_run_interview_threads(
+    request: Request,
+    project_id: str,
+    run_id: str,
+) -> InterviewThreadListResponse:
+    try:
+        return _project_service(request).list_interview_threads(
+            _user_record_for_request(request),
+            project_id,
+            run_id,
+        )
+    except ServiceError as exc:
+        raise _service_error(exc) from exc
+
+
+@router.post("/api/projects/{project_id}/runs/{run_id}/interview-threads")
+def create_project_run_interview_thread(
+    request: Request,
+    project_id: str,
+    run_id: str,
+    payload: InterviewThreadCreateRequest,
+) -> InterviewThreadResponse:
+    try:
+        return _project_service(request).create_interview_thread(
+            _user_record_for_request(request),
+            project_id,
+            run_id,
+            payload,
+        )
+    except ServiceError as exc:
+        raise _service_error(exc) from exc
+
+
+@router.post("/api/projects/{project_id}/runs/{run_id}/interview-threads/{thread_id}/messages")
+def ask_project_run_interview_thread(
+    request: Request,
+    project_id: str,
+    run_id: str,
+    thread_id: str,
+    payload: InterviewThreadMessageRequest,
+) -> InterviewThreadResponse:
+    try:
+        return _project_service(request).ask_interview_thread_question(
+            _user_record_for_request(request),
+            project_id,
+            run_id,
+            thread_id,
             payload,
             llm_client=request.app.state.llm_client,
         )

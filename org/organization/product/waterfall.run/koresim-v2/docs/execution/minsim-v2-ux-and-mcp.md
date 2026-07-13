@@ -12,7 +12,7 @@
 - `/results?project_id=...&run_id=...` renders a minsim-style report from the live `RunResultEnvelope`.
 - `/classic/app` and `/classic/results?run_id=...` preserve the original KoreaSim UI.
 
-The result page uses `frontend/src/v2/resultAdapter.ts` as the boundary between backend data and minsim visualization. It converts the API envelope into verdict, metric cards, rank rows, segment matrices, evidence quotes, methodology, recommendations, and follow-up targets.
+The result page uses `frontend/src/v2/resultAdapter.ts` as the boundary between backend data and minsim visualization. It converts the API envelope into verdict, metric cards, rank rows, segment matrices, evidence quotes, methodology, recommendations, and follow-up targets. `frontend/src/v2/ResearchWorkspace.tsx` combines evidence and respondent browsing with one target-aware composer: a cohort target runs fan-out follow-up, while an individual target uses a persisted cumulative interview thread.
 
 ## Server-Persisted Flow
 
@@ -30,8 +30,11 @@ The V2 frontend uses these project-scoped APIs:
 - `POST /api/projects/{project_id}/runs/{run_id}/feedback`
 - `POST /api/projects/{project_id}/runs/{run_id}/followup`
 - `POST /api/projects/{project_id}/runs/{run_id}/interview`
+- `GET /api/projects/{project_id}/runs/{run_id}/interview-threads`
+- `POST /api/projects/{project_id}/runs/{run_id}/interview-threads`
+- `POST /api/projects/{project_id}/runs/{run_id}/interview-threads/{thread_id}/messages`
 
-All project APIs use the authenticated user and reject cross-user access.
+All project APIs use the authenticated user and reject cross-user access. The legacy one-shot `/interview` API remains available for MCP and existing clients; the V2 web result workspace uses the thread APIs so each respondent's history survives refreshes and later visits.
 
 ## MCP Endpoint
 

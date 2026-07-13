@@ -1,8 +1,6 @@
-import { useEffect, useMemo, useState, type CSSProperties, type FormEvent } from 'react'
-import { ArrowLeft, Chats, DownloadSimple, FolderSimple, Plus } from '@phosphor-icons/react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { ArrowLeft, DownloadSimple, FolderSimple, Plus } from '@phosphor-icons/react'
 import {
-  askProjectRunFollowup,
-  askProjectRunInterview,
   getProject,
   getProjectRunExport,
   getProjectRunResult,
@@ -14,7 +12,7 @@ import { navigateTo } from './navigation'
 import { adaptRunResult } from './resultAdapter'
 import { buildMinsimReport, type MinsimReport, type MinsimRegion, type TitleBody } from './minsimReport'
 import { InteractiveKoreaMap } from './KoreaReactionMap'
-import type { V2EvidenceQuote, V2FollowupLogEntry } from './types'
+import { ResearchWorkspace } from './ResearchWorkspace'
 
 const OPT: Record<string, string> = {
   A: 'var(--opt-a)',
@@ -33,16 +31,11 @@ type ResultsState = {
 
 export function MinsimResultsPage({ projectId, runId }: { projectId: string | null; runId: string | null }) {
   const [state, setState] = useState<ResultsState>({ project: null, run: null, result: null, loading: true, error: null })
-  const [followupQuestion, setFollowupQuestion] = useState('이 결과에서 가장 큰 거절 이유를 더 구체적으로 말해주세요.')
-  const [followupCohort, setFollowupCohort] = useState('all')
-  const [selectedQuote, setSelectedQuote] = useState<V2EvidenceQuote | null>(null)
-  const [interviewQuestion, setInterviewQuestion] = useState('왜 그렇게 답했는지 한 문장 더 설명해주세요.')
-  const [logs, setLogs] = useState<V2FollowupLogEntry[]>([])
   const [actionError, setActionError] = useState<string | null>(null)
   const [feedbackText, setFeedbackText] = useState('')
   const [intendedAction, setIntendedAction] = useState('')
   const [feedbackNotice, setFeedbackNotice] = useState<string | null>(null)
-  const [actionPending, setActionPending] = useState<'followup' | 'interview' | 'feedback' | null>(null)
+  const [actionPending, setActionPending] = useState<'feedback' | null>(null)
 
   useEffect(() => {
     if (!projectId || !runId) {
@@ -90,64 +83,6 @@ export function MinsimResultsPage({ projectId, runId }: { projectId: string | nu
     }
   }
 
-  const submitFollowup = async (event: FormEvent) => {
-    event.preventDefault()
-    if (!projectId || !runId || !followupQuestion.trim()) return
-    try {
-      setActionError(null)
-      setActionPending('followup')
-      const response = await askProjectRunFollowup(projectId, runId, {
-        question: followupQuestion,
-        cohort: followupCohort,
-        sample_size: 8,
-      })
-      setLogs((current) => [
-        {
-          id: `followup-${Date.now()}`,
-          kind: 'followup',
-          question: response.question,
-          cohort: response.cohort,
-          summary: response.summary,
-          answers: response.answers.map((answer) => `${answer.name}: ${answer.answer}`),
-        },
-        ...current,
-      ])
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setActionPending(null)
-    }
-  }
-
-  const submitInterview = async (event: FormEvent) => {
-    event.preventDefault()
-    if (!projectId || !runId || !interviewQuestion.trim()) return
-    try {
-      setActionError(null)
-      setActionPending('interview')
-      const response = await askProjectRunInterview(projectId, runId, {
-        subject_uuid: selectedQuote?.uuid ?? null,
-        question: interviewQuestion,
-        sample_size: 1,
-      })
-      setLogs((current) => [
-        {
-          id: `interview-${Date.now()}`,
-          kind: 'interview',
-          question: response.question,
-          cohort: selectedQuote?.label ?? response.subject_uuid ?? 'all',
-          summary: response.summary,
-          answers: response.answers.map((answer) => `${answer.name}: ${answer.answer}`),
-        },
-        ...current,
-      ])
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setActionPending(null)
-    }
-  }
-
   const submitFeedback = async (event: FormEvent) => {
     event.preventDefault()
     if (!projectId || !runId) return
@@ -181,17 +116,13 @@ export function MinsimResultsPage({ projectId, runId }: { projectId: string | nu
       </div>
     )
   }
+  if (!projectId || !runId) return <p className="muted" style={{ padding: '48px 0' }}>결과 식별자가 없습니다.</p>
   if (!report || !view) return <p className="muted" style={{ padding: '48px 0' }}>결과가 없습니다.</p>
 
   const projectName = state.project?.name ?? 'Project'
   const runLabel = state.run?.run_label ?? view.simulationLabel
   const projectPath = state.project ? `/projects/${encodeURIComponent(state.project.project_id)}` : '/projects'
   const intakePath = state.project ? `/projects/${encodeURIComponent(state.project.project_id)}/type` : '/projects'
-
-  const openInterview = (uuid: string, name: string, choice: string, meta: string, body: string) => {
-    setSelectedQuote({ uuid, label: `${name} · ${choice}안`, meta, body, tone: 'neutral', cohort: choice || 'all' })
-    document.getElementById('interview-panel')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  }
 
   return (
     <div className="report">
@@ -220,9 +151,8 @@ export function MinsimResultsPage({ projectId, runId }: { projectId: string | nu
       <div className="wrap">
         <nav className="result-section-nav" aria-label="결과 보고서 섹션">
           <a href="#result-summary">요약</a>
-          <a href="#result-evidence">근거</a>
+          <a href="#result-evidence">응답·대화</a>
           <a href="#result-method">방법론</a>
-          <a href="#result-followup">후속 분석</a>
         </nav>
         <div id="result-summary" />
         <Verdict report={report} onExport={downloadExport} />
@@ -233,91 +163,9 @@ export function MinsimResultsPage({ projectId, runId }: { projectId: string | nu
         <ResultDisclosure title="연령대별 선호 전체표"><AgeFullTable report={report} /></ResultDisclosure>
         <ResultDisclosure title="세그먼트 반응 매트릭스"><SegmentMatrix report={report} /></ResultDisclosure>
         <ResultDisclosure title="기회·리스크 통합 맵"><OpportunityRiskMap report={report} /></ResultDisclosure>
-        <div id="result-evidence" />
-        <ResultDisclosure title="해석 근거 발언"><EvidenceSection report={report} onOpen={openInterview} /></ResultDisclosure>
+        <ResearchWorkspace projectId={projectId} runId={runId} report={report} />
         <div id="result-method" />
         <ResultDisclosure title="방법론과 신뢰 정보"><Methodology report={report} /></ResultDisclosure>
-        <ResultDisclosure title="응답자 패널"><Crowd report={report} onOpen={openInterview} /></ResultDisclosure>
-
-        {/* follow-up + interview */}
-        <section id="result-followup" style={{ padding: '40px 0' }}>
-          <SectionHead kicker="후속 분석" title="결과에서 다시 묻기" sub="집계 결과를 바탕으로 코호트에 후속 질문을 던지거나, 특정 응답자와 바로 인터뷰합니다." />
-          <div className="result-followup-grid">
-            <form className="card" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }} onSubmit={submitFollowup}>
-              <label className="lbl-mono" htmlFor="followup-cohort">후속질문 · 코호트 선택</label>
-              <select id="followup-cohort" className="inp" value={followupCohort} onChange={(event) => setFollowupCohort(event.target.value)}>
-                <option value="all">전체</option>
-                <option value="positive">긍정층</option>
-                <option value="negative">부정층</option>
-                <option value="confused">혼란층</option>
-                {view.ranks.slice(0, 4).map((row) => (
-                  <option key={row.label} value={row.label}>{row.label}</option>
-                ))}
-              </select>
-              <label className="sr-only" htmlFor="followup-question">후속 질문</label>
-              <textarea id="followup-question" className="inp" value={followupQuestion} onChange={(event) => setFollowupQuestion(event.target.value)} rows={3} />
-              <button className="btn primary" type="submit" disabled={actionPending !== null}>{actionPending === 'followup' ? '질문하는 중…' : '후속질문 실행'}</button>
-            </form>
-
-            <form id="interview-panel" className="card" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }} onSubmit={submitInterview}>
-              <label className="lbl-mono" htmlFor="interview-question">페르소나 인터뷰</label>
-              <p className="muted" style={{ fontSize: 12.5, lineHeight: 1.55 }}>
-                {selectedQuote ? selectedQuote.label : '발언 카드나 군중 카드를 누르면 그 응답자와, 없으면 전체에서 1명을 샘플링합니다.'}
-              </p>
-              <textarea id="interview-question" className="inp" value={interviewQuestion} onChange={(event) => setInterviewQuestion(event.target.value)} rows={3} />
-              <button className="btn" type="submit" disabled={actionPending !== null}><Chats size={16} /> {actionPending === 'interview' ? '인터뷰 중…' : '인터뷰'}</button>
-            </form>
-          </div>
-
-          {logs.length > 0 && (
-            <div style={{ marginTop: 18 }}>
-              <div className="spread" style={{ alignItems: 'baseline', marginBottom: 10, gap: 12 }}>
-                <div className="lbl-mono">후속 분석 로그</div>
-                <div className="row" style={{ gap: 12 }}>
-                  <span className="lbl-mono">{logs.length}건 누적</span>
-                  <button type="button" className="btn ghost sm" style={{ padding: '2px 8px', fontSize: 11.5 }} onClick={() => setLogs([])}>
-                    지우기
-                  </button>
-                </div>
-              </div>
-              <div className="v2-followup-log-scroll">
-                {logs.map((log) => (
-                  <div key={log.id} className="card" style={{ padding: 16 }}>
-                    <div className="spread" style={{ marginBottom: 8 }}>
-                      <span className="row" style={{ gap: 8 }}>
-                        <span className="badge" style={{ border: '1px solid var(--border-strong)', color: 'var(--fg-dim)' }}>
-                          {log.kind === 'followup' ? '후속질문' : '인터뷰'}
-                        </span>
-                        <span className="lbl-mono faint">{log.cohort}</span>
-                      </span>
-                      <span className="lbl-mono">{log.answers.length}명</span>
-                    </div>
-                    <div className="row" style={{ gap: 10, alignItems: 'flex-start', marginBottom: 6 }}>
-                      <span className="lbl-mono" style={{ color: 'var(--lime)', flex: 'none', marginTop: 1 }}>Q</span>
-                      <span style={{ fontSize: 13.5, lineHeight: 1.5 }}>{log.question}</span>
-                    </div>
-                    <div className="row" style={{ gap: 10, alignItems: 'flex-start' }}>
-                      <span className="lbl-mono faint" style={{ flex: 'none', marginTop: 1 }}>A</span>
-                      <div className="col" style={{ gap: 4, minWidth: 0 }}>
-                        <p className="muted" style={{ fontSize: 13, lineHeight: 1.6 }}>{log.summary}</p>
-                        {log.answers.slice(0, 3).map((answer) => (
-                          <span
-                            key={answer}
-                            className="lbl"
-                            title={answer}
-                            style={{ fontSize: 11.5, lineHeight: 1.5, display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
-                          >
-                            · {answer}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </section>
 
         <hr className="hr" />
 
@@ -999,38 +847,6 @@ function RegionDetailPanel({ region, onClear }: { region: MinsimRegion | null; o
   )
 }
 
-function EvidenceSection({ report, onOpen }: { report: MinsimReport; onOpen: (uuid: string, name: string, choice: string, meta: string, body: string) => void }) {
-  if (report.quotes.length === 0) return null
-  return (
-    <section style={{ padding: '40px 0' }}>
-      <SectionHead kicker="응답 근거" title="해석 근거 발언" sub="발언 카드를 누르면 그 응답자와 바로 인터뷰를 시작합니다." />
-      <div className="result-evidence-grid">
-        {report.quotes.map((quote) => {
-          const color = OPT[quote.choice] ?? 'var(--opt-d)'
-          return (
-            <button
-              key={quote.uuid}
-              className="card"
-              onClick={() => onOpen(quote.uuid, quote.name, quote.choice, quote.meta, quote.q)}
-              style={{ padding: 18, textAlign: 'left', cursor: 'pointer', borderLeft: `3px solid ${color}` }}
-            >
-              <div className="spread" style={{ marginBottom: 12 }}>
-                <span style={{ fontWeight: 600, fontSize: 14 }}>{quote.name}</span>
-                {quote.choice && <ChoicePill id={quote.choice} on />}
-              </div>
-              <p style={{ fontSize: 13, lineHeight: 1.65, marginBottom: 12 }}>“{quote.q}”</p>
-              <div className="spread">
-                <span className="lbl-mono">{quote.meta}</span>
-                <span className="lbl" style={{ color: 'var(--lime)' }}>인터뷰 →</span>
-              </div>
-            </button>
-          )
-        })}
-      </div>
-    </section>
-  )
-}
-
 function Methodology({ report }: { report: MinsimReport }) {
   const { sampleAge, sampleRegion, run, disclaimer } = report
   const maxAge = Math.max(1, ...sampleAge.map(([, n]) => n))
@@ -1071,66 +887,4 @@ function Methodology({ report }: { report: MinsimReport }) {
       <div className="card card-2" style={{ padding: '14px 18px', marginTop: 12, fontSize: 12.5, lineHeight: 1.6, color: 'var(--fg-faint)' }}>{disclaimer}</div>
     </section>
   )
-}
-
-function Crowd({ report, onOpen }: { report: MinsimReport; onOpen: (uuid: string, name: string, choice: string, meta: string, body: string) => void }) {
-  const [filter, setFilter] = useState('all')
-  const { crowd, winner } = report
-  const winId = winner?.id ?? 'B'
-  const filtered = crowd.filter((person) => {
-    if (filter === 'all') return true
-    if (filter === 'miss') return person.choice !== winId
-    return person.choice === filter
-  })
-  const filters: [string, string][] = [
-    ['all', '전체'],
-    [winId, `${winId} 선택`],
-    ['miss', `${winId} 미선택`],
-  ]
-  return (
-    <section style={{ padding: '40px 0' }}>
-      <SectionHead
-        kicker="응답자 패널"
-        title="군중감"
-        right={
-          <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-            {filters.map(([key, label]) => (
-              <button key={key} type="button" aria-pressed={filter === key} className={`chip sm${filter === key ? ' on' : ''}`} onClick={() => setFilter(key)}>
-                {label}
-              </button>
-            ))}
-          </div>
-        }
-      />
-      <div className="lbl" style={{ marginBottom: 14 }}>
-        대표 {Math.min(21, filtered.length)}명 표시 · 해당 코호트 {filtered.length}명 · 전체 응답 {report.run.panel}명 · <span className="faint">카드를 누르면 인터뷰</span>
-      </div>
-      <div className="result-crowd-grid">
-        {filtered.slice(0, 21).map((person, index) => {
-          const color = OPT[person.choice] ?? 'var(--opt-d)'
-          return (
-            <button
-              key={`${person.name}-${index}`}
-              className="card"
-              onClick={() => onOpen(`crowd-${index}`, person.name, person.choice, `${person.sex} · ${person.age}세 · ${person.region}`, `${person.occ} · ${person.choice}안 선택`)}
-              style={{ padding: 9, textAlign: 'left', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 7, borderLeft: `2px solid ${color}` } as CSSProperties}
-            >
-              <div className="row" style={{ gap: 7 }}>
-                <img src={portraitUrl(person.name + index)} alt={person.name} width={26} height={26} style={{ width: 26, height: 26, borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--border)', flex: 'none' }} />
-                <span style={{ fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{person.name}</span>
-              </div>
-              <span className="lbl" style={{ fontSize: 10.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{person.age}세 · {person.choice}안</span>
-            </button>
-          )
-        })}
-      </div>
-    </section>
-  )
-}
-
-function portraitUrl(seed: string): string {
-  let hash = 0
-  for (let i = 0; i < seed.length; i += 1) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0
-  const n = String((hash % 31) + 1).padStart(2, '0')
-  return `/landing/portraits/portrait-${n}.png`
 }

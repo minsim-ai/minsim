@@ -15,6 +15,8 @@ from src.api.schemas import RunCreateRequest
 from src.config import SQLITE_PATH
 from src.jobs.models import (
     AgentRunRecord,
+    InterviewMessageRecord,
+    InterviewThreadRecord,
     IntakeEventRecord,
     IntakeHistoryRecord,
     IntakeMessageRecord,
@@ -144,6 +146,41 @@ class SQLiteRunStore:
 
                 CREATE INDEX IF NOT EXISTS idx_project_runs_run
                     ON project_runs (run_id);
+
+                CREATE TABLE IF NOT EXISTS interview_threads (
+                    thread_id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    project_id TEXT NOT NULL,
+                    run_id TEXT NOT NULL,
+                    subject_uuid TEXT NOT NULL,
+                    subject_label TEXT NOT NULL DEFAULT '',
+                    subject_meta TEXT NOT NULL DEFAULT '',
+                    context_quote TEXT NOT NULL DEFAULT '',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    UNIQUE (user_id, run_id, subject_uuid),
+                    FOREIGN KEY (user_id) REFERENCES users (user_id),
+                    FOREIGN KEY (project_id) REFERENCES projects (project_id),
+                    FOREIGN KEY (run_id) REFERENCES runs (run_id)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_interview_threads_run_updated
+                    ON interview_threads (run_id, updated_at);
+
+                CREATE TABLE IF NOT EXISTS interview_messages (
+                    message_id TEXT PRIMARY KEY,
+                    thread_id TEXT NOT NULL,
+                    role TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    ordinal INTEGER NOT NULL,
+                    metadata_json TEXT NOT NULL DEFAULT '{}',
+                    created_at TEXT NOT NULL,
+                    UNIQUE (thread_id, ordinal),
+                    FOREIGN KEY (thread_id) REFERENCES interview_threads (thread_id)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_interview_messages_thread_ordinal
+                    ON interview_messages (thread_id, ordinal);
 
                 CREATE TABLE IF NOT EXISTS usage_ledger (
                     usage_id TEXT PRIMARY KEY,
@@ -812,6 +849,21 @@ class SQLiteRunStore:
             counts: dict[str, int] = {}
             if run_ids:
                 placeholders = ",".join("?" for _ in run_ids)
+                cursor = conn.execute(
+                    f"""
+                    DELETE FROM interview_messages
+                    WHERE thread_id IN (
+                        SELECT thread_id FROM interview_threads WHERE run_id IN ({placeholders})
+                    )
+                    """,
+                    run_ids,
+                )
+                counts["interview_messages"] = cursor.rowcount
+                cursor = conn.execute(
+                    f"DELETE FROM interview_threads WHERE run_id IN ({placeholders})",
+                    run_ids,
+                )
+                counts["interview_threads"] = cursor.rowcount
                 for table in (
                     "run_partial_results",
                     "run_results",
@@ -826,6 +878,16 @@ class SQLiteRunStore:
                 for table in ("intake_messages", "intake_events"):
                     cursor = conn.execute(f"DELETE FROM {table} WHERE session_id IN ({placeholders})", session_ids)
                     counts[table] = cursor.rowcount
+            cursor = conn.execute(
+                """
+                DELETE FROM interview_messages
+                WHERE thread_id IN (SELECT thread_id FROM interview_threads WHERE user_id = ?)
+                """,
+                (user_id,),
+            )
+            counts["interview_messages"] = counts.get("interview_messages", 0) + cursor.rowcount
+            cursor = conn.execute("DELETE FROM interview_threads WHERE user_id = ?", (user_id,))
+            counts["interview_threads"] = counts.get("interview_threads", 0) + cursor.rowcount
             for table in ("analytics_events", "user_feedback", "result_followups", "usage_ledger", "intake_sessions", "runs"):
                 cursor = conn.execute(f"DELETE FROM {table} WHERE user_id = ?", (user_id,))
                 counts[table] = counts.get(table, 0) + cursor.rowcount
@@ -871,6 +933,21 @@ class SQLiteRunStore:
                 }
             if run_ids:
                 placeholders = ",".join("?" for _ in run_ids)
+                cursor = conn.execute(
+                    f"""
+                    DELETE FROM interview_messages
+                    WHERE thread_id IN (
+                        SELECT thread_id FROM interview_threads WHERE run_id IN ({placeholders})
+                    )
+                    """,
+                    run_ids,
+                )
+                counts["interview_messages"] = cursor.rowcount
+                cursor = conn.execute(
+                    f"DELETE FROM interview_threads WHERE run_id IN ({placeholders})",
+                    run_ids,
+                )
+                counts["interview_threads"] = cursor.rowcount
                 for table in (
                     "run_partial_results",
                     "run_results",
@@ -1387,6 +1464,173 @@ class SQLiteRunStore:
                 (run_id,),
             ).fetchone()
         return self._row_to_project(row) if row else None
+
+    def get_or_create_interview_thread(
+        self,
+        *,
+        user_id: str,
+        project_id: str,
+        run_id: str,
+        subject_uuid: str,
+        subject_label: str = "",
+        subject_meta: str = "",
+        context_quote: str = "",
+    ) -> InterviewThreadRecord:
+        self.init_db()
+        now = _utc_now()
+        thread_id = str(uuid4())
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO interview_threads (
+                    thread_id, user_id, project_id, run_id, subject_uuid,
+                    subject_label, subject_meta, context_quote, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(user_id, run_id, subject_uuid)
+                DO UPDATE SET
+                    subject_label = CASE
+                        WHEN excluded.subject_label = '' THEN interview_threads.subject_label
+                        ELSE excluded.subject_label
+                    END,
+                    subject_meta = CASE
+                        WHEN excluded.subject_meta = '' THEN interview_threads.subject_meta
+                        ELSE excluded.subject_meta
+                    END,
+                    context_quote = CASE
+                        WHEN excluded.context_quote = '' THEN interview_threads.context_quote
+                        ELSE excluded.context_quote
+                    END
+                """,
+                (
+                    thread_id,
+                    user_id,
+                    project_id,
+                    run_id,
+                    subject_uuid,
+                    subject_label.strip(),
+                    subject_meta.strip(),
+                    context_quote.strip(),
+                    now,
+                    now,
+                ),
+            )
+            row = conn.execute(
+                """
+                SELECT * FROM interview_threads
+                WHERE user_id = ? AND run_id = ? AND subject_uuid = ?
+                """,
+                (user_id, run_id, subject_uuid),
+            ).fetchone()
+        if row is None:
+            raise RuntimeError(f"Interview thread was not persisted: {run_id}/{subject_uuid}")
+        return self._row_to_interview_thread(row)
+
+    def list_interview_threads(self, *, user_id: str, run_id: str) -> list[InterviewThreadRecord]:
+        self.init_db()
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM interview_threads
+                WHERE user_id = ? AND run_id = ?
+                ORDER BY updated_at DESC, created_at DESC
+                """,
+                (user_id, run_id),
+            ).fetchall()
+        return [self._row_to_interview_thread(row) for row in rows]
+
+    def get_interview_thread(self, *, user_id: str, thread_id: str) -> InterviewThreadRecord | None:
+        self.init_db()
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM interview_threads WHERE user_id = ? AND thread_id = ?",
+                (user_id, thread_id),
+            ).fetchone()
+        return self._row_to_interview_thread(row) if row else None
+
+    def list_interview_messages(self, thread_id: str) -> list[InterviewMessageRecord]:
+        self.init_db()
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM interview_messages
+                WHERE thread_id = ?
+                ORDER BY ordinal ASC, created_at ASC
+                """,
+                (thread_id,),
+            ).fetchall()
+        return [self._row_to_interview_message(row) for row in rows]
+
+    def append_interview_exchange(
+        self,
+        *,
+        user_id: str,
+        thread_id: str,
+        question: str,
+        answer: str,
+        assistant_metadata: dict[str, Any] | None = None,
+    ) -> tuple[InterviewMessageRecord, InterviewMessageRecord]:
+        self.init_db()
+        now = _utc_now()
+        with self._connect() as conn:
+            thread = conn.execute(
+                "SELECT thread_id FROM interview_threads WHERE thread_id = ? AND user_id = ?",
+                (thread_id, user_id),
+            ).fetchone()
+            if thread is None:
+                raise KeyError(thread_id)
+            row = conn.execute(
+                "SELECT COALESCE(MAX(ordinal), -1) AS value FROM interview_messages WHERE thread_id = ?",
+                (thread_id,),
+            ).fetchone()
+            first_ordinal = int(row["value"] if row else -1) + 1
+            user_message_id = str(uuid4())
+            assistant_message_id = str(uuid4())
+            conn.execute(
+                """
+                INSERT INTO interview_messages (
+                    message_id, thread_id, role, content, ordinal, metadata_json, created_at
+                )
+                VALUES (?, ?, 'user', ?, ?, '{}', ?)
+                """,
+                (user_message_id, thread_id, question.strip(), first_ordinal, now),
+            )
+            conn.execute(
+                """
+                INSERT INTO interview_messages (
+                    message_id, thread_id, role, content, ordinal, metadata_json, created_at
+                )
+                VALUES (?, ?, 'assistant', ?, ?, ?, ?)
+                """,
+                (
+                    assistant_message_id,
+                    thread_id,
+                    answer.strip(),
+                    first_ordinal + 1,
+                    _json_dumps(assistant_metadata or {}),
+                    now,
+                ),
+            )
+            conn.execute("UPDATE interview_threads SET updated_at = ? WHERE thread_id = ?", (now, thread_id))
+        return (
+            InterviewMessageRecord(
+                message_id=user_message_id,
+                thread_id=thread_id,
+                role="user",
+                content=question.strip(),
+                ordinal=first_ordinal,
+                created_at=now,
+            ),
+            InterviewMessageRecord(
+                message_id=assistant_message_id,
+                thread_id=thread_id,
+                role="assistant",
+                content=answer.strip(),
+                ordinal=first_ordinal + 1,
+                metadata=assistant_metadata or {},
+                created_at=now,
+            ),
+        )
 
     def user_owns_run(self, user_id: str, run_id: str) -> bool:
         self.init_db()
@@ -2287,6 +2531,31 @@ class SQLiteRunStore:
             role=row["role"],
             content=row["content"],
             ordinal=row["ordinal"],
+            created_at=row["created_at"],
+        )
+
+    def _row_to_interview_thread(self, row: sqlite3.Row) -> InterviewThreadRecord:
+        return InterviewThreadRecord(
+            thread_id=row["thread_id"],
+            user_id=row["user_id"],
+            project_id=row["project_id"],
+            run_id=row["run_id"],
+            subject_uuid=row["subject_uuid"],
+            subject_label=row["subject_label"],
+            subject_meta=row["subject_meta"],
+            context_quote=row["context_quote"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
+
+    def _row_to_interview_message(self, row: sqlite3.Row) -> InterviewMessageRecord:
+        return InterviewMessageRecord(
+            message_id=row["message_id"],
+            thread_id=row["thread_id"],
+            role=row["role"],
+            content=row["content"],
+            ordinal=int(row["ordinal"]),
+            metadata=_json_loads(row["metadata_json"], {}),
             created_at=row["created_at"],
         )
 

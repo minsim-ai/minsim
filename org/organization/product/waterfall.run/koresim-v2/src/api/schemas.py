@@ -613,6 +613,43 @@ class ProjectRunInterviewResponse(APIModel):
     summary: str
 
 
+class InterviewThreadCreateRequest(APIModel):
+    subject_uuid: str = Field(min_length=1, max_length=160)
+    subject_label: str = Field(default="", max_length=160)
+    subject_meta: str = Field(default="", max_length=300)
+    context_quote: str = Field(default="", max_length=1000)
+
+
+class InterviewThreadMessageRequest(APIModel):
+    question: str = Field(min_length=1, max_length=500)
+
+
+class InterviewMessageResponse(APIModel):
+    message_id: str
+    role: Literal["user", "assistant"]
+    content: str
+    ordinal: int
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    created_at: str
+
+
+class InterviewThreadResponse(APIModel):
+    thread_id: str
+    project_id: str
+    run_id: str
+    subject_uuid: str
+    subject_label: str
+    subject_meta: str
+    context_quote: str
+    messages: list[InterviewMessageResponse] = Field(default_factory=list)
+    created_at: str
+    updated_at: str
+
+
+class InterviewThreadListResponse(APIModel):
+    threads: list[InterviewThreadResponse]
+
+
 class AdminOverviewResponse(APIModel):
     users: int
     runs: int

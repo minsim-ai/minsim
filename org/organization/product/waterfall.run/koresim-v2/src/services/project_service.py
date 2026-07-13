@@ -5,6 +5,11 @@ from collections.abc import Callable
 from src.api.schemas import (
     ErrorCode,
     ErrorResponse,
+    InterviewMessageResponse,
+    InterviewThreadCreateRequest,
+    InterviewThreadListResponse,
+    InterviewThreadMessageRequest,
+    InterviewThreadResponse,
     ProjectCreateRequest,
     ProjectListResponse,
     ProjectResponse,
@@ -26,11 +31,11 @@ from src.api.schemas import (
     RunStatus,
     SimulationType,
 )
-from src.jobs.models import ProjectRecord, RunRecord, UserRecord
+from src.jobs.models import InterviewThreadRecord, ProjectRecord, RunRecord, UserRecord
 from src.jobs.store import SQLiteRunStore
 from src.services.errors import ServiceError, require_authenticated_user
 from src.services.export_service import build_run_export_response
-from src.services.followup_service import run_followup
+from src.services.followup_service import run_followup, run_interview_turn
 from src.services.run_service import create_run_for_user
 
 
@@ -54,6 +59,32 @@ def snapshot_from_run(run: RunRecord, result_available: bool) -> RunSnapshot:
         completed_at=run.completed_at,
         error=ErrorResponse.model_validate(run.error) if run.error else None,
         result_available=result_available,
+    )
+
+
+def interview_thread_response(store: SQLiteRunStore, record: InterviewThreadRecord) -> InterviewThreadResponse:
+    messages = [
+        InterviewMessageResponse(
+            message_id=message.message_id,
+            role=message.role,
+            content=message.content,
+            ordinal=message.ordinal,
+            metadata=message.metadata,
+            created_at=message.created_at,
+        )
+        for message in store.list_interview_messages(record.thread_id)
+    ]
+    return InterviewThreadResponse(
+        thread_id=record.thread_id,
+        project_id=record.project_id,
+        run_id=record.run_id,
+        subject_uuid=record.subject_uuid,
+        subject_label=record.subject_label,
+        subject_meta=record.subject_meta,
+        context_quote=record.context_quote,
+        messages=messages,
+        created_at=record.created_at,
+        updated_at=record.updated_at,
     )
 
 
@@ -250,6 +281,133 @@ class ProjectService:
             answers=followup.answers,
             summary=followup.summary,
         )
+
+    def list_interview_threads(
+        self,
+        user: UserRecord | None,
+        project_id: str,
+        run_id: str,
+    ) -> InterviewThreadListResponse:
+        user = require_authenticated_user(user)
+        self._owned_project_run(user, project_id, run_id)
+        records = self.store.list_interview_threads(user_id=user.user_id, run_id=run_id)
+        return InterviewThreadListResponse(
+            threads=[interview_thread_response(self.store, record) for record in records]
+        )
+
+    def create_interview_thread(
+        self,
+        user: UserRecord | None,
+        project_id: str,
+        run_id: str,
+        payload: InterviewThreadCreateRequest,
+    ) -> InterviewThreadResponse:
+        user = require_authenticated_user(user)
+        run = self._owned_project_run(user, project_id, run_id)
+        result = self._ready_result(run)
+        self._raw_subject(result.result.get("raw_results") or [], payload.subject_uuid)
+        record = self.store.get_or_create_interview_thread(
+            user_id=user.user_id,
+            project_id=project_id,
+            run_id=run_id,
+            subject_uuid=payload.subject_uuid,
+            subject_label=payload.subject_label,
+            subject_meta=payload.subject_meta,
+            context_quote=payload.context_quote,
+        )
+        return interview_thread_response(self.store, record)
+
+    def ask_interview_thread_question(
+        self,
+        user: UserRecord | None,
+        project_id: str,
+        run_id: str,
+        thread_id: str,
+        payload: InterviewThreadMessageRequest,
+        llm_client: object | None = None,
+    ) -> InterviewThreadResponse:
+        user = require_authenticated_user(user)
+        run = self._owned_project_run(user, project_id, run_id)
+        thread = self.store.get_interview_thread(user_id=user.user_id, thread_id=thread_id)
+        if thread is None or thread.project_id != project_id or thread.run_id != run_id:
+            raise ServiceError(
+                status_code=404,
+                code=ErrorCode.RUN_NOT_FOUND,
+                message="Interview thread was not found.",
+                details={"project_id": project_id, "run_id": run_id, "thread_id": thread_id},
+            )
+        result = self._ready_result(run)
+        self._raw_subject(result.result.get("raw_results") or [], thread.subject_uuid)
+        history = [message.__dict__ for message in self.store.list_interview_messages(thread_id)]
+        try:
+            turn = run_interview_turn(
+                raw_results=result.result.get("raw_results") or [],
+                subject_uuid=thread.subject_uuid,
+                question=payload.question,
+                history=history,
+                context_quote=thread.context_quote,
+                llm_client=llm_client,
+            )
+        except ValueError as exc:
+            raise ServiceError(
+                status_code=400,
+                code=ErrorCode.INVALID_REQUEST,
+                message="The selected respondent is not available in this run.",
+                details={"subject_uuid": thread.subject_uuid},
+            ) from exc
+        self.store.append_interview_exchange(
+            user_id=user.user_id,
+            thread_id=thread_id,
+            question=payload.question,
+            answer=turn["answer"],
+            assistant_metadata={
+                "provider": turn.get("provider"),
+                "provider_model": turn.get("provider_model"),
+                "trace_id": turn.get("trace_id"),
+            },
+        )
+        updated = self.store.get_interview_thread(user_id=user.user_id, thread_id=thread_id)
+        if updated is None:
+            raise RuntimeError(f"Interview thread disappeared: {thread_id}")
+        self.store.record_analytics_event(
+            event_name="interview_message_sent",
+            user=user,
+            run_id=run_id,
+            page="/results",
+            simulation_type=run.simulation_type,
+            payload={"project_id": project_id, "thread_id": thread_id},
+        )
+        return interview_thread_response(self.store, updated)
+
+    def _ready_result(self, run: RunRecord):
+        result = self.store.get_result(run.run_id)
+        if result is None:
+            raise ServiceError(
+                status_code=409,
+                code=ErrorCode.RESULT_NOT_READY,
+                message="Run result is not ready yet.",
+                details={"run_id": run.run_id, "status": run.status.value},
+            )
+        return result
+
+    @staticmethod
+    def _raw_subject(raw_results: list[dict], subject_uuid: str) -> dict:
+        subject = next(
+            (
+                item
+                for item in raw_results
+                if str(item.get("uuid") or (item.get("persona") or {}).get("uuid") or "") == subject_uuid
+            ),
+            None,
+        )
+        if subject is None:
+            raise ServiceError(
+                status_code=400,
+                code=ErrorCode.INVALID_REQUEST,
+                message="The selected respondent is not available in this run.",
+                details={"subject_uuid": subject_uuid},
+            )
+        return subject
 
     def _owned_project(self, user: UserRecord | None, project_id: str) -> ProjectRecord:
         user = require_authenticated_user(user)

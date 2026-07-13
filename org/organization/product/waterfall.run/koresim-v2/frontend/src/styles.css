@@ -7227,3 +7227,656 @@ html[data-theme="minsim"] body {
     display: none;
   }
 }
+
+/* Results research workspace: evidence, audience follow-up, and persisted interviews. */
+.minsim-shell .research-workspace {
+  padding: 52px 0 44px;
+  scroll-margin-top: 72px;
+}
+
+.minsim-shell .research-workspace-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 18px;
+}
+
+.minsim-shell .research-workspace-heading h2 {
+  margin-top: 8px;
+  color: var(--fg);
+  font-size: 28px;
+  letter-spacing: -0.025em;
+}
+
+.minsim-shell .research-workspace-heading p {
+  max-width: 650px;
+  margin-top: 8px;
+  color: var(--fg-faint);
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+.minsim-shell .research-persistence-note {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--fg-faint);
+  padding: 8px 10px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+}
+
+.minsim-shell .research-persistence-note span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--lime);
+  box-shadow: 0 0 0 3px var(--lime-soft);
+}
+
+.minsim-shell .research-workspace-shell {
+  display: grid;
+  grid-template-columns: minmax(360px, 0.86fr) minmax(480px, 1.14fr);
+  min-height: 680px;
+  overflow: hidden;
+  padding: 0;
+}
+
+.minsim-shell .research-explorer {
+  min-width: 0;
+  border-right: 1px solid var(--border-soft);
+  background: var(--surface-2);
+  padding: 18px;
+}
+
+.minsim-shell .research-explorer-toolbar,
+.minsim-shell .research-target-row,
+.minsim-shell .research-subject-head,
+.minsim-shell .research-followup-answers > div > p {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.minsim-shell .research-explorer-toolbar > span {
+  color: var(--fg-ghost);
+  font-family: var(--mono);
+  font-size: 10.5px;
+}
+
+.minsim-shell .research-view-tabs,
+.minsim-shell .research-choice-filters,
+.minsim-shell .research-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.minsim-shell .research-view-tabs button,
+.minsim-shell .research-choice-filters button,
+.minsim-shell .research-suggestions button,
+.minsim-shell .research-close-target,
+.minsim-shell .research-followup-answers button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--fg-faint);
+  padding: 0 11px;
+  cursor: pointer;
+  font-size: 11.5px;
+  font-weight: 650;
+}
+
+.minsim-shell .research-view-tabs button.on,
+.minsim-shell .research-choice-filters button.on {
+  border-color: var(--border-strong);
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.minsim-shell .research-choice-filters {
+  margin: 14px 0 12px;
+}
+
+.minsim-shell .research-choice-filters button {
+  min-width: 50px;
+  background: transparent;
+}
+
+.minsim-shell .research-subject-list {
+  display: grid;
+  gap: 8px;
+  max-height: 570px;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+}
+
+.minsim-shell .research-subject-card {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  width: 100%;
+  min-height: 0;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--fg);
+  padding: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.minsim-shell .research-subject-list.people {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.minsim-shell .research-subject-list.people .research-subject-card {
+  grid-template-columns: 32px minmax(0, 1fr);
+}
+
+.minsim-shell .research-subject-list.people .research-thread-mark {
+  grid-column: 2;
+  justify-self: start;
+}
+
+.minsim-shell .research-subject-card:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+}
+
+.minsim-shell .research-subject-card.selected {
+  border-color: var(--lime-line);
+  background: var(--lime-soft);
+  box-shadow: inset 3px 0 0 var(--lime);
+}
+
+.minsim-shell .research-avatar {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--bg-2);
+  color: var(--fg-dim);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.minsim-shell .research-avatar.large {
+  width: 42px;
+  height: 42px;
+  font-size: 14px;
+}
+
+.minsim-shell .research-subject-copy {
+  min-width: 0;
+}
+
+.minsim-shell .research-subject-head strong {
+  overflow: hidden;
+  color: var(--fg);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.minsim-shell .research-subject-head > span {
+  flex: none;
+  border-radius: 4px;
+  background: var(--bg-2);
+  color: var(--fg-faint);
+  padding: 3px 6px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+}
+
+.minsim-shell .research-subject-copy q {
+  display: -webkit-box;
+  overflow: hidden;
+  margin-top: 8px;
+  color: var(--fg-dim);
+  font-size: 12.5px;
+  line-height: 1.55;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.minsim-shell .research-subject-copy small {
+  display: block;
+  overflow: hidden;
+  margin-top: 7px;
+  color: var(--fg-ghost);
+  font-family: var(--mono);
+  font-size: 9.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.minsim-shell .research-thread-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--fg-ghost);
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+.minsim-shell .research-thread-mark.saved {
+  color: var(--lime);
+}
+
+.minsim-shell .research-conversation {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  background: var(--surface);
+}
+
+.minsim-shell .research-conversation-head {
+  display: flex;
+  min-height: 84px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--border-soft);
+  padding: 16px 18px;
+}
+
+.minsim-shell .research-conversation-person {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+
+.minsim-shell .research-conversation-head h3 {
+  margin-top: 4px;
+  color: var(--fg);
+  font-size: 17px;
+}
+
+.minsim-shell .research-conversation-head p {
+  margin-top: 4px;
+  color: var(--fg-faint);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.minsim-shell .research-close-target {
+  flex: none;
+  background: transparent;
+}
+
+.minsim-shell .research-context-quote {
+  display: grid;
+  gap: 6px;
+  margin: 14px 18px 0;
+  border-left: 2px solid var(--lime);
+  background: var(--bg-2);
+  padding: 10px 12px;
+}
+
+.minsim-shell .research-context-quote > span {
+  color: var(--fg-ghost);
+  font-family: var(--mono);
+  font-size: 9.5px;
+  text-transform: uppercase;
+}
+
+.minsim-shell .research-context-quote q {
+  color: var(--fg-dim);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.minsim-shell .research-conversation-stream {
+  flex: 1;
+  min-height: 280px;
+  max-height: 470px;
+  overflow-y: auto;
+  padding: 18px;
+  scrollbar-width: thin;
+}
+
+.minsim-shell .research-empty {
+  display: flex;
+  min-height: 230px;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--fg-ghost);
+  text-align: center;
+}
+
+.minsim-shell .research-empty strong {
+  color: var(--fg-dim);
+  font-size: 13px;
+}
+
+.minsim-shell .research-empty span {
+  max-width: 360px;
+  color: var(--fg-faint);
+  font-size: 11.5px;
+  line-height: 1.55;
+}
+
+.minsim-shell .research-message-list,
+.minsim-shell .research-followup-list {
+  display: grid;
+  gap: 14px;
+}
+
+.minsim-shell .research-message {
+  display: grid;
+  gap: 5px;
+  max-width: 82%;
+}
+
+.minsim-shell .research-message > span {
+  color: var(--fg-ghost);
+  font-family: var(--mono);
+  font-size: 9.5px;
+}
+
+.minsim-shell .research-message p {
+  border: 1px solid var(--border-soft);
+  border-radius: 4px 12px 12px 12px;
+  background: var(--bg-2);
+  color: var(--fg-dim);
+  padding: 11px 12px;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.minsim-shell .research-message.user {
+  justify-self: end;
+}
+
+.minsim-shell .research-message.user > span {
+  text-align: right;
+}
+
+.minsim-shell .research-message.user p {
+  border-color: var(--fg);
+  border-radius: 12px 4px 12px 12px;
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.minsim-shell .research-followup-list > article {
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  padding: 14px;
+}
+
+.minsim-shell .research-followup-question {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+}
+
+.minsim-shell .research-followup-question > span {
+  color: var(--lime);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.minsim-shell .research-followup-question p {
+  color: var(--fg);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.minsim-shell .research-followup-summary {
+  margin: 8px 0 12px 30px;
+  color: var(--fg-faint);
+  font-size: 11.5px;
+}
+
+.minsim-shell .research-followup-answers {
+  display: grid;
+  gap: 8px;
+}
+
+.minsim-shell .research-followup-answers > div {
+  display: grid;
+  gap: 7px;
+  border-top: 1px solid var(--border-soft);
+  padding-top: 10px;
+}
+
+.minsim-shell .research-followup-answers strong {
+  color: var(--fg);
+  font-size: 12px;
+}
+
+.minsim-shell .research-followup-answers p span {
+  color: var(--fg-ghost);
+  font-family: var(--mono);
+  font-size: 9.5px;
+}
+
+.minsim-shell .research-followup-answers q {
+  color: var(--fg-dim);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+.minsim-shell .research-followup-answers button {
+  justify-self: end;
+  border: 0;
+  background: transparent;
+  color: var(--lime);
+  padding-right: 0;
+}
+
+.minsim-shell .research-composer {
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid var(--border-soft);
+  background: var(--surface-2);
+  padding: 14px 18px 16px;
+}
+
+.minsim-shell .research-target-row {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.minsim-shell .research-target-chip,
+.minsim-shell .research-context-chip {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--fg-faint);
+  padding: 0 8px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+}
+
+.minsim-shell .research-target-chip.person {
+  border-color: var(--lime-line);
+  background: var(--lime-soft);
+  color: var(--lime);
+}
+
+.minsim-shell .research-target-row label {
+  margin-left: auto;
+}
+
+.minsim-shell .research-target-row select {
+  min-height: 32px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--fg-dim);
+  padding: 0 28px 0 9px;
+  font-size: 11px;
+}
+
+.minsim-shell .research-suggestions button {
+  min-height: 32px;
+  border-style: dashed;
+  background: transparent;
+  color: var(--fg-ghost);
+  font-size: 10.5px;
+  font-weight: 550;
+}
+
+.minsim-shell .research-composer-input {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 9px;
+  align-items: stretch;
+}
+
+.minsim-shell .research-composer textarea {
+  width: 100%;
+  min-height: 74px;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--fg);
+  padding: 11px 12px;
+  outline: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.minsim-shell .research-composer textarea:focus {
+  border-color: var(--lime-line);
+  box-shadow: 0 0 0 3px var(--lime-soft);
+}
+
+.minsim-shell .research-composer-input > button {
+  display: inline-flex;
+  min-width: 132px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid var(--fg);
+  border-radius: var(--r-sm);
+  background: var(--fg);
+  color: var(--bg);
+  padding: 0 14px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.minsim-shell .research-composer-input > button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.minsim-shell .research-error {
+  color: #a33a31;
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+@media (max-width: 960px) {
+  .minsim-shell .research-workspace-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .minsim-shell .research-explorer {
+    border-right: 0;
+    border-bottom: 1px solid var(--border-soft);
+  }
+
+  .minsim-shell .research-subject-list {
+    max-height: 430px;
+  }
+
+  .minsim-shell .research-conversation-stream {
+    max-height: 520px;
+  }
+}
+
+@media (max-width: 640px) {
+  .minsim-shell .research-workspace {
+    padding: 36px 0 28px;
+  }
+
+  .minsim-shell .research-workspace-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .minsim-shell .research-workspace-heading h2 {
+    font-size: 24px;
+  }
+
+  .minsim-shell .research-workspace-shell {
+    min-height: 0;
+    margin: 0 -4px;
+  }
+
+  .minsim-shell .research-explorer,
+  .minsim-shell .research-conversation-head,
+  .minsim-shell .research-conversation-stream,
+  .minsim-shell .research-composer {
+    padding-left: 13px;
+    padding-right: 13px;
+  }
+
+  .minsim-shell .research-subject-list.people {
+    grid-template-columns: 1fr;
+  }
+
+  .minsim-shell .research-conversation-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .minsim-shell .research-close-target {
+    align-self: stretch;
+  }
+
+  .minsim-shell .research-context-quote {
+    margin-left: 13px;
+    margin-right: 13px;
+  }
+
+  .minsim-shell .research-target-row label,
+  .minsim-shell .research-target-row select {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .minsim-shell .research-composer-input {
+    grid-template-columns: 1fr;
+  }
+
+  .minsim-shell .research-composer-input > button {
+    min-height: 48px;
+  }
+
+  .minsim-shell .research-message {
+    max-width: 92%;
+  }
+}

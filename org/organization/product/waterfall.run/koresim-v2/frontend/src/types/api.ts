@@ -517,6 +517,43 @@ export interface ProjectRunInterviewResponse {
   summary: string
 }
 
+export interface InterviewThreadCreateRequest {
+  subject_uuid: string
+  subject_label?: string
+  subject_meta?: string
+  context_quote?: string
+}
+
+export interface InterviewThreadMessageRequest {
+  question: string
+}
+
+export interface InterviewMessageResponse {
+  message_id: string
+  role: 'user' | 'assistant'
+  content: string
+  ordinal: number
+  metadata: JsonObject
+  created_at: string
+}
+
+export interface InterviewThreadResponse {
+  thread_id: string
+  project_id: string
+  run_id: string
+  subject_uuid: string
+  subject_label: string
+  subject_meta: string
+  context_quote: string
+  messages: InterviewMessageResponse[]
+  created_at: string
+  updated_at: string
+}
+
+export interface InterviewThreadListResponse {
+  threads: InterviewThreadResponse[]
+}
+
 export interface AdminOverviewResponse {
   users: number
   runs: number

@@ -184,10 +184,79 @@ def test_project_run_actions_reject_other_users(tmp_path, monkeypatch) -> None:
             f"/api/projects/{project['project_id']}/runs/{run_id}/interview",
             {"json": {"question": "더 설명해주세요.", "sample_size": 1}},
         ),
+        (
+            "get",
+            f"/api/projects/{project['project_id']}/runs/{run_id}/interview-threads",
+            {},
+        ),
+        (
+            "post",
+            f"/api/projects/{project['project_id']}/runs/{run_id}/interview-threads",
+            {"json": {"subject_uuid": "persona-1"}},
+        ),
     ]
     for method, path, kwargs in cases:
         response = getattr(other, method)(path, **kwargs)
         assert response.status_code == 404
+
+
+def test_project_interview_thread_persists_messages_and_rejects_unknown_subject(tmp_path, monkeypatch) -> None:
+    store = SQLiteRunStore(tmp_path / "runs.sqlite3")
+    client = TestClient(create_app(store=store, enqueue_run_func=lambda run_id: f"job-{run_id}"))
+    _login(client, monkeypatch, "owner@example.com")
+    project = client.post("/api/projects", json={"name": "Interview project"}).json()
+    created_run = client.post(
+        f"/api/projects/{project['project_id']}/runs",
+        json={
+            "simulation_type": "creative_testing",
+            "input": {"creatives": ["A copy", "B copy"]},
+            "sample_size": 2,
+            "seed": 42,
+        },
+    ).json()
+    run_id = created_run["run"]["run_id"]
+    store.save_result(run_id, _result_envelope(run_id))
+    store.update_run_status(run_id, RunStatusValue.COMPLETED, done_count=2)
+
+    invalid = client.post(
+        f"/api/projects/{project['project_id']}/runs/{run_id}/interview-threads",
+        json={"subject_uuid": "missing-persona"},
+    )
+    assert invalid.status_code == 400
+
+    created = client.post(
+        f"/api/projects/{project['project_id']}/runs/{run_id}/interview-threads",
+        json={
+            "subject_uuid": "persona-1",
+            "subject_label": "김영희 · A안",
+            "subject_meta": "30세 · 서울",
+            "context_quote": "메시지가 명확해서 좋습니다.",
+        },
+    )
+    assert created.status_code == 200
+    thread_id = created.json()["thread_id"]
+    assert created.json()["messages"] == []
+
+    first_turn = client.post(
+        f"/api/projects/{project['project_id']}/runs/{run_id}/interview-threads/{thread_id}/messages",
+        json={"question": "왜 그렇게 답했나요?"},
+    )
+    assert first_turn.status_code == 200
+    assert [message["role"] for message in first_turn.json()["messages"]] == ["user", "assistant"]
+
+    second_turn = client.post(
+        f"/api/projects/{project['project_id']}/runs/{run_id}/interview-threads/{thread_id}/messages",
+        json={"question": "조금 더 설명해주세요."},
+    )
+    assert second_turn.status_code == 200
+    assert [message["ordinal"] for message in second_turn.json()["messages"]] == [0, 1, 2, 3]
+
+    restored = client.get(
+        f"/api/projects/{project['project_id']}/runs/{run_id}/interview-threads"
+    )
+    assert restored.status_code == 200
+    assert restored.json()["threads"][0]["thread_id"] == thread_id
+    assert len(restored.json()["threads"][0]["messages"]) == 4
 
 
 def _result_envelope(run_id: str) -> dict:

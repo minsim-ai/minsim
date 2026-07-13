@@ -1,5 +1,9 @@
 import { requestJson } from './client'
 import type {
+  InterviewThreadCreateRequest,
+  InterviewThreadListResponse,
+  InterviewThreadMessageRequest,
+  InterviewThreadResponse,
   ProjectCreateRequest,
   ProjectListResponse,
   ProjectResponse,
@@ -100,4 +104,42 @@ export function askProjectRunInterview(
     method: 'POST',
     body: JSON.stringify(payload),
   })
+}
+
+export function listProjectRunInterviewThreads(
+  projectId: string,
+  runId: string,
+): Promise<InterviewThreadListResponse> {
+  return requestJson<InterviewThreadListResponse>(
+    `/api/projects/${enc(projectId)}/runs/${enc(runId)}/interview-threads`,
+  )
+}
+
+export function createProjectRunInterviewThread(
+  projectId: string,
+  runId: string,
+  payload: InterviewThreadCreateRequest,
+): Promise<InterviewThreadResponse> {
+  return requestJson<InterviewThreadResponse>(
+    `/api/projects/${enc(projectId)}/runs/${enc(runId)}/interview-threads`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+  )
+}
+
+export function askProjectRunInterviewThread(
+  projectId: string,
+  runId: string,
+  threadId: string,
+  payload: InterviewThreadMessageRequest,
+): Promise<InterviewThreadResponse> {
+  return requestJson<InterviewThreadResponse>(
+    `/api/projects/${enc(projectId)}/runs/${enc(runId)}/interview-threads/${enc(threadId)}/messages`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+  )
 }

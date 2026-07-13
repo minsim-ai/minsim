@@ -12,6 +12,20 @@ _NAMES_F = ["강순녀", "나순희", "장화영", "유복연", "안혜영", "�
 _NAMES_M = ["이재호", "임병태", "손동하", "봉수훈", "오민영", "이성기", "권상운", "백용일"]
 
 
+class _BorrowedLLMClient:
+    """Keep request-scoped simulations from closing the app-owned LLM client."""
+
+    def __init__(self, client: Any) -> None:
+        self._client = client
+
+    async def generate(self, request: Any) -> Any:
+        return await self._client.generate(request)
+
+
+def _simulator_client(client: Any | None) -> Any | None:
+    return _BorrowedLLMClient(client) if client is not None else None
+
+
 def select_cohort_subset(raw_results: list[dict[str, Any]], cohort: str) -> list[dict[str, Any]]:
     if cohort in {"positive", "high-intent"}:
         return [item for item in raw_results if (_score(item) is not None and _score(item) >= 4)]
@@ -55,7 +69,7 @@ def run_followup(
     if sample_size is not None:
         personas = personas[: max(1, sample_size)]
 
-    simulator = BatchSimulator(purpose="marketing", llm_client=llm_client)
+    simulator = BatchSimulator(purpose="marketing", llm_client=_simulator_client(llm_client))
     results = asyncio.run(simulator.run(personas, _followup_prompt(question)))
 
     answers: list[dict[str, Any]] = []
@@ -79,6 +93,54 @@ def run_followup(
         "panel_seed": seed,
         "answers": answers,
         "summary": _summarize(answers, cohort),
+    }
+
+
+def run_interview_turn(
+    *,
+    raw_results: list[dict[str, Any]],
+    subject_uuid: str,
+    question: str,
+    history: list[dict[str, Any]] | None = None,
+    context_quote: str = "",
+    llm_client: Any | None = None,
+) -> dict[str, Any]:
+    """Run one turn for a persisted interview with the same synthetic persona."""
+
+    subject = next(
+        (
+            item
+            for item in raw_results
+            if str(item.get("uuid") or (item.get("persona") or {}).get("uuid") or "") == subject_uuid
+        ),
+        None,
+    )
+    if subject is None:
+        raise ValueError(f"Unknown interview subject: {subject_uuid}")
+
+    persona = dict(subject.get("persona") or {})
+    persona.setdefault("uuid", subject_uuid)
+    _fill_prompt_fields(persona)
+    original_quote = context_quote.strip() or _original_quote(subject)
+    prompt = _interview_prompt(
+        question=question,
+        original_quote=original_quote,
+        history=history or [],
+    )
+
+    simulator = BatchSimulator(purpose="marketing", llm_client=_simulator_client(llm_client))
+    results = asyncio.run(simulator.run([persona], prompt))
+    if not results or results[0].error or not results[0].response:
+        error = results[0].error if results else "No response"
+        raise RuntimeError(f"Interview response failed: {error}")
+
+    item = results[0]
+    return {
+        "subject_uuid": subject_uuid,
+        "answer": _parse_answer(item.response),
+        "provider": item.provider,
+        "provider_model": item.provider_model,
+        "trace_id": item.trace_id,
     }
 
 
@@ -120,6 +182,52 @@ def _display_name(persona: dict[str, Any], uuid: str) -> str:
 
 def _followup_prompt(question: str) -> str:
     return f"앞선 설문에 이어 추가 질문입니다.\n\n{question}\n\n답변 형식:\n답변: 한두 문장으로 솔직하게"
+
+
+def _interview_prompt(*, question: str, original_quote: str, history: list[dict[str, Any]]) -> str:
+    recent = history[-16:]
+    transcript_lines: list[str] = []
+    for message in recent:
+        content = str(message.get("content") or "").strip()
+        if not content:
+            continue
+        speaker = "인터뷰어" if message.get("role") == "user" else "응답자"
+        transcript_lines.append(f"{speaker}: {content[:500]}")
+    transcript = "\n".join(transcript_lines) or "(첫 질문)"
+    quote = original_quote[:1000] or "(기존 발언 없음)"
+    return (
+        "앞선 설문에 참여한 동일한 응답자와 이어지는 심층 인터뷰입니다.\n"
+        "이전 발언과 지금까지의 대화를 일관되게 이어가세요. "
+        "프로필에 없는 구체적 사실은 지어내지 말고, 질문에 한두 문장으로 솔직하게 답하세요.\n\n"
+        f"[앞선 설문 발언]\n{quote}\n\n"
+        f"[지금까지의 인터뷰]\n{transcript}\n\n"
+        f"[새 질문]\n{question.strip()}\n\n"
+        "답변 형식:\n답변: 한두 문장으로 자연스럽게"
+    )
+
+
+def _original_quote(subject: dict[str, Any]) -> str:
+    parsed = subject.get("parsed") or {}
+    reason = parsed.get("reason") if isinstance(parsed, dict) else None
+    if isinstance(reason, str) and reason.strip():
+        return reason.strip()
+    return str(subject.get("response") or "").strip()[:1000]
+
+
+def _fill_prompt_fields(persona: dict[str, Any]) -> None:
+    defaults: dict[str, Any] = {
+        "age": 0,
+        "sex": "미상",
+        "province": "미상",
+        "district": "",
+        "occupation": "미상",
+        "education_level": "미상",
+        "marital_status": "미상",
+        "family_type": "미상",
+        "housing_type": "미상",
+    }
+    for key, value in defaults.items():
+        persona.setdefault(key, value)
 
 
 def _parse_answer(response: str) -> str:

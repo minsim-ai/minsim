@@ -101,6 +101,31 @@ class ProjectRunRecord:
 
 
 @dataclass(frozen=True)
+class InterviewThreadRecord:
+    thread_id: str
+    user_id: str
+    project_id: str
+    run_id: str
+    subject_uuid: str
+    subject_label: str = ""
+    subject_meta: str = ""
+    context_quote: str = ""
+    created_at: str = ""
+    updated_at: str = ""
+
+
+@dataclass(frozen=True)
+class InterviewMessageRecord:
+    message_id: str
+    thread_id: str
+    role: str
+    content: str
+    ordinal: int
+    metadata: dict[str, Any] = field(default_factory=dict)
+    created_at: str = ""
+
+
+@dataclass(frozen=True)
 class RunEventRecord:
     run_id: str
     event_type: RunEventType

@@ -81,7 +81,7 @@ export type MinsimReport = {
   reco: { action: string; meta: string; bullets: string[] }
   sampleAge: [string, number][]
   sampleRegion: [string, number][]
-  crowd: { name: string; sex: string; age: number | string; region: string; occ: string; choice: string }[]
+  crowd: { uuid: string; name: string; sex: string; age: number | string; region: string; occ: string; choice: string; quote: string }[]
   quotes: { uuid: string; name: string; choice: string; meta: string; q: string }[]
   disclaimer: string
 }
@@ -638,13 +638,16 @@ function buildCrowd(rawResults: RawPersonaResult[]): MinsimReport['crowd'] {
     .map((item) => {
       const persona = item.persona
       const sex = typeof persona.sex === 'string' ? persona.sex : '여자'
+      const reason = item.parsed && typeof item.parsed.reason === 'string' ? item.parsed.reason : ''
       return {
+        uuid: item.uuid,
         name: displayName(item.uuid, sex),
         sex,
         age: typeof persona.age === 'number' ? persona.age : (persona.age as string) ?? '',
         region: (typeof persona.district === 'string' && persona.district) || (typeof persona.province === 'string' ? persona.province : ''),
         occ: typeof persona.occupation === 'string' ? persona.occupation : '',
         choice: choiceOf(item),
+        quote: (reason || extractReason(item.response) || item.response.replace(/\s+/g, ' ').slice(0, 160)).trim(),
       }
     })
 }
