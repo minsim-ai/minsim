@@ -28,11 +28,55 @@ export function runIntakeFixtureCheck(): IntakeFixtureCheckResult {
   failures.push(...checkPriceOptionalFormDoesNotLoop());
   failures.push(...checkSampleSizePolicy());
   failures.push(...checkProjectContextIntake());
+  failures.push(...checkCampaignChannelClarification());
   return {
     ok: failures.length === 0,
     failures,
     checked: fixtures.length,
   };
+}
+
+function checkCampaignChannelClarification(): string[] {
+  const project: ProjectResponse = {
+    project_id: "campaign-project-fixture",
+    user_id: "user-fixture",
+    name: "캠페인 테스트",
+    description: "새 서비스의 캠페인 전략을 정합니다.",
+    product_context: { product_description: "새 구독형 서비스" },
+    features: [],
+    prices: [],
+    target_notes: "",
+    alternatives: [],
+    created_at: "2026-07-13T00:00:00Z",
+    updated_at: "2026-07-13T00:00:00Z",
+    archived_at: null,
+  };
+  const initial = createProjectIntakeSession(project, "campaign_strategy");
+  const afterOneChannel = advanceIntakeSession(initial, {
+    type: "user_message",
+    content: "x.com",
+    selectedSimulationType: "campaign_strategy",
+  });
+  const failures: string[] = [];
+
+  if (initial.action?.type !== "ask_question" || !initial.action.message.includes("2개 이상")) {
+    failures.push("campaign channel clarification: initial question must explain that two or more placements are needed");
+  }
+  if (initial.action?.type === "ask_question" && initial.action.message.includes("채널 후보")) {
+    failures.push("campaign channel clarification: user-facing question must not expose the internal '채널 후보' label");
+  }
+  if (JSON.stringify(afterOneChannel.slots.channels?.value) !== JSON.stringify(["x.com"])) {
+    failures.push(`campaign channel clarification: expected x.com to be preserved, got ${JSON.stringify(afterOneChannel.slots.channels?.value)}`);
+  }
+  if (afterOneChannel.action?.type !== "show_form") {
+    failures.push(`campaign channel clarification: a partial channel answer must continue in the structured form, got ${afterOneChannel.action?.type}`);
+  } else {
+    const channelField = afterOneChannel.action.form.fields.find((field) => field.id === "channels");
+    if (channelField?.label !== "캠페인을 보여줄 곳" || channelField.minItems !== 2) {
+      failures.push(`campaign channel clarification: structured field must explain the channel choice, got ${JSON.stringify(channelField)}`);
+    }
+  }
+  return failures;
 }
 
 function checkProjectContextIntake(): string[] {

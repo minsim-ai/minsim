@@ -60,6 +60,12 @@ column with field-specific examples. The free-text composer is present only for
 `ask_question`; it is removed while a structured form, candidate review,
 assumption review, or run-ready action is active.
 
+Multi-value critical questions must use plain user language, state the minimum
+number of answers, and include recognizable examples. If the user supplies fewer
+than the required number after that question, the planner preserves the partial
+answer and continues in the prefilled structured form. It must not repeat the
+same question verbatim.
+
 ## Request Contract
 
 `RunCreateRequest` may include:

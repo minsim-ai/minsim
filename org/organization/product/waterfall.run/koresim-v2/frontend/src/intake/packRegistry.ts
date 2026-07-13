@@ -77,8 +77,8 @@ const packPlaceholders: Record<Exclude<SimulationType, "creative_testing">, Simu
   ]),
   campaign_strategy: pack("campaign_strategy", "캠페인 전략", ["캠페인", "채널", "메시지 조합", "예산", "매체"], [
     slot("product_context", "캠페인 대상", "object", "critical", "textarea", { placeholder: "예: 1인 가구 어르신을 위한 말벗 로봇 월 구독 서비스" }),
-    slot("channels", "채널 후보", "options", "critical", "multi_text", { minItems: 2, maxItems: 5, canGenerate: true, placeholder: "예: 네이버 검색광고\n유튜브\n카카오톡 채널" }),
-    slot("messages", "메시지 후보", "options", "critical", "multi_text", { minItems: 2, maxItems: 4, canGenerate: true, placeholder: "예: 부모님 곁을 지키는 다정한 로봇\n멀리 있어도 안심할 수 있는 돌봄" }),
+    slot("channels", "캠페인을 보여줄 곳", "options", "critical", "multi_text", { minItems: 2, maxItems: 5, canGenerate: true, helperText: "서로 비교할 곳을 한 줄에 하나씩, 최소 2개 적어주세요.", placeholder: "예: X(트위터)\n인스타그램\n유튜브" }),
+    slot("messages", "캠페인 문구", "options", "critical", "multi_text", { minItems: 2, maxItems: 4, canGenerate: true, helperText: "서로 비교할 문구를 한 줄에 하나씩, 최소 2개 적어주세요.", placeholder: "예: 부모님 곁을 지키는 다정한 로봇\n멀리 있어도 안심할 수 있는 돌봄" }),
     slot("budget", "예산", "constraints", "recommended", "number", { placeholder: "예: 5000000" }),
     slot("campaign_objective", "캠페인 목표", "criteria", "recommended", "text", { canGenerate: true, placeholder: "예: 무료 체험 신청 500건 확보" }),
   ]),

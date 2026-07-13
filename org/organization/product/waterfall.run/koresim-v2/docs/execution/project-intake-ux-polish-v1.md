@@ -68,6 +68,13 @@ related: [[minsim-v2-ux-and-mcp]], [[../design/agentic-intake-workflows/intake-l
 - [x] `uv run python scripts/verify.py`: 202 tests, 89.33% coverage, frontend gate passed
 - [ ] 프로덕션 외부 readiness check
 
+### 2026-07-13 campaign channel clarification regression
+
+- [x] 사용자 용어를 `채널 후보`에서 `캠페인을 보여줄 곳`으로 변경하고 X(트위터)·인스타그램·유튜브 예시와 최소 2개 조건을 표시했다.
+- [x] `x.com` 한 개 입력도 보존하며 같은 질문을 반복하지 않고 prefilled 1열 폼으로 이동한다.
+- [x] 기존 가격 후보의 첫 질문 동작을 유지하는 회귀 범위까지 `npm run check:intake` 126 fixtures로 확인했다.
+- [x] 로컬 브라우저에서 질문 문구, `x.com` 보존, 구조화 폼 전환, 자유 입력 composer 제거를 확인했다.
+
 ## 6. Completion Log
 
 - [x] Implementation completed

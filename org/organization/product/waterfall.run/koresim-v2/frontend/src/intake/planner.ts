@@ -134,9 +134,16 @@ function planGenericSimulationAction(session: IntakeSession): IntakeAction {
     .filter((requirement) => !hasEnoughCollectedValue(session.slots[requirement.id], requirement));
   const missingCritical = missingFields.filter((requirement) => requirement.importance === "critical");
   const formId = `${pack.simulationType}_intake_v1`;
+  const nextCritical = missingCritical[0];
+  const hasPartialAnswerToCurrentQuestion = Boolean(
+    nextCritical
+    && hasCollectedValue(session.slots[nextCritical.id])
+    && session.action?.type === "ask_question"
+    && session.action.slotIds.includes(nextCritical.id),
+  );
 
-  if (missingCritical.length > 0 && session.turnCount <= 1) {
-    const target = missingCritical[0];
+  if (nextCritical && session.turnCount <= 1 && !hasPartialAnswerToCurrentQuestion) {
+    const target = nextCritical;
     return {
       type: "ask_question",
       message: `${withObjectParticle(pack.label)} 실행하려면 먼저 ${withSubjectParticle(target.label)} 필요합니다. ${questionHelpText(target.id)}`,
@@ -334,6 +341,10 @@ function questionHelpText(slotId: string): string {
     case "product_context":
     case "product_concept":
       return "어떤 제품이나 서비스를 검증하려는지 한 문장으로 알려주세요.";
+    case "channels":
+      return "비교할 홍보 채널을 2개 이상 적어주세요. 예: X(트위터) / 인스타그램 / 유튜브";
+    case "messages":
+      return "비교할 캠페인 문구를 2개 이상 적어주세요. 한 줄에 하나씩 적으면 됩니다.";
     default:
       return "아는 만큼만 짧게 알려주세요.";
   }
