@@ -10,10 +10,11 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "check:intake": "node scripts/check-intake-fixtures.mjs",
+    "check:loading": "node scripts/check-loading-failure.mjs",
     "check:minsim": "node scripts/check-minsim-result.mjs",
     "check:landing": "node scripts/check-landing-demo-pdf-cta.mjs",
     "preview": "vite preview",
-    "verify": "npm run lint && npm run typecheck && npm run check:intake && npm run check:minsim && npm run check:landing && npm run build"
+    "verify": "npm run lint && npm run typecheck && npm run check:intake && npm run check:loading && npm run check:minsim && npm run check:landing && npm run build"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

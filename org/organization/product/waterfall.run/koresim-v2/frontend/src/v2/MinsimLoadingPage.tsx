@@ -5,6 +5,7 @@ import { SimulationProgress } from '../components/SimulationProgress'
 import { getSimulationLabel } from '../simulations/registry'
 import type { ProjectResponse, RunSnapshot } from '../types/api'
 import { navigateTo } from './navigation'
+import { terminalRunCopy } from './runTerminalCopy'
 
 const PHASES: [string, number][] = [
   ['페르소나 샘플링', 12],
@@ -104,7 +105,52 @@ export function MinsimLoadingPage({
     )
   }
 
-  if (!prefersReducedMotion && status !== 'failed' && status !== 'canceled' && status !== 'interrupted') {
+  const terminal = status === 'failed' || status === 'canceled' || status === 'interrupted'
+  if (run && terminal) {
+    const copy = terminalRunCopy(status, run.error)
+    return (
+      <div className="wrap" style={{ paddingTop: 40, paddingBottom: 80, maxWidth: 860, margin: '0 auto' }}>
+        <div className="col" style={{ gap: 8, marginBottom: 24 }}>
+          <div className="kicker">실행 상태 · {projectName}</div>
+          <h1 style={{ fontSize: 28 }}>{copy.title}</h1>
+          <p className="muted" style={{ fontSize: 13.5, lineHeight: 1.6 }}>
+            {done.toLocaleString('ko-KR')} / {total.toLocaleString('ko-KR')}명 응답을 수집한 시점의 상태입니다.
+          </p>
+        </div>
+
+        {project && <div style={{ marginBottom: 16 }}><ProjectBanner project={project} /></div>}
+
+        <section className="card" role="alert" style={{ padding: 24, borderColor: 'var(--lime-line)', marginBottom: 16 }}>
+          <div className="lbl-mono" style={{ color: 'var(--lime)', marginBottom: 10 }}>{copy.reasonLabel}</div>
+          <p style={{ fontSize: 16, fontWeight: 600, lineHeight: 1.55 }}>{copy.reason}</p>
+          {copy.code && <div className="lbl-mono" style={{ marginTop: 12 }}>오류 코드 · {copy.code}</div>}
+          {copy.detail && (
+            <details style={{ marginTop: 14 }}>
+              <summary className="lbl" style={{ cursor: 'pointer' }}>기술 상세 보기</summary>
+              <p className="muted" style={{ marginTop: 8, fontSize: 12.5, lineHeight: 1.55, overflowWrap: 'anywhere' }}>{copy.detail}</p>
+            </details>
+          )}
+          <p className="muted" style={{ marginTop: 14, fontSize: 13, lineHeight: 1.6 }}>{copy.nextStep}</p>
+        </section>
+
+        <div className="card" style={{ padding: 18, marginBottom: 18 }}>
+          <div className="spread" style={{ gap: 12, flexWrap: 'wrap' }}>
+            <span><span className="lbl-mono">진행률</span> <b>{Math.round(pct)}%</b></span>
+            <span><span className="lbl-mono">수집 완료</span> <b>{done.toLocaleString('ko-KR')} / {total.toLocaleString('ko-KR')}명</b></span>
+            <span><span className="lbl-mono">실행 ID</span> <b>{run.run_id.slice(0, 8)}</b></span>
+          </div>
+        </div>
+
+        {projectId && (
+          <button className="btn" onClick={() => navigateTo(`/projects/${encodeURIComponent(projectId)}`)}>
+            프로젝트로 돌아가기
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  if (!prefersReducedMotion) {
     return (
       <SimulationProgress
         snapshot={run}

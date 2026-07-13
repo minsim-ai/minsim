@@ -151,8 +151,9 @@ function RunHistoryRow({ item, projectId }: { item: ProjectRunItem; projectId: s
   const { run } = item
   const active = run.status === 'queued' || run.status === 'running'
   const completed = run.status === 'completed' && run.result_available
-  const navigable = active || completed
-  const href = active
+  const terminal = run.status === 'failed' || run.status === 'canceled' || run.status === 'interrupted'
+  const navigable = active || completed || terminal
+  const href = active || terminal
     ? `/loading?project_id=${encodeURIComponent(projectId)}&run_id=${encodeURIComponent(run.run_id)}`
     : `/results?project_id=${encodeURIComponent(projectId)}&run_id=${encodeURIComponent(run.run_id)}`
   const pct = Math.round(run.progress_pct)
