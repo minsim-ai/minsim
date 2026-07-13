@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { CheckCircle, Flask, FolderSimple, SpinnerGap } from '@phosphor-icons/react'
 import { getProject, listProjectRuns } from '../api/projects'
+import { SimulationProgress } from '../components/SimulationProgress'
+import { getSimulationLabel } from '../simulations/registry'
 import type { ProjectResponse, RunSnapshot } from '../types/api'
 import { navigateTo } from './navigation'
 
@@ -26,6 +28,7 @@ export function MinsimLoadingPage({
   runId: string | null
 }) {
   const [state, setState] = useState<LoadingState>({ project: null, run: null, error: null })
+  const prefersReducedMotion = usePrefersReducedMotion()
 
   useEffect(() => {
     if (!projectId || !runId) {
@@ -101,6 +104,25 @@ export function MinsimLoadingPage({
     )
   }
 
+  if (!prefersReducedMotion && status !== 'failed' && status !== 'canceled' && status !== 'interrupted') {
+    return (
+      <SimulationProgress
+        snapshot={run}
+        resultAvailable={Boolean(run?.status === 'completed' && run.result_available)}
+        runLabel={`${projectName} · ${run ? getSimulationLabel(run.simulation_type) : '시뮬레이션 준비'}`}
+        stageTitle={`${total.toLocaleString('ko-KR')}명의 합성 페르소나가 응답하는 중`}
+        stageBody={`${phaseLabel} · ${done.toLocaleString('ko-KR')} / ${total.toLocaleString('ko-KR')}명 응답 완료${eta === null ? '' : ` · 예상 잔여 약 ${eta}초`}`}
+        pendingLabel="분석 중"
+        completeLabel="결과 보기"
+        onComplete={() => {
+          if (projectId && runId) {
+            navigateTo(`/results?project_id=${encodeURIComponent(projectId)}&run_id=${encodeURIComponent(runId)}`)
+          }
+        }}
+      />
+    )
+  }
+
   return (
     <div className="wrap" style={{ paddingTop: 40, paddingBottom: 80, maxWidth: 860, margin: '0 auto' }}>
       <div className="spread" style={{ marginBottom: 26, gap: 12, flexWrap: 'wrap' }}>
@@ -170,6 +192,21 @@ export function MinsimLoadingPage({
       </div>
     </div>
   )
+}
+
+function usePrefersReducedMotion(): boolean {
+  const [reduced, setReduced] = useState(() => (
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  ))
+
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const update = () => setReduced(media.matches)
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
+  }, [])
+
+  return reduced
 }
 
 function ProjectBanner({ project }: { project: ProjectResponse }) {

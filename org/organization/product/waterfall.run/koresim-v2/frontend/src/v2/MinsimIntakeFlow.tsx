@@ -3,10 +3,11 @@ import { generateIntakeCandidates, linkIntakeSessionRun, saveIntakeSession } fro
 import { createProjectRun, getProject } from '../api/projects'
 import { advanceIntakeSession, createInitialIntakeSession } from '../intake/planner'
 import { buildGenericSimulationPayload, validateCreativeTestingPayload } from '../intake/payloadBuilder'
-import { createSlot, upsertSlot } from '../intake/slotUtils'
 import type { CreativeCandidate, DynamicFormField, IntakeSession, IntakeSlotValue } from '../intake/types'
 import type { JsonObject, ProjectResponse, SimulationType } from '../types/api'
+import { getSimulationLabel } from '../simulations/registry'
 import { navigateTo } from './navigation'
+import { createProjectIntakeSession } from './projectIntake'
 
 export function MinsimIntakeFlow({
   projectId,
@@ -16,7 +17,11 @@ export function MinsimIntakeFlow({
   simulationType: SimulationType | null
 }) {
   const [project, setProject] = useState<ProjectResponse | null>(null)
-  const [session, setSession] = useState<IntakeSession>(() => createInitialIntakeSession())
+  const [session, setSession] = useState<IntakeSession>(() => ({
+    ...createInitialIntakeSession(),
+    messages: [],
+    action: null,
+  }))
   const [message, setMessage] = useState('')
   const [formValues, setFormValues] = useState<Record<string, string>>({})
   const [error, setError] = useState<string | null>(null)
@@ -33,7 +38,7 @@ export function MinsimIntakeFlow({
 
   useEffect(() => {
     if (!project) return
-    setSession((current) => withProjectDefaults(current, project, type))
+    setSession(createProjectIntakeSession(project, type))
   }, [project, type])
 
   useEffect(() => {
@@ -206,6 +211,13 @@ export function MinsimIntakeFlow({
         <div className="col">
           <p className="v2-kicker">{project?.name ?? 'Project'}</p>
           <h1>입력값을 대화로 정리합니다</h1>
+          <div className="minsim-selected-simulation" aria-label={`선택한 시뮬레이션: ${getSimulationLabel(type)}`}>
+            <span>선택한 시뮬레이션</span>
+            <strong>{getSimulationLabel(type)}</strong>
+            <button type="button" onClick={() => navigateTo(`/projects/${encodeURIComponent(projectId)}/type`)}>
+              변경
+            </button>
+          </div>
         </div>
         <div className="row minsim-chat-header-actions" aria-live="polite">
           {candidateMeta && <span className="badge live">AI {candidateMeta}</span>}
@@ -240,23 +252,25 @@ export function MinsimIntakeFlow({
             onRun={run}
             onSubmitForm={submitForm}
           />
-          <div className="v2-chat-input minsim-chat-composer">
-            <textarea
-              value={message}
-              onChange={(event) => setMessage(event.target.value)}
-              onCompositionStart={() => {
-                composingRef.current = true
-              }}
-              onCompositionEnd={() => {
-                composingRef.current = false
-              }}
-              onKeyDown={handleComposerKeyDown}
-              aria-label="입력 메시지"
-              rows={3}
-              placeholder="제품, 가격, 고객, 메시지 고민을 적어주세요."
-            />
-            <button type="button" onClick={send}>전송 →</button>
-          </div>
+          {action?.type === 'ask_question' && (
+            <div className="v2-chat-input minsim-chat-composer">
+              <textarea
+                value={message}
+                onChange={(event) => setMessage(event.target.value)}
+                onCompositionStart={() => {
+                  composingRef.current = true
+                }}
+                onCompositionEnd={() => {
+                  composingRef.current = false
+                }}
+                onKeyDown={handleComposerKeyDown}
+                aria-label="질문에 답변"
+                rows={2}
+                placeholder="위 질문에 아는 만큼 답해주세요. 예: 최근 3개월간 재구매율이 줄었습니다."
+              />
+              <button type="button" onClick={send} disabled={!message.trim()}>답변 전송 →</button>
+            </div>
+          )}
         </div>
 
         <aside className="minsim-input-summary card">
@@ -321,26 +335,33 @@ function ActionPanel({
           <span className="lbl-mono">필요 정보</span>
           <p>아는 만큼만 채우고 비워둔 항목은 후보 생성 단계에서 보완합니다.</p>
         </div>
-        {action.form.fields.map((field) => (
-          <label key={field.id}>
-            <span>{field.label}</span>
-            {field.type === 'textarea' || field.type === 'multi_text' ? (
-              <textarea
-                value={formValues[field.id] ?? valueToString(field.value)}
-                onChange={(event) => onFormValues((current) => ({ ...current, [field.id]: event.target.value }))}
-                placeholder={field.placeholder}
-                rows={4}
-              />
-            ) : (
-              <input
-                value={formValues[field.id] ?? valueToString(field.value)}
-                onChange={(event) => onFormValues((current) => ({ ...current, [field.id]: event.target.value }))}
-                placeholder={field.placeholder}
-              />
-            )}
-            {field.helperText && <small>{field.helperText}</small>}
-          </label>
-        ))}
+        <div className="minsim-form-fields">
+          {action.form.fields.map((field, index) => (
+            <label className="minsim-form-field" key={field.id}>
+              <span className="minsim-form-question">
+                <b>질문 {index + 1}</b>
+                <strong>{field.label}</strong>
+                {!field.required && <em>선택</em>}
+              </span>
+              <span className="sr-only">답변 입력</span>
+              {field.type === 'textarea' || field.type === 'multi_text' ? (
+                <textarea
+                  value={formValues[field.id] ?? valueToString(field.value)}
+                  onChange={(event) => onFormValues((current) => ({ ...current, [field.id]: event.target.value }))}
+                  placeholder={field.placeholder || `${field.label}의 예시나 현재 상황을 적어주세요.`}
+                  rows={3}
+                />
+              ) : (
+                <input
+                  value={formValues[field.id] ?? valueToString(field.value)}
+                  onChange={(event) => onFormValues((current) => ({ ...current, [field.id]: event.target.value }))}
+                  placeholder={field.placeholder || `${field.label}을 입력해주세요.`}
+                />
+              )}
+              {field.helperText && <small>{field.helperText}</small>}
+            </label>
+          ))}
+        </div>
         <button type="submit">{action.form.primaryAction}</button>
       </form>
     )
@@ -530,38 +551,6 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
       <strong>{value}</strong>
     </div>
   )
-}
-
-function withProjectDefaults(session: IntakeSession, project: ProjectResponse, type: SimulationType): IntakeSession {
-  const projectText = stringFromProject(project)
-  let slots = session.slots
-  if (projectText) {
-    slots = upsertSlot(slots, createSlot('product_description', projectText, 'user', 0.99, 'project context', false))
-    slots = upsertSlot(slots, createSlot('product_context', projectText, 'user', 0.99, 'project context', false))
-  }
-  if (project.features.length > 0) {
-    slots = upsertSlot(slots, createSlot('key_features', project.features, 'user', 0.99, 'project context', false))
-  }
-  if (project.prices.length > 0) {
-    slots = upsertSlot(slots, createSlot('price_points', project.prices, 'user', 0.99, 'project context', false))
-  }
-  if (project.alternatives.length > 0) {
-    slots = upsertSlot(slots, createSlot('products', project.alternatives, 'user', 0.99, 'project context', false))
-  }
-  return {
-    ...session,
-    slots,
-    taskFrame: {
-      taskId: session.taskFrame?.taskId ?? `v2-${type}`,
-      userGoal: session.taskFrame?.userGoal ?? project.description ?? '',
-      decisionQuestion: session.taskFrame?.decisionQuestion ?? '어떤 선택지가 더 설득력 있는가?',
-      likelySimulationTypes: session.taskFrame?.likelySimulationTypes ?? [type],
-      primarySimulationType: type,
-      preSimulationActions: type === 'creative_testing' ? ['generate_creative_candidates'] : [],
-      confidence: 0.8,
-      evidence: session.taskFrame?.evidence ?? ['project context'],
-    },
-  }
 }
 
 function normalizeFormValues(fields: DynamicFormField[], values: Record<string, string>) {

@@ -14,7 +14,6 @@ export function ProjectsPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (window.sessionStorage.getItem('minsim.heroPrompt')) setCreating(true)
     listProjects()
       .then((response) => setProjects(response.projects))
       .catch((err) => setError(err instanceof Error ? err.message : String(err)))
@@ -43,6 +42,13 @@ export function ProjectsPage() {
     }
   }
 
+  const cancelCreate = () => {
+    setCreating(false)
+    setName('')
+    setDescription('')
+    window.sessionStorage.removeItem('minsim.heroPrompt')
+  }
+
   return (
     <div className="wrap" style={{ paddingTop: 44, paddingBottom: 72 }}>
       <div className="spread" style={{ alignItems: 'flex-end', marginBottom: 8, flexWrap: 'wrap', gap: 14 }}>
@@ -62,7 +68,7 @@ export function ProjectsPage() {
         <form className="card" style={{ padding: 22, marginTop: 22, marginBottom: 8 }} onSubmit={submit}>
           <div className="spread" style={{ marginBottom: 14 }}>
             <span className="lbl-mono">새 프로젝트</span>
-            <button type="button" className="btn ghost sm" onClick={() => setCreating(false)}>취소</button>
+            <button type="button" className="btn ghost sm" onClick={cancelCreate}>취소</button>
           </div>
           <div className="minsim-project-form-grid">
             <label className="col" style={{ gap: 6 }}>
@@ -78,7 +84,7 @@ export function ProjectsPage() {
         </form>
       )}
 
-      {error && <p className="muted" style={{ color: 'var(--fg)', marginTop: 12 }}>⚠ {error}</p>}
+      {error && <p className="muted" role="alert" style={{ color: 'var(--fg)', marginTop: 12 }}>오류: {error}</p>}
 
       <div className="lbl-mono" style={{ marginTop: 28, marginBottom: 12 }}>최근 프로젝트</div>
       <div className="v2-project-dashboard-grid">
@@ -123,6 +129,15 @@ export function ProjectsPage() {
           </div>
         </button>}
       </div>
+
+      {!loading && projects.length === 0 && !creating && (
+        <div className="card minsim-empty-projects">
+          <Flask size={28} weight="duotone" aria-hidden="true" />
+          <strong>아직 프로젝트가 없습니다</strong>
+          <p className="muted">제품이나 서비스별로 프로젝트를 만들면 입력 정보와 실행 이력이 함께 쌓입니다.</p>
+          <button className="btn primary" type="button" onClick={() => setCreating(true)}><Plus size={16} /> 첫 프로젝트 만들기</button>
+        </div>
+      )}
 
       {loading && <p className="muted" style={{ marginTop: 16 }}>불러오는 중…</p>}
     </div>

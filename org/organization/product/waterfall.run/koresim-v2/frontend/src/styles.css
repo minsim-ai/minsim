@@ -7880,3 +7880,314 @@ html[data-theme="minsim"] body {
     max-width: 92%;
   }
 }
+
+/* Project + intake clarity pass (2026-07-13). */
+.minsim-shell :is(.v2-editor-grid, .v2-chat-input, .v2-dynamic-form, .minsim-project-form-grid) :is(input, textarea, select) {
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.minsim-shell .v2-editor-grid label > span,
+.minsim-shell .minsim-project-form-grid label > span {
+  color: var(--fg-dim);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.minsim-empty-projects {
+  display: grid;
+  place-items: center;
+  gap: 10px;
+  min-height: 260px;
+  padding: 36px;
+  text-align: center;
+}
+
+.minsim-empty-projects p {
+  max-width: 480px;
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+.minsim-selected-simulation {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  width: fit-content;
+  margin-top: 14px;
+  border: 1px solid var(--lime-line);
+  border-radius: var(--r-sm);
+  background: var(--lime-soft);
+  color: var(--fg-dim);
+  padding: 8px 10px 8px 12px;
+  font-size: 13px;
+}
+
+.minsim-selected-simulation strong {
+  color: var(--lime);
+  font-size: 14px;
+}
+
+.minsim-selected-simulation button {
+  min-height: 32px !important;
+  border: 0;
+  border-left: 1px solid var(--lime-line);
+  background: transparent;
+  color: var(--fg-dim);
+  padding: 0 6px 0 12px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.minsim-shell .v2-chat-line {
+  font-size: 16px;
+}
+
+.minsim-shell .v2-chat-input.minsim-chat-composer {
+  width: min(100%, 680px);
+  justify-self: start;
+  align-items: end;
+}
+
+.minsim-shell .v2-chat-input.minsim-chat-composer textarea {
+  min-height: 76px;
+  max-height: 180px;
+}
+
+.minsim-shell .v2-chat-input.minsim-chat-composer button:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.minsim-shell .v2-dynamic-form {
+  grid-template-columns: 1fr;
+}
+
+.minsim-form-fields {
+  display: grid;
+  gap: 12px;
+}
+
+.minsim-shell .v2-dynamic-form .minsim-form-field {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  padding: 16px;
+}
+
+.minsim-form-question {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--fg);
+  font-family: var(--sans);
+}
+
+.minsim-form-question b {
+  flex: none;
+  border-radius: var(--r-sm);
+  background: var(--lime-soft);
+  color: var(--lime);
+  padding: 4px 7px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+
+.minsim-form-question strong {
+  color: var(--fg);
+  font-size: 15px;
+}
+
+.minsim-form-question em {
+  margin-left: auto;
+  color: var(--fg-faint);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 500;
+}
+
+.minsim-shell .v2-dynamic-form .minsim-form-field small {
+  color: var(--fg-faint);
+  font-family: var(--sans);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+.v2-run-history-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.v2-run-history-head h2 {
+  margin-top: 5px;
+  margin-bottom: 0 !important;
+}
+
+.v2-run-history-head > span {
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  color: var(--fg-dim);
+  padding: 6px 9px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.minsim-shell .v2-run-list {
+  grid-template-columns: 1fr;
+  max-height: min(640px, 72vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+}
+
+.minsim-shell .v2-run-list .v2-run-history-row {
+  display: grid;
+  grid-template-columns: 82px minmax(190px, 1.4fr) minmax(150px, 0.8fr) 124px 22px;
+  align-items: center;
+  gap: 14px;
+  min-height: 92px;
+  padding: 16px 18px;
+}
+
+.minsim-shell .v2-run-list .v2-run-history-row:disabled {
+  opacity: 0.72;
+  cursor: default;
+}
+
+.v2-run-status {
+  width: fit-content;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--fg-dim) !important;
+  padding: 5px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.v2-run-status.status-running,
+.v2-run-status.status-queued {
+  border-color: var(--lime-line);
+  background: var(--lime-soft);
+  color: var(--lime) !important;
+}
+
+.v2-run-history-copy {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.v2-run-history-copy strong {
+  font-size: 16px;
+}
+
+.v2-run-history-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v2-run-history-progress {
+  display: grid;
+  gap: 7px;
+}
+
+.v2-run-history-progress > span {
+  color: var(--fg-dim) !important;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.v2-run-history-progress i {
+  display: block;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--bg-2);
+}
+
+.v2-run-history-progress b {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--lime);
+}
+
+.v2-run-history-row time {
+  color: var(--fg-faint);
+  font-size: 12px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.v2-run-empty {
+  display: grid;
+  justify-items: center;
+  gap: 7px;
+  min-height: 180px;
+  place-content: center;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r);
+  color: var(--fg-faint);
+  text-align: center;
+}
+
+.v2-run-empty strong {
+  color: var(--fg);
+  font-size: 15px;
+}
+
+.v2-run-empty span {
+  font-size: 13px;
+}
+
+@media (max-width: 820px) {
+  .minsim-shell .v2-run-list .v2-run-history-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .v2-run-history-progress {
+    grid-column: 1 / -1;
+  }
+
+  .v2-run-history-row time {
+    grid-column: 2;
+    grid-row: 2;
+    text-align: left;
+  }
+}
+
+@media (max-width: 640px) {
+  .minsim-selected-simulation {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .minsim-shell .v2-chat-input.minsim-chat-composer {
+    width: 100%;
+  }
+
+  .minsim-shell .v2-run-list .v2-run-history-row {
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+  }
+
+  .v2-run-status,
+  .v2-run-history-copy,
+  .v2-run-history-progress,
+  .v2-run-history-row time {
+    grid-column: 1 / -1;
+  }
+
+  .v2-run-history-row time {
+    grid-row: auto;
+  }
+}

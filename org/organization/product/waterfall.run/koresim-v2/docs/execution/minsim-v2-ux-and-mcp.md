@@ -12,6 +12,23 @@
 - `/results?project_id=...&run_id=...` renders a minsim-style report from the live `RunResultEnvelope`.
 - `/classic/app` and `/classic/results?run_id=...` preserve the original KoreaSim UI.
 
+The 2026-07-13 project/intake clarity pass adds these V2 interaction contracts:
+
+- project creation is progressive disclosure: the form opens only after the user
+  chooses `새 프로젝트`.
+- run history is a one-column, scrollable list with status, simulation type,
+  response count, progress, time, and status-aware navigation.
+- intake displays the selected simulation, seeds only saved user-provided project
+  facts, skips already answered critical questions, and renders structured fields
+  as one question/answer card per row with examples.
+- intake text inputs use a readable 16px baseline and the free-text composer is
+  hidden while a structured action is active.
+- `/loading` reuses the existing Three.js/GSAP `SimulationProgress` experience with
+  the real project run snapshot. Reduced-motion users retain the static progress
+  alternative.
+- React Grab is a Vite development-only dependency and is never initialized by the
+  production bundle.
+
 The result page uses `frontend/src/v2/resultAdapter.ts` as the boundary between backend data and minsim visualization. It converts the API envelope into verdict, metric cards, rank rows, segment matrices, evidence quotes, methodology, recommendations, and follow-up targets. `frontend/src/v2/ResearchWorkspace.tsx` combines evidence and respondent browsing with one target-aware composer: a cohort target runs fan-out follow-up, while an individual target uses a persisted cumulative interview thread.
 
 ## Server-Persisted Flow

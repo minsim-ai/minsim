@@ -37,6 +37,29 @@ the snapshot through `/api/intake/sessions`, links it to a run, validates the
 envelope, and rejects `unreviewed_assumption_count > 0`. New intake behavior must
 be implemented in the React planner and covered by the shared intake fixtures.
 
+## Project-Backed Initialization Contract
+
+The project-scoped V2 route initializes the canonical planner before rendering its
+first assistant action. `frontend/src/v2/projectIntake.ts` may seed slots from the
+saved project only under these rules:
+
+- the simulation type comes from the user's explicit type selection and remains
+  visible throughout intake.
+- project name, description, product context, features, prices, target notes, and
+  alternatives are treated as `user` provenance with `saved project context`
+  evidence.
+- a critical slot already satisfied by saved project context must not be asked
+  again. The planner starts at the first genuinely missing field instead of the
+  generic goal question.
+- initialization must not infer new facts from the project or copy a raw chat
+  transcript. Generated and inferred values still require the existing review
+  gates.
+
+When the planner returns `show_form`, fields render as a single question/answer
+column with field-specific examples. The free-text composer is present only for
+`ask_question`; it is removed while a structured form, candidate review,
+assumption review, or run-ready action is active.
+
 ## Request Contract
 
 `RunCreateRequest` may include:

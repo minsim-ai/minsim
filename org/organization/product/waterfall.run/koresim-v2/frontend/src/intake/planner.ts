@@ -92,6 +92,10 @@ export function planNextAction(session: IntakeSession): IntakeAction {
   return planPreparedAction(materializeIntakeDefaults(session));
 }
 
+export function prepareIntakeSession(session: IntakeSession): IntakeSession {
+  return withPlannedAction(session);
+}
+
 function planPreparedAction(session: IntakeSession): IntakeAction {
   const taskFrame = session.taskFrame;
   if (!taskFrame) {
@@ -135,7 +139,7 @@ function planGenericSimulationAction(session: IntakeSession): IntakeAction {
     const target = missingCritical[0];
     return {
       type: "ask_question",
-      message: `${withObjectParticle(pack.label)} 실행하려면 먼저 ${target.label}이 필요합니다. ${questionHelpText(target.id)}`,
+      message: `${withObjectParticle(pack.label)} 실행하려면 먼저 ${withSubjectParticle(target.label)} 필요합니다. ${questionHelpText(target.id)}`,
       slotIds: [target.id],
     };
   }
@@ -311,6 +315,14 @@ function withObjectParticle(label: string): string {
   const code = last.charCodeAt(0);
   if (code < 0xac00 || code > 0xd7a3) return `${label}를`;
   return (code - 0xac00) % 28 === 0 ? `${label}를` : `${label}을`;
+}
+
+function withSubjectParticle(label: string): string {
+  const last = label.trim().at(-1);
+  if (!last) return label;
+  const code = last.charCodeAt(0);
+  if (code < 0xac00 || code > 0xd7a3) return `${label}이`;
+  return (code - 0xac00) % 28 === 0 ? `${label}가` : `${label}이`;
 }
 
 function questionHelpText(slotId: string): string {

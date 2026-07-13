@@ -6,6 +6,8 @@ import { advanceIntakeSession, createInitialIntakeSession } from "./planner";
 import { createSlot } from "./slotUtils";
 import type { IntakeEvaluationFixture } from "./fixtures/types";
 import type { IntakeAction, IntakeSession } from "./types";
+import { createProjectIntakeSession } from "../v2/projectIntake";
+import type { ProjectResponse } from "../types/api";
 
 export type IntakeFixtureCheckResult = {
   ok: boolean;
@@ -25,11 +27,55 @@ export function runIntakeFixtureCheck(): IntakeFixtureCheckResult {
   failures.push(...checkPricePayloadRegression());
   failures.push(...checkPriceOptionalFormDoesNotLoop());
   failures.push(...checkSampleSizePolicy());
+  failures.push(...checkProjectContextIntake());
   return {
     ok: failures.length === 0,
     failures,
     checked: fixtures.length,
   };
+}
+
+function checkProjectContextIntake(): string[] {
+  const baseProject: ProjectResponse = {
+    project_id: "project-fixture",
+    user_id: "user-fixture",
+    name: "사주·점성술 앱",
+    description: "사주앱을 쓰는 사람은 어떤 사람들일까",
+    product_context: { product_description: "오늘의 운세와 궁합을 제공하는 구독형 사주 앱" },
+    features: ["오늘의 운세", "궁합"],
+    prices: [],
+    target_notes: "20~50대 모바일 사용자",
+    alternatives: [],
+    created_at: "2026-07-13T00:00:00Z",
+    updated_at: "2026-07-13T00:00:00Z",
+    archived_at: null,
+  };
+  const market = createProjectIntakeSession(baseProject, "market_segmentation");
+  const churn = createProjectIntakeSession({
+    ...baseProject,
+    name: "어르신 동반 강아지 로봇",
+    description: "무료 체험 뒤 재구독률이 낮아지고 있습니다.",
+    product_context: { product_description: "어르신 말벗 로봇 월 구독 서비스" },
+  }, "churn_prediction");
+  const failures: string[] = [];
+  const genericQuestion = "어떤 결정을 돕고 싶으신가요? 제품, 캠페인, 가격, 메시지 고민을 편하게 적어주세요.";
+
+  if (market.messages.some((message) => message.content === genericQuestion)) {
+    failures.push("project intake: must not repeat the generic decision question");
+  }
+  if (market.slots.category?.value !== baseProject.name || market.slots.category?.source !== "user") {
+    failures.push("project intake: market category must reuse user-owned project context");
+  }
+  if (market.action?.type === "ask_question" && market.action.slotIds.includes("category")) {
+    failures.push("project intake: must not ask for a saved market category again");
+  }
+  if (churn.action?.type !== "ask_question" || !churn.action.slotIds.includes("trigger_event") || churn.action.slotIds.includes("service_name")) {
+    failures.push(`project intake: churn should reuse service name and ask the next missing question, got ${churn.action?.type}`);
+  }
+  if (churn.messages.some((message) => message.content.includes("트리거이"))) {
+    failures.push("project intake: Korean subject particle must be grammatically correct");
+  }
+  return failures;
 }
 
 function checkSampleSizePolicy(): string[] {

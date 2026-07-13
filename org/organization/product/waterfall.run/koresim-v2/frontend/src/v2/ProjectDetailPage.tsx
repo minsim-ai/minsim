@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
+import { ArrowRight, ClockCounterClockwise } from '@phosphor-icons/react'
 import { archiveProject, getProject, listProjectRuns, updateProject } from '../api/projects'
 import type { ProjectResponse, ProjectRunItem } from '../types/api'
+import { getSimulationLabel } from '../simulations/registry'
 import { navigateTo } from './navigation'
 
 export function ProjectDetailPage({ projectId }: { projectId: string }) {
@@ -123,23 +125,78 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
       </div>
 
       <section className="v2-report-section">
-        <h2>실행 이력</h2>
+        <div className="v2-run-history-head">
+          <div>
+            <p className="v2-kicker">Run history</p>
+            <h2>실행 이력</h2>
+          </div>
+          <span>{runs.length.toLocaleString('ko-KR')}개</span>
+        </div>
         <div className="v2-run-list">
-          {runs.map((item) => (
-            <button
-              key={item.run.run_id}
-              type="button"
-              onClick={() => navigateTo(`/results?project_id=${encodeURIComponent(projectId)}&run_id=${encodeURIComponent(item.run.run_id)}`)}
-            >
-              <span>{item.run_label ?? item.run.simulation_type}</span>
-              <small>{item.run.status} · {item.run.done_count}/{item.run.total_count}</small>
-            </button>
-          ))}
-          {runs.length === 0 && <p className="v2-muted">아직 실행한 시뮬레이션이 없습니다.</p>}
+          {runs.map((item) => <RunHistoryRow item={item} projectId={projectId} key={item.run.run_id} />)}
+          {runs.length === 0 && (
+            <div className="v2-run-empty">
+              <ClockCounterClockwise size={24} aria-hidden="true" />
+              <strong>아직 실행한 시뮬레이션이 없습니다</strong>
+              <span>새 시뮬레이션을 시작하면 상태와 결과가 시간순으로 쌓입니다.</span>
+            </div>
+          )}
         </div>
       </section>
     </section>
   )
+}
+
+function RunHistoryRow({ item, projectId }: { item: ProjectRunItem; projectId: string }) {
+  const { run } = item
+  const active = run.status === 'queued' || run.status === 'running'
+  const completed = run.status === 'completed' && run.result_available
+  const navigable = active || completed
+  const href = active
+    ? `/loading?project_id=${encodeURIComponent(projectId)}&run_id=${encodeURIComponent(run.run_id)}`
+    : `/results?project_id=${encodeURIComponent(projectId)}&run_id=${encodeURIComponent(run.run_id)}`
+  const pct = Math.round(run.progress_pct)
+
+  return (
+    <button
+      className={`v2-run-history-row status-${run.status}`}
+      type="button"
+      disabled={!navigable}
+      onClick={() => navigable && navigateTo(href)}
+    >
+      <span className={`v2-run-status status-${run.status}`}>{runStatusLabel(run.status)}</span>
+      <span className="v2-run-history-copy">
+        <strong>{getSimulationLabel(run.simulation_type)}</strong>
+        <small>{item.run_label || `${getSimulationLabel(run.simulation_type)} 실행`}</small>
+      </span>
+      <span className="v2-run-history-progress">
+        <span>{run.done_count.toLocaleString('ko-KR')} / {run.total_count.toLocaleString('ko-KR')}명</span>
+        <i aria-hidden="true"><b style={{ width: `${pct}%` }} /></i>
+      </span>
+      <time dateTime={item.created_at}>{formatRunDate(item.created_at)}</time>
+      {navigable && <ArrowRight size={18} aria-hidden="true" />}
+    </button>
+  )
+}
+
+function runStatusLabel(status: ProjectRunItem['run']['status']): string {
+  return ({
+    queued: '대기 중',
+    running: '진행 중',
+    completed: '완료',
+    failed: '실패',
+    canceled: '취소됨',
+    interrupted: '중단됨',
+  } as const)[status]
+}
+
+function formatRunDate(value: string): string {
+  return new Intl.DateTimeFormat('ko-KR', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value))
 }
 
 function splitLines(value: string, options: { splitCommas?: boolean } = {}): string[] {
