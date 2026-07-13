@@ -25,8 +25,8 @@ related: [[CLAUDE]], [[README]], [[../design/llm-gateway-orchestration]], [[../d
 ## Design Position
 
 Phase 7의 기본 경계는 완료됐다. 2026-07-13 provider 정책은 Solar Pro 2 목표,
-Gemini temporary live compatibility/rollback, Ollama 비지원이다. Solar credential과
-격리 10명 검증은 완료됐으며 production 10 → 50 → 200 검증 전에는 전환 완료로 보지 않는다.
+Gemini rollback compatibility, Ollama 비지원이다. Solar credential, 격리 10명,
+production external MCP 10 → 50 → 200 검증이 모두 완료됐다.
 
 Recommended first stack:
 
@@ -70,7 +70,7 @@ Cloudflare AI Gateway는 Phase 7 범위에서 제외한다. Cloudflare는 Tunnel
 - [x] **7.16** Analysis → Report → QA를 실제 compiled LangGraph node로 실행하고 node별 checkpoint 저장
 - [x] **7.17** strict backend/alias validation, public health redaction, QA quality gate 적용
 - [x] **7.18** LiteLLM active alias를 `koresim/solar-*`로 전환하고 Ollama route 제거
-- [ ] **7.19** `UPSTAGE_API_KEY` 주입 후 Solar 10 → 50 → 200 live gate
+- [x] **7.19** `UPSTAGE_API_KEY` 주입 후 Solar 10 → 50 → 200 live gate
 
 ## Contracts
 
@@ -137,7 +137,7 @@ Provider prompt policy:
 - [x] Actual result-agent LangGraph exists and does not replace persona fanout.
 - [x] Base persona dataset remains immutable.
 - [x] Ollama is absent from the supported backend allowlist and active LiteLLM config.
-- [ ] Live Solar validation passes after credential provisioning.
+- [x] Live Solar validation passes after credential provisioning.
 
 ## Historical and Current Validation Evidence
 
@@ -173,6 +173,10 @@ current provider policy.
   completed but recorded 43 provider rate-limit errors; all 157 successful
   responses matched the required format. Provider-aware bounded backoff was added
   under a regression test before rerunning the 200-person gate.
+- 2026-07-13: external MCP rerun `fb6a4ced-4d9f-4658-82b8-fb9c70432643`
+  passed 200/200 with 0 parse failures, quality A, 8 recovered retries, 0 warnings,
+  and LLM-backed Upstage Analysis/Report/QA. Phase 7.19 is complete; evidence is
+  `docs/verification/solar-pro2-external-mcp-live-gate-2026-07-13.json`.
 
 ## Risks
 

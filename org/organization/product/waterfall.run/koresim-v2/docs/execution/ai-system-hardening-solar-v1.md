@@ -4,7 +4,7 @@ type: execution-plan
 tags: [ai-system, solar, security, intake, orchestration, trust]
 created: 2026-07-13
 updated: 2026-07-13
-status: solar-live-gate-remediation
+status: complete
 related: [[../design/llm-gateway-orchestration]], [[ai-agent-improvement-loop-v1]], [[agentic-intake-layer-v2]]
 ---
 
@@ -15,7 +15,7 @@ related: [[../design/llm-gateway-orchestration]], [[ai-agent-improvement-loop-v1
 - [x] Execution plan id: `ai-system-hardening-solar-v1`
 - [x] Target phase: Phase 5/7 post-demo productization
 - [x] Owner: Codex
-- [x] Status: solar-live-gate-remediation
+- [x] Status: complete
 - [x] Created/updated: 2026-07-13
 
 ## 1. Objective
@@ -30,7 +30,7 @@ related: [[../design/llm-gateway-orchestration]], [[ai-agent-improvement-loop-v1
 | --- | --- | --- | --- |
 | [x] | 공개 health/config | 내부 경로와 provider 설정 노출 | 공개 응답은 최소 상태/제품 계약만, 상세 응답은 인증 필요 |
 | [x] | 모델 backend | 알 수 없는 backend가 Gemini로 묵시적 fallback | `upstage`, `gemini`, `litellm`, `fake`만 허용하고 나머지는 즉시 실패 |
-| [ ] | 프로덕션 모델 | 로컬 `.env` Upstage 설정 및 격리 10명 통과 | Upstage `solar-pro2` 배포 후 10 → 50 → 200 live gate |
+| [x] | 프로덕션 모델 | 로컬 `.env` Upstage 설정 및 격리 10명 통과 | Upstage `solar-pro2` 배포 후 10 → 50 → 200 live gate |
 | [x] | Ollama | 문서와 LiteLLM config에 활성 fallback | 운영 범위에서 제거, 과거 검증 기록만 보존 |
 | [x] | 모델 override | 요청 alias allowlist 없음 | 운영 설정에 등록된 alias만 허용 |
 | [x] | 결과 모델 기록 | 요청 alias가 없으면 `model_alias=null` 가능 | 실제 resolved alias/provider model 기록 |
@@ -129,3 +129,8 @@ related: [[../design/llm-gateway-orchestration]], [[ai-agent-improvement-loop-v1
   contained the required choice label, isolating the failure from parser format.
   A failing regression test reproduced the immediate-retry bug; the implementation
   now honors provider retry headers and otherwise uses bounded exponential backoff.
+- 2026-07-13: backoff commit `3b69848` passed the full gate with 206 tests and
+  89.32% coverage, then deployed successfully. External MCP 200-person rerun
+  `fb6a4ced-4d9f-4658-82b8-fb9c70432643` passed 200/200 with 0 parse failures,
+  quality A, 8 recovered retries, no warnings, and Upstage LLM Analysis/Report/QA.
+  Evidence: `docs/verification/solar-pro2-external-mcp-live-gate-2026-07-13.json`.

@@ -1,0 +1,110 @@
+{
+  "schema_version": "solar-live-gate/v1",
+  "validated_at": "2026-07-13",
+  "transport": {
+    "type": "external_mcp_streamable_http",
+    "url": "https://arabesque.cc/mcp",
+    "authentication": "dedicated_bearer_key_from_ignored_local_env"
+  },
+  "runtime": {
+    "provider": "upstage",
+    "model": "solar-pro2",
+    "credential_value_recorded": false,
+    "raw_results_recorded": false,
+    "trace_policy": "metadata_only"
+  },
+  "project_id": "693c1561-f0a0-4323-b511-7a9cf819bdf7",
+  "ordered_gate": [
+    {
+      "run_id": "1bff6a38-b126-42ad-becd-fb5935712201",
+      "seed": 4242,
+      "sample_size": 10,
+      "elapsed_seconds": 16.044,
+      "total_responses": 10,
+      "parse_failed": 0,
+      "parse_success_rate": 100.0,
+      "quality_grade": "B",
+      "agent_qa_severity": "directional_only",
+      "review_required": true,
+      "warning_count": 5,
+      "observed_calls": 10,
+      "retry_count_total": 0,
+      "status": "passed_directional_small_sample"
+    },
+    {
+      "run_id": "bef71b41-fb64-4c55-9181-bb359c35de3a",
+      "seed": 4243,
+      "sample_size": 50,
+      "elapsed_seconds": 21.564,
+      "total_responses": 50,
+      "parse_failed": 0,
+      "parse_success_rate": 100.0,
+      "quality_grade": "A",
+      "agent_qa_severity": "pass",
+      "review_required": false,
+      "warning_count": 0,
+      "observed_calls": 50,
+      "retry_count_total": 0,
+      "status": "passed"
+    },
+    {
+      "run_id": "fb6a4ced-4d9f-4658-82b8-fb9c70432643",
+      "seed": 4245,
+      "sample_size": 200,
+      "elapsed_seconds": 75.042,
+      "total_responses": 200,
+      "parse_failed": 0,
+      "parse_success_rate": 100.0,
+      "quality_grade": "A",
+      "agent_qa_severity": "pass",
+      "review_required": false,
+      "warning_count": 0,
+      "observed_calls": 200,
+      "retry_count_total": 8,
+      "status": "passed"
+    }
+  ],
+  "result_agents": {
+    "required": ["analysis", "report", "qa"],
+    "mode": "llm",
+    "provider": "upstage",
+    "provider_model": "solar-pro2",
+    "prompt_versions": {
+      "analysis": "analysis:v2-20260512",
+      "report": "report:v2-20260512",
+      "qa": "qa:v2-20260512"
+    }
+  },
+  "remediation_evidence": {
+    "initial_200_run_id": "68a6d391-fcad-4c67-ba5e-f2738c562550",
+    "initial_total_responses": 200,
+    "initial_parse_failed": 43,
+    "initial_parse_success_rate": 78.5,
+    "root_cause": "provider_rate_limit",
+    "successful_responses_with_required_choice_label": 157,
+    "fix": "provider_retry_after_or_bounded_exponential_backoff",
+    "production_tuning": {
+      "concurrency": 4,
+      "retry_attempts": 3,
+      "backoff_seconds": 5,
+      "max_backoff_seconds": 30
+    }
+  },
+  "repository_gate": {
+    "command": "uv run python scripts/verify.py",
+    "tests_passed": 206,
+    "backend_coverage_pct": 89.32,
+    "frontend_lint": "passed",
+    "frontend_typecheck": "passed",
+    "frontend_build": "passed"
+  },
+  "production_readiness": {
+    "external_origin": "passed",
+    "provider_model_probe": "passed",
+    "redis": "passed",
+    "rq_worker_count": 1,
+    "sqlite": "passed",
+    "cloudflare_tunnel": "passed"
+  },
+  "status": "passed"
+}

@@ -15,7 +15,7 @@ status: hardening-deployed-solar-live-pending
 
 - **제품**: KoreaSim — 한국형 AI 인간 행동 시뮬레이션 B2B SaaS
 - **데이터**: NVIDIA Nemotron-Personas-Korea (100만 한국 페르소나, 26필드)
-- **LLM 백엔드**: provider-agnostic `LLMClient` + Upstage `solar-pro2`. Upstage key는 Git 밖 로컬 환경에 설치됐고 운영 프로세스가 Solar로 전환됐다. 외부 10/50명은 통과했으며 최초 200명에서 provider rate limit 43건이 발생해 bounded retry/backoff 보완 후 재검증 중이다. Gemini는 명시적 rollback compatibility, Ollama는 운영 backend/fallback으로 사용하지 않는다.
+- **LLM 백엔드**: provider-agnostic `LLMClient` + Upstage `solar-pro2`. Upstage key는 Git 밖 로컬 환경에 설치됐고 운영 프로세스가 Solar로 전환됐다. 외부 MCP 10 → 50 → 200 gate가 provider-aware bounded retry/backoff 보완 후 통과했다. Gemini는 명시적 rollback compatibility, Ollama는 운영 backend/fallback으로 사용하지 않는다.
 - **공식 외부 데모**: React + FastAPI
 - **Fallback**: Streamlit `app.py`는 내부 운영/백업용
 - **배포 도메인**: `https://arabesque.cc`
@@ -26,7 +26,7 @@ status: hardening-deployed-solar-live-pending
 - **진행률**: SSE, polling fallback
 - **영속화**: SQLite job/result store
 - **작업 큐**: Redis + RQ worker
-- **현재 외부 LLM provider**: Upstage Solar Pro 2 (10/50 live passed; 200 rate-limit remediation pending)
+- **현재 외부 LLM provider**: Upstage Solar Pro 2 (external MCP 10/50/200 live gate passed)
 - **Rollback compatibility provider**: Gemini API
 - **Observability**: Langfuse, metadata-only 기본값
 - **LLM Gateway 계획**: [[docs/design/llm-gateway-orchestration]]
@@ -114,12 +114,12 @@ uv run python scripts/check_mac_studio_production.py --external --timeout-second
 
 ## 현재 활성 Phase
 
-**Phase 5/7: Post-demo hardening + Solar live validation**
+**Phase 5/7: Post-demo productization**
 
 Phase 1 tunnel, Phase 2 stability, public external route gate, Phase 4 trust content,
 and Phase 5 simulation expansion are validated. Phase 7 code hardening is complete;
-the remaining release dependency is Solar production activation and ordered live
-validation, followed by V2 research and product polish.
+Solar production activation and ordered live validation are complete. Remaining
+work is release operation, V2 research, and product polish.
 
 Current status:
 
@@ -139,7 +139,7 @@ Current status:
 - Public `arabesque.cc` route gate passed with `/`, `/app`, `/results`, `/api/health`, and `/api/config` returning origin responses without Cloudflare Access markers. External SSE replay returned snapshot/progress events for a completed 200-person run.
 - Historical note: May 2026 Ollama artifacts remain for audit evidence only and do not represent the current supported provider policy.
 - AI hardening commit `6da43ef` was deployed on 2026-07-13. The external Mac Studio readiness check passed for the landing page, redacted public health/config, app-auth boundary, Redis, one active RQ worker, SQLite, and Cloudflare Tunnel.
-- Solar activation progress: `UPSTAGE_API_KEY` is present only in the ignored local `.env`; isolated run `901bbb2f-4f18-4f6b-b602-56b181025123` completed with 10 responses and 0 parse failures. Production readiness then passed with `upstage` / `solar-pro2`. External MCP runs `1bff6a38-b126-42ad-becd-fb5935712201` (10/10, 0 failures) and `bef71b41-fb64-4c55-9181-bb359c35de3a` (50/50, 0 failures) passed. Run `68a6d391-fcad-4c67-ba5e-f2738c562550` completed 200 responses but 43 were Upstage rate-limit errors; immediate retry was identified as ineffective and provider-aware bounded backoff is being deployed before the 200-person rerun.
+- Solar activation complete: `UPSTAGE_API_KEY` is present only in the ignored local `.env`; isolated run `901bbb2f-4f18-4f6b-b602-56b181025123` completed with 10 responses and 0 parse failures. Production readiness passed with `upstage` / `solar-pro2`. External MCP runs `1bff6a38-b126-42ad-becd-fb5935712201` (10/10, 0 failures) and `bef71b41-fb64-4c55-9181-bb359c35de3a` (50/50, 0 failures) passed. Initial 200 run `68a6d391-fcad-4c67-ba5e-f2738c562550` exposed 43 rate-limit errors; provider-aware bounded backoff fixed the issue, and rerun `fb6a4ced-4d9f-4658-82b8-fb9c70432643` passed 200/200 with 0 failures, quality A, no warnings, and Upstage LLM Analysis/Report/QA. Artifact: `docs/verification/solar-pro2-external-mcp-live-gate-2026-07-13.json`.
 
 ## 전체 Phase 진행 현황
 

@@ -4,7 +4,7 @@ type: runbook
 tags: [llm, solar, upstage, litellm, langfuse, observability]
 created: 2026-07-13
 updated: 2026-07-13
-status: solar-live-gate-remediation
+status: live-validated
 related: [[../design/llm-gateway-orchestration]], [[../execution/ai-system-hardening-solar-v1]], [[../design/data-governance-and-io-boundary]]
 ---
 
@@ -14,15 +14,14 @@ related: [[../design/llm-gateway-orchestration]], [[../execution/ai-system-harde
 
 | 항목 | AS-IS | TO-BE |
 | --- | --- | --- |
-| live backend | Upstage direct (`LLM_BACKEND=upstage`) | 200-person rate-limit remediation 후 최종 승인 |
-| target model | `solar-pro2`; live 10/50 통과 | live 200 재검증 |
+| live backend | Upstage direct (`LLM_BACKEND=upstage`) | 유지 및 canary monitoring |
+| target model | `solar-pro2`; live 10/50/200 통과 | 품질·비용 benchmark 지속 |
 | Solar credential | ignored local `.env`에 설치 | secret manager 또는 local `.env`에만 유지 |
 | local fallback | 과거 Ollama 검증 기록 존재 | 운영 fallback 없음; Ollama backend 비지원 |
 | tracing | Langfuse metadata-only | 동일 정책 + latency/usage/retry metadata |
 
-Solar 코드, 설정, 자격증명, 격리 10명 검증과 production 10/50 검증은 통과했다.
-첫 200명 실행은 rate limit으로 실패했으므로 bounded backoff 보완 후 200명을
-재검증한 뒤에만 전환 완료로 기록한다. Gemini는 명시적 rollback 경로다.
+Solar 코드, 설정, 자격증명, 격리 10명 및 production external MCP 10/50/200
+검증이 통과했다. Gemini는 명시적 rollback 경로이며 자동 fallback은 없다.
 
 ## 2. Required Secrets
 
@@ -185,5 +184,10 @@ API와 worker를 재시작하고 readiness를 다시 실행한다. 미지원 bac
   but 43 were provider rate-limit errors. All 157 provider successes contained the
   required choice label. Immediate retry was replaced with provider-header-aware,
   bounded exponential backoff; final 200-person rerun remains required.
+- 2026-07-13: backoff build deployed and readiness passed. External MCP rerun
+  `fb6a4ced-4d9f-4658-82b8-fb9c70432643` completed 200/200 with 0 parse failures,
+  quality A, 8 recovered retries, no warnings, and Upstage LLM Analysis/Report/QA.
+  The ordered 10 → 50 → 200 live gate is complete. Artifact:
+  `docs/verification/solar-pro2-external-mcp-live-gate-2026-07-13.json`.
 
 실제 Solar 명령/API/browser 검증이 통과하기 전에는 live 항목을 완료 처리하지 않는다.
