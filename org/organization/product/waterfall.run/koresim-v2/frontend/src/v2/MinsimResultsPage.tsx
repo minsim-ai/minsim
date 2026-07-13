@@ -161,7 +161,7 @@ export function MinsimResultsPage({ projectId, runId }: { projectId: string | nu
         <ResultDisclosure title="AI 해석 보고서"><AiReport report={report} /></ResultDisclosure>
         <ResultDisclosure title="주요 지표 해석"><MarketResponse report={report} /></ResultDisclosure>
         <ResultDisclosure title="연령대별 선호 전체표"><AgeFullTable report={report} /></ResultDisclosure>
-        <ResultDisclosure title="세그먼트 반응 매트릭스"><SegmentMatrix report={report} /></ResultDisclosure>
+        <ResultDisclosure title="지역·성별 반응"><SegmentMatrix report={report} /></ResultDisclosure>
         <ResultDisclosure title="기회·리스크 통합 맵"><OpportunityRiskMap report={report} /></ResultDisclosure>
         <ResearchWorkspace projectId={projectId} runId={runId} report={report} />
         <div id="result-method" />
@@ -600,13 +600,13 @@ function AgeFullTable({ report }: { report: MinsimReport }) {
 }
 
 function SegmentMatrix({ report }: { report: MinsimReport }) {
-  const { ageRows, gender, regions, creatives } = report
+  const { gender, regions, creatives } = report
   const [region, setRegion] = useState<MinsimRegion | null>(null)
   const legend = [...creatives].sort((a, b) => a.id.localeCompare(b.id))
   const totalRegionN = regions.reduce((sum, item) => sum + item.n, 0)
   return (
     <section style={{ padding: '40px 0' }}>
-      <SectionHead kicker="세그먼트 표" title="세그먼트 반응 매트릭스" />
+      <SectionHead kicker="세그먼트 분석" title="지역·성별 반응" />
       <div className="row" style={{ gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
         {legend.map((creative) => (
           <span key={creative.id} className="row lbl" style={{ gap: 6, fontSize: 12 }}>
@@ -615,27 +615,6 @@ function SegmentMatrix({ report }: { report: MinsimReport }) {
           </span>
         ))}
       </div>
-
-      {ageRows.length > 0 && (
-        <div className="card" style={{ padding: 20, marginBottom: 12 }}>
-          <div className="lbl-mono" style={{ marginBottom: 16 }}>연령대별 반응</div>
-          <div className="col" style={{ gap: 12 }}>
-            {ageRows.map((row) => (
-              <div key={row.label} className="row" style={{ gap: 14 }}>
-                <span className="lbl" style={{ width: 48, fontSize: 12.5 }}>
-                  {row.label}
-                  <br />
-                  <span className="faint">{row.n}명</span>
-                </span>
-                <div style={{ flex: 1 }}>
-                  <StackBar parts={row.parts} />
-                </div>
-                <span className="lbl-mono" style={{ width: 130, textAlign: 'right' }}>{row.parts.map(([id, pct]) => `${id} ${pct}`).join(' · ')}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {regions.length > 0 && (
         <div className="region-map-layout">
