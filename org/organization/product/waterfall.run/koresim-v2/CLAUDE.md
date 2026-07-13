@@ -37,6 +37,7 @@ status: hardening-deployed-solar-live-pending
 - **Data Governance**: [[docs/design/data-governance-and-io-boundary]] — 제품 저장소의 full raw와 외부 provider/observability payload 정책을 분리한다.
 - **Evaluation Framework**: [[docs/design/evaluation-framework]] — schema/import, deterministic fixture, live local run, provider comparison eval을 gate별로 분리한다.
 - **Persona Simulation Protocol Engine**: [[docs/design/persona-simulation-protocol-engine]] — `price_optimization` 안에서 versioned protocol로 `price_research_v2`를 확장한다.
+- **MCP Server**: [[docs/design/mcp-server-integration]] — 배포된 custom MCP foundation을 official SDK Streamable HTTP + remote OAuth resource server로 harden한다. 실행계획: [[docs/execution/mcp-production-hardening-v1]].
 
 ## 현재 배포 방식
 
@@ -125,6 +126,7 @@ Current status:
 - Phase 5 implementation is complete: all 9 simulations have schemas, presets, registry entries, API/RQ worker execution, common result envelopes, trust-layer rendering, React result renderer registry support, V1 crowd visualization, and live external 200-person validation.
 - Phase 7 hardening is complete at the code gate: strict backend/model allowlists, Solar aliases, actual Analysis → Report → QA LangGraph execution, checkpoint persistence, QA/review quality gates, and metadata-only telemetry are implemented. Gemini remains live only until an Upstage credential is provisioned and Solar validation passes; Ollama is unsupported in the runtime allowlist/config.
 - App-level auth is implemented for the current React+FastAPI architecture: `GET /api/auth/session`, Google OAuth login/callback/logout, signed session cookie, disabled-by-default test login for E2E, and login enforcement for `/app*`, `/results*`, and run/preset/export APIs when auth is configured.
+- MCP foundation is implemented and live at `/mcp` with shared project services, 9 tools, protected-resource metadata, and ownership-aware tests. Production remote MCP interoperability remains planned: the current endpoint uses a custom JSON-RPC transport and browser session cookie, so official SDK transport, audience-bound Bearer/OAuth, idempotency, and target-client E2E are tracked in [[docs/execution/mcp-production-hardening-v1]].
 - Run cancellation and human-review JSON export are implemented as post-demo product controls. Export excludes `raw_results` and requires human review before external sharing.
 - Agentic Intake Layer V2 uses React planner `intake-planner:v3-20260713` as the single V2 planning policy. FastAPI persists `/api/intake/sessions`, links sessions to runs, rejects unreviewed assumptions, and passes only `safe_intake_summary` to result agents. `/api/intake/advance` is deprecated compatibility only.
 - Persona Simulation Performance Upgrade V1 is in progress: slices now include `price_research_v2` as a versioned `price_optimization` protocol, `product_qa_v1` as a versioned `value_proposition` protocol, aggregate calibration metadata, deterministic interview guide generation, result envelope `protocol` metadata, React metric rendering, and fake LLM benchmark artifact generation.
