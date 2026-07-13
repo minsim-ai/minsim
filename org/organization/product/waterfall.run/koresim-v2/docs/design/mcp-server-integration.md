@@ -42,6 +42,9 @@ Target:
 - 인증 없는 live `initialize` 요청은 `401`과 `WWW-Authenticate`를 반환한다.
 - private-pilot Bearer key는 web session과 분리된 MCP identity로 매핑되며,
   constant-time key comparison과 Origin allowlist를 적용한다.
+- 2026-07-13 external private-pilot smoke에서 authenticated initialize, tools/list,
+  list_projects가 HTTP 200으로 통과했고 invalid key는 401, untrusted Origin은 403을
+  반환했다.
 - 최초 구현 commit은 `553856c` (`feat: add authenticated mcp endpoint`), 문서 commit은
   `c211082` (`docs: document minsim v2 ux and mcp`)다.
 

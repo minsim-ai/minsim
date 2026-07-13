@@ -4,7 +4,7 @@ type: execution-plan
 tags: [mcp, oauth, streamable-http, interoperability, security]
 created: 2026-07-13
 updated: 2026-07-13
-status: in-progress-private-api-key-pilot
+status: private-api-key-pilot-deployed-oauth-pending
 related: [[../design/mcp-server-integration]], [[minsim-v2-ux-and-mcp]], [[../design/data-governance-and-io-boundary]], [[../design/harness-engineering-controls]], [[../runbooks/app-auth-operations]]
 ---
 
@@ -16,7 +16,7 @@ related: [[../design/mcp-server-integration]], [[minsim-v2-ux-and-mcp]], [[../de
 - [x] Target phase: Phase 5/7 post-demo productization
 - [x] Related design doc: [[../design/mcp-server-integration]]
 - [x] Owner: Codex + product owner
-- [x] Status: in progress; private API-key pilot approved, full OAuth pending
+- [x] Status: private API-key pilot deployed; full OAuth pending
 - [x] Created: 2026-07-13
 - [x] Updated: 2026-07-13
 
@@ -202,8 +202,8 @@ Private pilot slice:
 - [x] Map the credential to a configured KoreaSim user identity and normal quota.
 - [x] Compare the key in constant time and reject keys shorter than 32 characters.
 - [x] Reject untrusted browser `Origin` headers.
-- [ ] Generate/store the production pilot key outside git and restart the API.
-- [ ] Complete authenticated external initialize/tools/list smoke tests.
+- [x] Generate/store the production pilot key outside git and restart the API.
+- [x] Complete authenticated external initialize/tools/list smoke tests.
 
 ### 5.4 Tool/resource/prompt contract completion
 
@@ -366,10 +366,15 @@ uv run python scripts/check_mac_studio_production.py --external --timeout-second
 - [x] 2026-07-13: `uv run python -m pytest tests/test_mcp_http.py -q` — 3 passed.
 - [x] 2026-07-13: `uv run python scripts/verify.py` — Ruff, deterministic evals,
   202 backend tests, 89.33% coverage, frontend lint/typecheck/build passed.
+- [x] 2026-07-13: private-pilot change gate — 205 backend tests, 89.33% coverage,
+  Ruff, deterministic evals, frontend lint/typecheck/build passed.
 - [x] 2026-07-13: live protected-resource metadata returned HTTP 200 with
   `resource=https://arabesque.cc/mcp`.
 - [x] 2026-07-13: unauthenticated live initialize returned HTTP 401 and
   `WWW-Authenticate` metadata pointer.
+- [x] 2026-07-13: external Bearer pilot initialize, tools/list, and list_projects
+  returned HTTP 200; 9 tools were advertised; invalid key returned 401 and untrusted
+  Origin returned 403.
 - [ ] Official client authenticated interoperability has not yet been demonstrated.
 - [ ] Production OAuth token flow has not yet been implemented or validated.
 
