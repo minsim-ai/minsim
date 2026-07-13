@@ -12,9 +12,9 @@ related: [[../../README]], [[react-fastapi-migration]], [[harness-engineering-co
 
 ## 1. Current Decision
 
-KoreaSim의 목표 provider는 Upstage `solar-pro2`다. 운영 환경에는 아직
-`UPSTAGE_API_KEY`가 없으므로 live backend는 일시적으로 Gemini를 유지한다.
-자격증명 없이 backend만 바꿔 서비스 장애를 만들지 않는다.
+KoreaSim의 목표 provider는 Upstage `solar-pro2`다. `UPSTAGE_API_KEY`는 Git 밖
+로컬 환경에 설치됐고 격리 10명 Solar run이 통과했다. 현재 실행 중인 운영
+프로세스는 재시작과 10 → 50 → 200 live gate 전까지 기존 Gemini 설정을 유지한다.
 
 Ollama는 현재 제품·운영 fallback이 아니다. 과거 검증 artifact와 adapter는
 감사 기록/호환 코드로 남길 수 있지만, 지원 backend allowlist와 LiteLLM 활성
@@ -22,7 +22,7 @@ Ollama는 현재 제품·운영 fallback이 아니다. 과거 검증 artifact와
 
 | 영역 | AS-IS | TO-BE / 현재 결정 |
 | --- | --- | --- |
-| 기본 provider | Gemini live, 과거 Ollama fallback 문서 | Solar Pro 2 목표; 키 주입 전만 Gemini live 유지 |
+| 기본 provider | Gemini live, 격리 Solar 10명 통과 | Solar Pro 2 운영 전환; Gemini는 명시적 rollback 전용 |
 | backend 선택 | 잘못된 값이 Gemini로 묵시적 fallback 가능 | `upstage`, `gemini`, `litellm`, `fake`만 허용하고 즉시 실패 |
 | 모델 선택 | API 요청이 임의 alias를 전달 가능 | 운영 설정에 등록된 논리 alias만 허용 |
 | persona 실행 | LangGraph로 확장될 여지가 불명확 | 50–200 fan-out은 RQ + async batch에 고정 |
@@ -93,9 +93,9 @@ Supported runtime modes:
 
 | `LLM_BACKEND` | Purpose | Release status |
 | --- | --- | --- |
-| `upstage` | direct Solar Pro 2 production target | code ready; credential/live validation pending |
+| `upstage` | direct Solar Pro 2 production target | credential + isolated validation passed; production live gate pending |
 | `litellm` | optional server-side routing to Solar aliases | config ready; live validation pending |
-| `gemini` | temporary live compatibility and rollback | currently active until Solar credential |
+| `gemini` | temporary live compatibility and rollback | active only until Solar production restart/live gate |
 | `fake` | deterministic tests/evals | supported only for non-live validation |
 
 ## 4. Intake Boundary
@@ -209,8 +209,8 @@ is intentionally operated. Do not add an implicit second gateway.
    production readiness check.
 6. Validate 10, then 50, then 200 personas. Do not skip directly to the largest run.
 
-Until step 1 is possible, Gemini remains the explicit temporary live backend.
-This is a visible dependency, not a hidden fallback.
+Steps 1–4 passed on 2026-07-13. Gemini remains the explicit temporary live backend
+only until steps 5–6 complete; this is a visible transition state, not a hidden fallback.
 
 ## 10. Acceptance Status
 
@@ -223,7 +223,8 @@ This is a visible dependency, not a hidden fallback.
 - [x] Public health is minimal and detailed health is protected.
 - [x] Langfuse remains metadata-only by default.
 - [x] Active LiteLLM config contains Solar aliases and no Ollama route.
-- [ ] Solar credential is installed and a live Solar run has passed.
+- [x] Solar credential is installed outside Git and an isolated live Solar run has passed.
+- [ ] Production Solar 10 → 50 → 200 validation has passed.
 - [ ] Solar/Gemini benchmark and real customer calibration data are available.
 
 ## 11. Historical Note

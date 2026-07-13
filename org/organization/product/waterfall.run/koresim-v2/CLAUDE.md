@@ -15,7 +15,7 @@ status: hardening-deployed-solar-live-pending
 
 - **제품**: KoreaSim — 한국형 AI 인간 행동 시뮬레이션 B2B SaaS
 - **데이터**: NVIDIA Nemotron-Personas-Korea (100만 한국 페르소나, 26필드)
-- **LLM 백엔드**: provider-agnostic `LLMClient` + Upstage `solar-pro2` 목표. 현재 runtime에는 Upstage key가 없어 Gemini를 명시적 임시 live backend로 유지하며, Ollama는 운영 backend/fallback으로 사용하지 않는다.
+- **LLM 백엔드**: provider-agnostic `LLMClient` + Upstage `solar-pro2` 목표. Upstage key는 Git 밖 로컬 환경에 설치됐고 격리 10명 검증이 통과했다. 운영 프로세스 재시작과 10 → 50 → 200 live gate 완료 전까지 현재 프로세스는 기존 Gemini 설정을 유지하며, Ollama는 운영 backend/fallback으로 사용하지 않는다.
 - **공식 외부 데모**: React + FastAPI
 - **Fallback**: Streamlit `app.py`는 내부 운영/백업용
 - **배포 도메인**: `https://arabesque.cc`
@@ -26,8 +26,8 @@ status: hardening-deployed-solar-live-pending
 - **진행률**: SSE, polling fallback
 - **영속화**: SQLite job/result store
 - **작업 큐**: Redis + RQ worker
-- **목표 외부 LLM provider**: Upstage Solar Pro 2 (credential/live validation pending)
-- **현재 live compatibility provider**: Gemini API
+- **목표 외부 LLM provider**: Upstage Solar Pro 2 (credential + isolated 10-person validation complete; production live gate pending)
+- **현재 실행 중인 live compatibility provider**: Gemini API (Solar 배포 전)
 - **Observability**: Langfuse, metadata-only 기본값
 - **LLM Gateway 계획**: [[docs/design/llm-gateway-orchestration]]
 - **Cloudflare 운영 Runbook**: [[docs/runbooks/cloudflare-tunnel-operations]]
@@ -118,13 +118,13 @@ uv run python scripts/check_mac_studio_production.py --external --timeout-second
 
 Phase 1 tunnel, Phase 2 stability, public external route gate, Phase 4 trust content,
 and Phase 5 simulation expansion are validated. Phase 7 code hardening is complete;
-the remaining release dependency is Upstage credential provisioning plus Solar live
+the remaining release dependency is Solar production activation and ordered live
 validation, followed by V2 research and product polish.
 
 Current status:
 
 - Phase 5 implementation is complete: all 9 simulations have schemas, presets, registry entries, API/RQ worker execution, common result envelopes, trust-layer rendering, React result renderer registry support, V1 crowd visualization, and live external 200-person validation.
-- Phase 7 hardening is complete at the code gate: strict backend/model allowlists, Solar aliases, actual Analysis → Report → QA LangGraph execution, checkpoint persistence, QA/review quality gates, and metadata-only telemetry are implemented. Gemini remains live only until an Upstage credential is provisioned and Solar validation passes; Ollama is unsupported in the runtime allowlist/config.
+- Phase 7 hardening is complete at the code gate: strict backend/model allowlists, Solar aliases, actual Analysis → Report → QA LangGraph execution, checkpoint persistence, QA/review quality gates, and metadata-only telemetry are implemented. The Upstage credential and isolated 10-person Solar gate passed; Gemini remains live only until production restart and ordered live validation pass. Ollama is unsupported in the runtime allowlist/config.
 - App-level auth is implemented for the current React+FastAPI architecture: `GET /api/auth/session`, Google OAuth login/callback/logout, signed session cookie, disabled-by-default test login for E2E, and login enforcement for `/app*`, `/results*`, and run/preset/export APIs when auth is configured.
 - MCP foundation is deployed at `https://arabesque.cc/mcp` with shared project services, 9 tools, protected-resource metadata, and ownership-aware tests. A dedicated environment-only Bearer API key provides a single-identity external private-pilot path with constant-time comparison and Origin filtering; it is explicitly separate from `UPSTAGE_API_KEY`. External initialize/tools/list/list_projects passed on 2026-07-13, while invalid key returned 401 and untrusted Origin returned 403. Official SDK transport, multi-user audience-bound OAuth, idempotency, and broader target-client E2E remain tracked in [[docs/execution/mcp-production-hardening-v1]].
 - Run cancellation and human-review JSON export are implemented as post-demo product controls. Export excludes `raw_results` and requires human review before external sharing.
@@ -139,7 +139,7 @@ Current status:
 - Public `arabesque.cc` route gate passed with `/`, `/app`, `/results`, `/api/health`, and `/api/config` returning origin responses without Cloudflare Access markers. External SSE replay returned snapshot/progress events for a completed 200-person run.
 - Historical note: May 2026 Ollama artifacts remain for audit evidence only and do not represent the current supported provider policy.
 - AI hardening commit `6da43ef` was deployed on 2026-07-13. The external Mac Studio readiness check passed for the landing page, redacted public health/config, app-auth boundary, Redis, one active RQ worker, SQLite, and Cloudflare Tunnel.
-- Solar activation blocker: `UPSTAGE_API_KEY` is not present in the current runtime, so no live Solar result is claimed yet.
+- Solar activation progress: `UPSTAGE_API_KEY` is present only in the ignored local `.env`; isolated run `901bbb2f-4f18-4f6b-b602-56b181025123` completed with provider `upstage`, model `solar-pro2`, 10 responses, and 0 parse failures. The repository gate then passed with 205 tests and 89.30% coverage. No production Solar completion is claimed until deployment and external 10 → 50 → 200 validation pass.
 
 ## 전체 Phase 진행 현황
 

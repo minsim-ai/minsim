@@ -182,8 +182,9 @@ progress event로 저장되어 SSE와 polling 복구에 사용된다.
 
 이 fan-out은 의도적으로 LangGraph node fan-out이 아니다. RQ가 장시간 실행·복구를,
 simulation engine이 병렬 persona 호출·parsing·집계를 담당한다. 운영 목표 provider는
-Upstage `solar-pro2`이며, credentialed live validation 전까지 Gemini가 임시 live
-backend다. Ollama runtime fallback은 지원하지 않는다.
+Upstage `solar-pro2`이며 model route는 배포 환경의 provider 설정으로 결정된다.
+Gemini는 명시적 compatibility/rollback 경로로만 남고, Ollama runtime fallback은
+지원하지 않는다.
 
 ### 5. Result-agent LangGraph
 

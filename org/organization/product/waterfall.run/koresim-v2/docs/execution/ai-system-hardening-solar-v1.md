@@ -4,7 +4,7 @@ type: execution-plan
 tags: [ai-system, solar, security, intake, orchestration, trust]
 created: 2026-07-13
 updated: 2026-07-13
-status: deployed-solar-live-pending
+status: solar-isolated-passed-live-pending
 related: [[../design/llm-gateway-orchestration]], [[ai-agent-improvement-loop-v1]], [[agentic-intake-layer-v2]]
 ---
 
@@ -15,7 +15,7 @@ related: [[../design/llm-gateway-orchestration]], [[ai-agent-improvement-loop-v1
 - [x] Execution plan id: `ai-system-hardening-solar-v1`
 - [x] Target phase: Phase 5/7 post-demo productization
 - [x] Owner: Codex
-- [x] Status: deployed-solar-live-pending
+- [x] Status: solar-isolated-passed-live-pending
 - [x] Created/updated: 2026-07-13
 
 ## 1. Objective
@@ -30,7 +30,7 @@ related: [[../design/llm-gateway-orchestration]], [[ai-agent-improvement-loop-v1
 | --- | --- | --- | --- |
 | [x] | 공개 health/config | 내부 경로와 provider 설정 노출 | 공개 응답은 최소 상태/제품 계약만, 상세 응답은 인증 필요 |
 | [x] | 모델 backend | 알 수 없는 backend가 Gemini로 묵시적 fallback | `upstage`, `gemini`, `litellm`, `fake`만 허용하고 나머지는 즉시 실패 |
-| [ ] | 프로덕션 모델 | `.env`가 Gemini, Solar key 없음 | Upstage `solar-pro2` 목표; key 준비 후 live 전환 |
+| [ ] | 프로덕션 모델 | 로컬 `.env` Upstage 설정 및 격리 10명 통과 | Upstage `solar-pro2` 배포 후 10 → 50 → 200 live gate |
 | [x] | Ollama | 문서와 LiteLLM config에 활성 fallback | 운영 범위에서 제거, 과거 검증 기록만 보존 |
 | [x] | 모델 override | 요청 alias allowlist 없음 | 운영 설정에 등록된 alias만 허용 |
 | [x] | 결과 모델 기록 | 요청 alias가 없으면 `model_alias=null` 가능 | 실제 resolved alias/provider model 기록 |
@@ -111,3 +111,13 @@ related: [[../design/llm-gateway-orchestration]], [[ai-agent-improvement-loop-v1
   returned 401 when unauthenticated, Redis/RQ/SQLite/tunnel ready, one RQ worker
   active. The inspected live provider remains Gemini until an Upstage key is
   provisioned.
+- 2026-07-13: a rotated `UPSTAGE_API_KEY` was installed only in the ignored local
+  `.env`; repository scanning found no provider-key pattern outside excluded secret
+  and generated paths.
+- 2026-07-13: isolated run `901bbb2f-4f18-4f6b-b602-56b181025123` completed with
+  provider `upstage`, model `solar-pro2`, 10 responses, 0 parse failures, and LLM
+  Analysis/Report/QA nodes. Quality grade B and directional-only review warnings
+  were retained rather than hidden.
+- 2026-07-13: the post-credential repository gate passed: 205 tests, 89.30%
+  backend coverage, frontend lint/typecheck/production build. Production restart
+  and external 10 → 50 → 200 validation remain pending.

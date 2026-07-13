@@ -4,7 +4,7 @@ type: runbook
 tags: [llm, solar, upstage, litellm, langfuse, observability]
 created: 2026-07-13
 updated: 2026-07-13
-status: target-ready-credential-pending
+status: credentialed-isolated-passed-live-pending
 related: [[../design/llm-gateway-orchestration]], [[../execution/ai-system-hardening-solar-v1]], [[../design/data-governance-and-io-boundary]]
 ---
 
@@ -14,15 +14,15 @@ related: [[../design/llm-gateway-orchestration]], [[../execution/ai-system-harde
 
 | 항목 | AS-IS | TO-BE |
 | --- | --- | --- |
-| live backend | Gemini (`LLM_BACKEND=gemini`) | Upstage direct (`LLM_BACKEND=upstage`) |
-| target model | `gemini-3-flash-preview` | `solar-pro2` |
-| Solar credential | local/launchd 환경에 없음 | `.env` 또는 secret manager에만 주입 |
+| live backend | 실행 중 프로세스는 Gemini | Upstage direct 설정 완료; 재시작/live gate 대기 |
+| target model | 실행 중 프로세스는 Gemini model | `solar-pro2` 격리 10명 통과 |
+| Solar credential | ignored local `.env`에 설치 | secret manager 또는 local `.env`에만 유지 |
 | local fallback | 과거 Ollama 검증 기록 존재 | 운영 fallback 없음; Ollama backend 비지원 |
 | tracing | Langfuse metadata-only | 동일 정책 + latency/usage/retry metadata |
 
-Solar 코드와 설정은 준비됐지만 자격증명 없는 live 전환은 금지한다. 현재
-Gemini 실행은 명시적 임시 운영 상태이며, Solar key가 준비된 뒤 아래 gate를
-순서대로 통과한다.
+Solar 코드, 설정, 자격증명, 격리 10명 검증은 준비됐다. 현재 Gemini 실행은
+명시적 임시 운영 상태이며, 아래 production restart와 10 → 50 → 200 gate를
+순서대로 통과한 뒤에만 전환 완료로 기록한다.
 
 ## 2. Required Secrets
 
@@ -169,5 +169,14 @@ API와 worker를 재시작하고 readiness를 다시 실행한다. 미지원 bac
   implemented and covered by deterministic tests.
 - 2026-07-13: `UPSTAGE_API_KEY` is not present in the current runtime; live Solar
   activation remains intentionally pending.
+- 2026-07-13: rotated credential was installed only in the ignored local `.env`;
+  no provider-key pattern was found in the repository scan outside secret/generated
+  paths.
+- 2026-07-13: isolated run `901bbb2f-4f18-4f6b-b602-56b181025123` completed with
+  `upstage` / `solar-pro2`, 10 responses, 0 parse failures, and LLM-backed
+  Analysis/Report/QA nodes. Quality grade B and directional-only review warnings
+  remained visible.
+- 2026-07-13: `uv run python scripts/verify.py` passed with 205 tests, 89.30%
+  backend coverage, and frontend lint/typecheck/production build.
 
 실제 Solar 명령/API/browser 검증이 통과하기 전에는 live 항목을 완료 처리하지 않는다.

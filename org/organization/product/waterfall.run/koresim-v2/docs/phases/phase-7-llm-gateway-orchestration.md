@@ -25,8 +25,8 @@ related: [[CLAUDE]], [[README]], [[../design/llm-gateway-orchestration]], [[../d
 ## Design Position
 
 Phase 7의 기본 경계는 완료됐다. 2026-07-13 provider 정책은 Solar Pro 2 목표,
-Gemini temporary live compatibility, Ollama 비지원이다. Solar credential이 없는
-동안에는 Gemini를 유지하며 live Solar 검증을 통과하기 전에는 전환 완료로 보지 않는다.
+Gemini temporary live compatibility/rollback, Ollama 비지원이다. Solar credential과
+격리 10명 검증은 완료됐으며 production 10 → 50 → 200 검증 전에는 전환 완료로 보지 않는다.
 
 Recommended first stack:
 
@@ -163,6 +163,11 @@ current provider policy.
   the external readiness check passed for `https://arabesque.cc`, Redis/RQ,
   SQLite, app-level auth boundaries, redacted public health/config, and the
   Cloudflare Tunnel. The live provider remained Gemini by design.
+- 2026-07-13: rotated Upstage credential was installed only in ignored local
+  configuration. Isolated run `901bbb2f-4f18-4f6b-b602-56b181025123` completed
+  against `upstage` / `solar-pro2` with 10 responses, 0 parse failures, and LLM
+  Analysis → Report → QA execution. The post-credential full gate passed with
+  205 tests and 89.30% coverage; production 10 → 50 → 200 remains pending.
 
 ## Risks
 
