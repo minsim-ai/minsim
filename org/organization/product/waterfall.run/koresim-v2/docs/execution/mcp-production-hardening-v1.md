@@ -4,7 +4,7 @@ type: execution-plan
 tags: [mcp, oauth, streamable-http, interoperability, security]
 created: 2026-07-13
 updated: 2026-07-13
-status: draft-awaiting-approval
+status: in-progress-private-api-key-pilot
 related: [[../design/mcp-server-integration]], [[minsim-v2-ux-and-mcp]], [[../design/data-governance-and-io-boundary]], [[../design/harness-engineering-controls]], [[../runbooks/app-auth-operations]]
 ---
 
@@ -16,7 +16,7 @@ related: [[../design/mcp-server-integration]], [[minsim-v2-ux-and-mcp]], [[../de
 - [x] Target phase: Phase 5/7 post-demo productization
 - [x] Related design doc: [[../design/mcp-server-integration]]
 - [x] Owner: Codex + product owner
-- [x] Status: draft, implementation approval pending
+- [x] Status: in progress; private API-key pilot approved, full OAuth pending
 - [x] Created: 2026-07-13
 - [x] Updated: 2026-07-13
 
@@ -158,16 +158,17 @@ related: [[../design/mcp-server-integration]], [[minsim-v2-ux-and-mcp]], [[../de
 
 ### 5.0 Approval and decision gate
 
-- [ ] Product owner approves this plan before code changes.
+- [x] Product owner approved external MCP deployment and README usage documentation.
 - [ ] Record required client hosts and their E2E ownership.
 - [ ] Select authorization-server approach and document issuer, token audience,
   client registration model, consent, revocation, and account mapping.
-- [ ] Confirm whether private pilot tokens are needed before general OAuth rollout.
+- [x] Private pilot Bearer token selected before general OAuth rollout.
 - [ ] Confirm scope names and which tools require each scope.
 
 ### 5.1 Characterization and protocol tests
 
-- [ ] Expand `tests/test_mcp_http.py` to freeze current user-visible tool behavior.
+- [x] Expand `tests/test_mcp_http.py` for cookie auth, Bearer pilot auth, invalid key,
+  Origin rejection, tools/resources, and redacted export behavior.
 - [ ] Add official SDK client integration test for initialize/list/call/read.
 - [ ] Add protocol negotiation, notification, invalid JSON-RPC, Accept/content-type,
   GET `405`, Origin rejection, and body-size tests.
@@ -193,6 +194,16 @@ related: [[../design/mcp-server-integration]], [[minsim-v2-ux-and-mcp]], [[../de
 - [ ] Add revocation/disabled-user behavior and safe auth audit events.
 - [ ] Update `docs/runbooks/app-auth-operations.md` with setup, rotation, revoke, and
   incident rollback procedures.
+
+Private pilot slice:
+
+- [x] Accept a dedicated `KORESIM_MCP_API_KEY` Bearer credential without using or
+  exposing `UPSTAGE_API_KEY`.
+- [x] Map the credential to a configured KoreaSim user identity and normal quota.
+- [x] Compare the key in constant time and reject keys shorter than 32 characters.
+- [x] Reject untrusted browser `Origin` headers.
+- [ ] Generate/store the production pilot key outside git and restart the API.
+- [ ] Complete authenticated external initialize/tools/list smoke tests.
 
 ### 5.4 Tool/resource/prompt contract completion
 
@@ -221,7 +232,7 @@ related: [[../design/mcp-server-integration]], [[minsim-v2-ux-and-mcp]], [[../de
 - [ ] Update [[minsim-v2-ux-and-mcp]] from foundation wording to the validated protocol
   and client setup.
 - [ ] Update [[../design/mcp-server-integration]] decisions and actual auth provider.
-- [ ] Update `README.md`, `.env.example`, `CLAUDE.md`, and execution index.
+- [x] Add README and `.env.example` private-pilot connection/configuration guidance.
 - [ ] Add MCP operator runbook and client connection examples without real secrets.
 - [ ] Record validation evidence only after each command/client flow passes.
 

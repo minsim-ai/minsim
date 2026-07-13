@@ -13,6 +13,7 @@ KoreaSim is a Korean AI human-behavior simulation product built on NVIDIA Nemotr
 - Runtime persistence: SQLite job/result store
 - Job execution: RQ worker backed by Redis
 - Realtime progress: Server-Sent Events, with polling fallback
+- Remote MCP: `https://arabesque.cc/mcp` is exposed through the same Cloudflare Tunnel. The current private pilot accepts a dedicated KoreaSim MCP Bearer API key; browser Google login remains available, while standards-complete OAuth is tracked as follow-up hardening.
 - Result trust layer: quality indicators, sample summary, seed, and disclaimer are part of the common result schema from the start
 - LLM strategy: Upstage `solar-pro2` is the production target behind a provider-agnostic `LLMClient`; Gemini remains the explicit temporary live backend until an Upstage credential is provisioned. LiteLLM is optional, Ollama is not a supported runtime fallback, and observability is metadata-only.
 - Agentic intake strategy: React planner v3 is the V2 planning source-of-truth. Natural-language goals become provenance-tagged slots, `IntakeContextEnvelope`, and `safe_intake_summary`; FastAPI persists sessions and rejects unreviewed assumptions.
@@ -46,6 +47,8 @@ flowchart LR
   LLMGateway -. "temporary live compatibility" .-> Gemini["Gemini"]
   LLMGateway --> Obs["Langfuse metadata tracing"]
   API --> SSE["SSE progress stream"]
+  API --> MCP["Remote MCP /mcp"]
+  MCP --> MCPClient["Codex or MCP client"]
   SSE --> User
 ```
 
@@ -363,6 +366,131 @@ ingress:
 ```
 
 Before changing DNS, confirm in the Cloudflare dashboard that existing `arabesque.cc` apex records can be replaced or routed to this tunnel. Then create or reuse a Named Tunnel, route `arabesque.cc` to it, and run it against the FastAPI origin.
+
+## Remote MCP Connection and Usage
+
+KoreaSim exposes its project simulation capabilities at:
+
+```text
+https://arabesque.cc/mcp
+```
+
+The endpoint uses Streamable HTTP-style MCP JSON-RPC and the same project service,
+SQLite ownership checks, Redis/RQ queue, quota ledger, and redacted export path as
+the web application.
+
+### Keep the two API keys separate
+
+- `UPSTAGE_API_KEY` is a server-side provider credential used only by KoreaSim to call
+  Upstage Solar Pro 2. Never give it to an MCP client.
+- `KORESIM_MCP_API_KEY` is the separate Bearer credential issued to a remote MCP
+  client. It does not grant direct access to Upstage.
+
+The current production runtime still uses Gemini because no `UPSTAGE_API_KEY` has
+been provisioned. Solar activation requires the server-side key and the 10 → 50 →
+200 persona validation sequence in
+`docs/runbooks/llm-solar-langfuse-operations.md`.
+
+### Server-side private pilot configuration
+
+Real values belong only in `.env`, the shell environment, or a secret manager:
+
+```bash
+KORESIM_MCP_API_KEY=<random-secret-at-least-32-characters>
+KORESIM_MCP_API_KEY_ID=external-pilot
+KORESIM_MCP_API_KEY_EMAIL=mcp-pilot@example.com
+KORESIM_MCP_API_KEY_NAME="KoreaSim MCP Pilot"
+KORESIM_MCP_ALLOWED_ORIGINS=https://arabesque.cc
+```
+
+Restart the API after rotating the key. Do not commit the key or put it in a client
+configuration file that will be committed.
+
+### Connect from Codex
+
+Put the issued MCP key in the client shell environment, then register the remote
+server without copying the secret into the Codex configuration:
+
+```bash
+export KORESIM_MCP_API_KEY='<issued-by-the-KoreaSim-operator>'
+codex mcp add koresim \
+  --url https://arabesque.cc/mcp \
+  --bearer-token-env-var KORESIM_MCP_API_KEY
+```
+
+Inspect the saved connection:
+
+```bash
+codex mcp get koresim
+```
+
+The environment variable must be available whenever Codex starts.
+
+### Verify with curl
+
+Initialize the MCP connection without printing the key:
+
+```bash
+curl https://arabesque.cc/mcp \
+  -H "Authorization: Bearer $KORESIM_MCP_API_KEY" \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  --data '{
+    "jsonrpc": "2.0",
+    "id": "init-1",
+    "method": "initialize",
+    "params": {
+      "protocolVersion": "2025-11-25",
+      "capabilities": {},
+      "clientInfo": {"name": "koresim-readme", "version": "1.0"}
+    }
+  }'
+```
+
+List tools:
+
+```bash
+curl https://arabesque.cc/mcp \
+  -H "Authorization: Bearer $KORESIM_MCP_API_KEY" \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  --data '{"jsonrpc":"2.0","id":"tools-1","method":"tools/list","params":{}}'
+```
+
+List the authenticated MCP identity's projects:
+
+```bash
+curl https://arabesque.cc/mcp \
+  -H "Authorization: Bearer $KORESIM_MCP_API_KEY" \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  --data '{
+    "jsonrpc": "2.0",
+    "id": "projects-1",
+    "method": "tools/call",
+    "params": {
+      "name": "koresim.list_projects",
+      "arguments": {}
+    }
+  }'
+```
+
+Available tools:
+
+- `koresim.list_projects`
+- `koresim.create_project`
+- `koresim.get_project`
+- `koresim.list_project_runs`
+- `koresim.create_project_run`
+- `koresim.export_run`
+- `koresim.submit_feedback`
+- `koresim.ask_followup`
+- `koresim.ask_interview`
+
+Run creation uses the normal KoreaSim queue and quota. Export remains redacted and
+does not return `raw_results`. The API-key path is a single-identity private pilot;
+multi-user OAuth 2.1, audience-bound tokens, idempotency, and broader client
+interoperability remain tracked in `docs/execution/mcp-production-hardening-v1.md`.
 
 ## Common API Contract
 

@@ -4,7 +4,7 @@ type: design-doc
 tags: [mcp, streamable-http, oauth, tools, remote-client]
 created: 2026-07-13
 updated: 2026-07-13
-status: proposed
+status: active-private-pilot-oauth-pending
 related: [[../../README]], [[../execution/minsim-v2-ux-and-mcp]], [[../execution/mcp-production-hardening-v1]], [[data-governance-and-io-boundary]], [[harness-engineering-controls]]
 ---
 
@@ -40,6 +40,8 @@ Target:
 - `tests/test_mcp_http.py`의 3개 focused test가 통과한다.
 - live protected-resource metadata는 `resource=https://arabesque.cc/mcp`를 반환한다.
 - 인증 없는 live `initialize` 요청은 `401`과 `WWW-Authenticate`를 반환한다.
+- private-pilot Bearer key는 web session과 분리된 MCP identity로 매핑되며,
+  constant-time key comparison과 Origin allowlist를 적용한다.
 - 최초 구현 commit은 `553856c` (`feat: add authenticated mcp endpoint`), 문서 commit은
   `c211082` (`docs: document minsim v2 ux and mcp`)다.
 
@@ -48,7 +50,7 @@ Target:
 | 영역 | 현재 | 목표 |
 | --- | --- | --- |
 | Transport | custom FastAPI JSON-RPC handler | official stable MCP SDK Streamable HTTP |
-| Auth credential | signed browser session cookie | OAuth 2.1-compatible Bearer token |
+| Auth credential | signed browser session cookie + private-pilot MCP API key | OAuth 2.1-compatible audience-bound Bearer token |
 | Authorization server | metadata가 same-origin issuer를 가리키지만 RFC 8414/OIDC token flow 없음 | 실제 discovery, PKCE, token issuance/validation |
 | Token binding | MCP audience 검증 없음 | `https://arabesque.cc/mcp` audience/resource 검증 |
 | Protocol lifecycle | server가 protocol version을 고정 반환 | client version negotiation + protocol header 검증 |
@@ -107,8 +109,17 @@ React web application. A browser cookie is not the production remote MCP credent
 
 ### Remote MCP auth
 
-The MCP server acts as an OAuth resource server and accepts only Bearer access tokens
-that pass all of these checks:
+2026-07-13 private pilot은 `KORESIM_MCP_API_KEY`를 Bearer header로 받고, 별도
+`mcp_api_key` user identity로 매핑한다. 이 키는 Upstage provider key와 완전히
+분리하며 최소 32자여야 한다. 서버는 키를 로그/응답에 넣지 않고 constant-time으로
+비교한다. `Origin` header가 있으면 `KORESIM_MCP_ALLOWED_ORIGINS`와 origin base URL
+중 하나와 일치해야 한다. 이 방식은 제한된 운영자 발급 pilot credential이며,
+일반 사용자용 OAuth 완료를 의미하지 않는다.
+
+Production OAuth target에서는 MCP server가 OAuth resource server로 동작하고 다음을
+검증한다.
+
+OAuth access tokens must pass all of these checks:
 
 - trusted issuer;
 - signature and expiry;

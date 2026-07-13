@@ -1,6 +1,7 @@
 """Streamable HTTP-style MCP endpoint backed by FastAPI JSON-RPC."""
 from __future__ import annotations
 
+import hmac
 import os
 from json import JSONDecodeError
 from typing import Any
@@ -44,6 +45,8 @@ async def oauth_protected_resource_metadata(request: Request) -> dict[str, Any]:
 
 @router.get("/mcp")
 async def mcp_get(request: Request) -> Response:
+    if not _origin_allowed(request):
+        return _forbidden_origin()
     if _user_record(request) is None:
         return _unauthorized(request)
     return Response(status_code=405, headers={"Allow": "POST"})
@@ -51,6 +54,8 @@ async def mcp_get(request: Request) -> Response:
 
 @router.post("/mcp")
 async def mcp_post(request: Request) -> Response:
+    if not _origin_allowed(request):
+        return _forbidden_origin()
     user = _user_record(request)
     if user is None:
         return _unauthorized(request)
@@ -159,7 +164,7 @@ def _unauthorized(request: Request) -> JSONResponse:
         status_code=401,
         content={
             "error": "AUTH_REQUIRED",
-            "message": "Google login is required to use the KoreaSim MCP server.",
+            "message": "A KoreaSim MCP API key or Google login is required.",
             "login_url": f"{_base_url(request)}/api/auth/google/login?next=/app",
         },
         headers={
@@ -170,13 +175,57 @@ def _unauthorized(request: Request) -> JSONResponse:
     )
 
 
+def _forbidden_origin() -> JSONResponse:
+    return JSONResponse(
+        status_code=403,
+        content={
+            "error": "ORIGIN_FORBIDDEN",
+            "message": "The request Origin is not allowed for this MCP server.",
+        },
+    )
+
+
+def _origin_allowed(request: Request) -> bool:
+    origin = request.headers.get("Origin")
+    if origin is None:
+        return True
+    configured = os.getenv("KORESIM_MCP_ALLOWED_ORIGINS", "")
+    allowed = {_base_url(request)}
+    allowed.update(item.strip().rstrip("/") for item in configured.split(",") if item.strip())
+    return origin.strip().rstrip("/") in allowed
+
+
 def _user_record(request: Request):
     user = read_session_user(request)
+    if user is None:
+        user = _api_key_user(request)
     if user is None and auth_required() and local_dev_auto_login_enabled(request):
         user = local_dev_user()
     if user is None:
         return None
     return _store(request).upsert_user_from_auth(user, free_run_limit=_free_run_limit())
+
+
+def _api_key_user(request: Request) -> dict[str, Any] | None:
+    configured_key = os.getenv("KORESIM_MCP_API_KEY", "").strip()
+    email = os.getenv("KORESIM_MCP_API_KEY_EMAIL", "").strip().lower()
+    if len(configured_key) < 32 or not email:
+        return None
+
+    scheme, separator, provided_key = request.headers.get("Authorization", "").partition(" ")
+    if not separator or scheme.lower() != "bearer" or not provided_key:
+        return None
+    if not hmac.compare_digest(provided_key.strip().encode(), configured_key.encode()):
+        return None
+
+    return {
+        "id": os.getenv("KORESIM_MCP_API_KEY_ID", "default").strip() or "default",
+        "email": email,
+        "name": os.getenv("KORESIM_MCP_API_KEY_NAME", "KoreaSim MCP API Client").strip()
+        or "KoreaSim MCP API Client",
+        "picture": None,
+        "provider": "mcp_api_key",
+    }
 
 
 def _store(request: Request) -> SQLiteRunStore:

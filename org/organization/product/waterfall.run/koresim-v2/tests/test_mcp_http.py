@@ -23,6 +23,15 @@ def _rpc(method: str, params: dict | None = None, request_id: str = "1") -> dict
     return body
 
 
+def _configure_api_key(monkeypatch, *, token: str = "mcp_test_0123456789abcdef0123456789abcdef") -> str:
+    monkeypatch.setenv("KORESIM_MCP_API_KEY", token)
+    monkeypatch.setenv("KORESIM_MCP_API_KEY_ID", "external-pilot")
+    monkeypatch.setenv("KORESIM_MCP_API_KEY_EMAIL", "mcp-pilot@arabesque.test")
+    monkeypatch.setenv("KORESIM_MCP_API_KEY_NAME", "MCP Pilot")
+    monkeypatch.setenv("KORESIM_AUTH_LOCAL_DEV_AUTO_LOGIN", "false")
+    return token
+
+
 def test_mcp_unauthenticated_response_advertises_protected_resource(monkeypatch) -> None:
     monkeypatch.setenv("KORESIM_AUTH_SECRET", "test-secret")
     monkeypatch.setenv("GOOGLE_CLIENT_ID", "google-client")
@@ -73,6 +82,65 @@ def test_mcp_initialize_tools_and_resources_after_login(tmp_path, monkeypatch) -
     )
     assert resource.status_code == 200
     assert "MCP Project" in resource.json()["result"]["contents"][0]["text"]
+
+
+def test_mcp_bearer_api_key_authenticates_external_client(tmp_path, monkeypatch) -> None:
+    store = SQLiteRunStore(tmp_path / "runs.sqlite3")
+    client = TestClient(
+        create_app(store=store, enqueue_run_func=lambda run_id: f"job-{run_id}"),
+        base_url="https://arabesque.test",
+    )
+    token = _configure_api_key(monkeypatch)
+
+    response = client.post(
+        "/mcp",
+        headers={"Authorization": f"Bearer {token}"},
+        json=_rpc("initialize"),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["result"]["serverInfo"]["name"] == "koresim-v2"
+    user = store.get_user("mcp_api_key:external-pilot")
+    assert user is not None
+    assert user.email == "mcp-pilot@arabesque.test"
+    assert user.provider == "mcp_api_key"
+
+
+def test_mcp_rejects_invalid_bearer_api_key(tmp_path, monkeypatch) -> None:
+    client = TestClient(
+        create_app(store=SQLiteRunStore(tmp_path / "runs.sqlite3")),
+        base_url="https://arabesque.test",
+    )
+    _configure_api_key(monkeypatch)
+
+    response = client.post(
+        "/mcp",
+        headers={"Authorization": "Bearer wrong-key"},
+        json=_rpc("initialize"),
+    )
+
+    assert response.status_code == 401
+    assert response.json()["error"] == "AUTH_REQUIRED"
+
+
+def test_mcp_rejects_untrusted_origin_even_with_valid_api_key(tmp_path, monkeypatch) -> None:
+    client = TestClient(
+        create_app(store=SQLiteRunStore(tmp_path / "runs.sqlite3")),
+        base_url="https://arabesque.test",
+    )
+    token = _configure_api_key(monkeypatch)
+
+    response = client.post(
+        "/mcp",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Origin": "https://attacker.example",
+        },
+        json=_rpc("initialize"),
+    )
+
+    assert response.status_code == 403
+    assert response.json()["error"] == "ORIGIN_FORBIDDEN"
 
 
 def test_mcp_export_tool_returns_redacted_project_report(tmp_path, monkeypatch) -> None:
