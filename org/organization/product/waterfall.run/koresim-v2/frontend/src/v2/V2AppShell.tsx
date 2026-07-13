@@ -2,7 +2,6 @@ import type { ReactNode } from 'react'
 import { AuthStatus } from '../components/AuthStatus'
 import type { V2Stage } from './types'
 import type { V2Route } from './navigation'
-import { navigateTo } from './navigation'
 
 type Props = {
   route: V2Route
@@ -11,7 +10,7 @@ type Props = {
 
 const stages: { id: V2Stage; label: string }[] = [
   { id: 'projects', label: '프로젝트' },
-  { id: 'type', label: '유형' },
+  { id: 'type', label: '유형 선택' },
   { id: 'intake', label: '입력' },
   { id: 'results', label: '결과' },
 ]
@@ -27,30 +26,42 @@ function activeStage(route: V2Route): V2Stage {
 
 export function V2AppShell({ route, children }: Props) {
   const active = activeStage(route)
+  const activeIndex = stages.findIndex((stage) => stage.id === active)
   return (
-    <div className="v2-shell">
-      <header className="v2-topbar">
-        <button className="v2-brand" type="button" onClick={() => navigateTo('/projects')}>
-          KoreaSim V2
-        </button>
-        <nav className="v2-nav" aria-label="Primary">
-          <button type="button" onClick={() => navigateTo('/projects')}>
-            프로젝트
-          </button>
-          <button type="button" onClick={() => navigateTo('/classic/app')}>
-            Classic
-          </button>
-        </nav>
-        <AuthStatus compact />
+    <div className="minsim-shell">
+      <a className="minsim-skip-link" href="#main-content">본문으로 건너뛰기</a>
+      <header className="topnav">
+        <div className="wrap spread">
+          <a className="brand minsim-brand-button" href="/" aria-label="minsim 홈">
+            <span className="dot">m</span>
+            minsim
+          </a>
+          <nav className="row minsim-top-actions" aria-label="주요 메뉴">
+            <a className="navlink" href="/">
+              제품
+            </a>
+            <a className="navlink" href="/projects" aria-current={route.page === 'projects' ? 'page' : undefined}>
+              프로젝트
+            </a>
+          </nav>
+          <AuthStatus compact />
+        </div>
       </header>
-      <div className="v2-flow-rail">
-        {stages.map((stage) => (
-          <span className={stage.id === active ? 'active' : ''} key={stage.id}>
-            {stage.label}
-          </span>
-        ))}
+      <div className="minsim-flow-rail">
+        <ol className="wrap row" aria-label="시뮬레이션 진행 단계">
+          {stages.map((stage, index) => (
+            <li
+              className={index < activeIndex ? 'complete' : index === activeIndex ? 'active' : ''}
+              aria-current={index === activeIndex ? 'step' : undefined}
+              key={stage.id}
+            >
+              <b>{index + 1}</b>
+              {stage.label}
+            </li>
+          ))}
+        </ol>
       </div>
-      <main className="v2-main">{children}</main>
+      <main className="v2-main screen" id="main-content">{children}</main>
     </div>
   )
 }

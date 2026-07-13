@@ -15,6 +15,7 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
   const [alternatives, setAlternatives] = useState('')
   const [notice, setNotice] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -38,22 +39,35 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
   }, [projectId])
 
   const save = async () => {
-    const updated = await updateProject(projectId, {
-      name,
-      description,
-      product_context: { product_description: productContext },
-      features: splitLines(features),
-      prices: splitLines(prices),
-      target_notes: targetNotes,
-      alternatives: splitLines(alternatives),
-    })
-    setProject(updated)
-    setNotice('저장했습니다.')
+    setSaving(true)
+    setError(null)
+    try {
+      const updated = await updateProject(projectId, {
+        name,
+        description,
+        product_context: { product_description: productContext },
+        features: splitLines(features),
+        prices: splitLines(prices, { splitCommas: false }),
+        target_notes: targetNotes,
+        alternatives: splitLines(alternatives),
+      })
+      setProject(updated)
+      setNotice('저장했습니다.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setSaving(false)
+    }
   }
 
   const archive = async () => {
-    await archiveProject(projectId)
-    navigateTo('/projects')
+    if (!window.confirm('이 프로젝트를 보관하시겠습니까? 프로젝트 목록에서 숨겨집니다.')) return
+    try {
+      await archiveProject(projectId)
+      navigateTo('/projects')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
   }
 
   if (error) return <p className="v2-error">{error}</p>
@@ -70,8 +84,8 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
           <button type="button" onClick={() => navigateTo(`/projects/${encodeURIComponent(projectId)}/type`)}>
             새 시뮬레이션
           </button>
-          <button type="button" onClick={save}>저장</button>
-          <button type="button" onClick={archive}>보관</button>
+          <button type="button" disabled={saving} onClick={save}>{saving ? '저장 중…' : '저장'}</button>
+          <button className="v2-danger-action" type="button" onClick={archive}>프로젝트 보관</button>
         </div>
       </div>
 
@@ -128,8 +142,9 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
   )
 }
 
-function splitLines(value: string): string[] {
-  return value.split(/\n|,/).map((item) => item.trim()).filter(Boolean)
+function splitLines(value: string, options: { splitCommas?: boolean } = {}): string[] {
+  const separator = options.splitCommas === false ? /\n/ : /\n|,/
+  return value.split(separator).map((item) => item.trim()).filter(Boolean)
 }
 
 function stringFromContext(value: ProjectResponse['product_context']): string {

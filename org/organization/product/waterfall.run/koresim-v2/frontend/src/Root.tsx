@@ -22,7 +22,7 @@ export function Root() {
   const [route, setRoute] = useState<V2Route>(getRouteState);
 
   useEffect(() => {
-    document.documentElement.setAttribute("data-theme", "dark");
+    document.documentElement.setAttribute("data-theme", "minsim");
   }, []);
 
   useEffect(() => {

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties, type FormEvent } from 'react'
+import { ArrowLeft, Chats, DownloadSimple, FolderSimple, Plus } from '@phosphor-icons/react'
 import {
   askProjectRunFollowup,
   askProjectRunInterview,
@@ -41,6 +42,7 @@ export function MinsimResultsPage({ projectId, runId }: { projectId: string | nu
   const [feedbackText, setFeedbackText] = useState('')
   const [intendedAction, setIntendedAction] = useState('')
   const [feedbackNotice, setFeedbackNotice] = useState<string | null>(null)
+  const [actionPending, setActionPending] = useState<'followup' | 'interview' | 'feedback' | null>(null)
 
   useEffect(() => {
     if (!projectId || !runId) {
@@ -93,6 +95,7 @@ export function MinsimResultsPage({ projectId, runId }: { projectId: string | nu
     if (!projectId || !runId || !followupQuestion.trim()) return
     try {
       setActionError(null)
+      setActionPending('followup')
       const response = await askProjectRunFollowup(projectId, runId, {
         question: followupQuestion,
         cohort: followupCohort,
@@ -111,6 +114,8 @@ export function MinsimResultsPage({ projectId, runId }: { projectId: string | nu
       ])
     } catch (err) {
       setActionError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setActionPending(null)
     }
   }
 
@@ -119,6 +124,7 @@ export function MinsimResultsPage({ projectId, runId }: { projectId: string | nu
     if (!projectId || !runId || !interviewQuestion.trim()) return
     try {
       setActionError(null)
+      setActionPending('interview')
       const response = await askProjectRunInterview(projectId, runId, {
         subject_uuid: selectedQuote?.uuid ?? null,
         question: interviewQuestion,
@@ -137,6 +143,8 @@ export function MinsimResultsPage({ projectId, runId }: { projectId: string | nu
       ])
     } catch (err) {
       setActionError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setActionPending(null)
     }
   }
 
@@ -145,6 +153,7 @@ export function MinsimResultsPage({ projectId, runId }: { projectId: string | nu
     if (!projectId || !runId) return
     try {
       setActionError(null)
+      setActionPending('feedback')
       await submitProjectRunFeedback(projectId, runId, {
         usefulness_score: 4,
         trust_score: 4,
@@ -157,6 +166,8 @@ export function MinsimResultsPage({ projectId, runId }: { projectId: string | nu
       setIntendedAction('')
     } catch (err) {
       setActionError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setActionPending(null)
     }
   }
 
@@ -186,55 +197,55 @@ export function MinsimResultsPage({ projectId, runId }: { projectId: string | nu
     <div className="report">
       {/* toolbar */}
       <div className="results-toolbar">
-        <div className="wrap spread" style={{ height: 52 }}>
+        <div className="wrap spread result-toolbar-inner">
           <div className="row" style={{ gap: 16, flexWrap: 'wrap' }}>
             <button className="btn ghost sm" onClick={() => navigateTo(projectPath)}>
-              ← {projectName.split(' ')[0]} 프로젝트
+              <ArrowLeft size={15} /> {projectName.split(' ')[0]} 프로젝트
             </button>
             <span style={{ fontWeight: 600 }}>{runLabel}</span>
-            <span className="lbl-mono faint">📁 {projectName}</span>
+            <span className="lbl-mono faint"><FolderSimple size={14} /> {projectName}</span>
             <span className="badge live">{view.statusLabel}</span>
           </div>
           <div className="row" style={{ gap: 12 }}>
             <button className="btn ghost sm" onClick={() => navigateTo(intakePath)}>
-              ＋ 새 시뮬레이션
+              <Plus size={15} /> 새 시뮬레이션
             </button>
             <button className="btn sm" onClick={downloadExport}>
-              ⌁ 내보내기
+              <DownloadSimple size={15} /> 내보내기
             </button>
           </div>
         </div>
       </div>
 
       <div className="wrap">
+        <nav className="result-section-nav" aria-label="결과 보고서 섹션">
+          <a href="#result-summary">요약</a>
+          <a href="#result-evidence">근거</a>
+          <a href="#result-method">방법론</a>
+          <a href="#result-followup">후속 분석</a>
+        </nav>
+        <div id="result-summary" />
         <Verdict report={report} onExport={downloadExport} />
         <CoreCase report={report} />
         <DecisionSummary report={report} />
-        <hr className="hr" />
-        <AiReport report={report} />
-        <hr className="hr" />
-        <MarketResponse report={report} />
-        <hr className="hr" />
-        <AgeFullTable report={report} />
-        <hr className="hr" />
-        <SegmentMatrix report={report} />
-        <hr className="hr" />
-        <OpportunityRiskMap report={report} />
-        <hr className="hr" />
-        <EvidenceSection report={report} onOpen={openInterview} />
-        <hr className="hr" />
-        <Methodology report={report} />
-        <hr className="hr" />
-        <Crowd report={report} onOpen={openInterview} />
-        <hr className="hr" />
+        <ResultDisclosure title="AI 해석 보고서"><AiReport report={report} /></ResultDisclosure>
+        <ResultDisclosure title="주요 지표 해석"><MarketResponse report={report} /></ResultDisclosure>
+        <ResultDisclosure title="연령대별 선호 전체표"><AgeFullTable report={report} /></ResultDisclosure>
+        <ResultDisclosure title="세그먼트 반응 매트릭스"><SegmentMatrix report={report} /></ResultDisclosure>
+        <ResultDisclosure title="기회·리스크 통합 맵"><OpportunityRiskMap report={report} /></ResultDisclosure>
+        <div id="result-evidence" />
+        <ResultDisclosure title="해석 근거 발언"><EvidenceSection report={report} onOpen={openInterview} /></ResultDisclosure>
+        <div id="result-method" />
+        <ResultDisclosure title="방법론과 신뢰 정보"><Methodology report={report} /></ResultDisclosure>
+        <ResultDisclosure title="응답자 패널"><Crowd report={report} onOpen={openInterview} /></ResultDisclosure>
 
         {/* follow-up + interview */}
-        <section style={{ padding: '40px 0' }}>
+        <section id="result-followup" style={{ padding: '40px 0' }}>
           <SectionHead kicker="후속 분석" title="결과에서 다시 묻기" sub="집계 결과를 바탕으로 코호트에 후속 질문을 던지거나, 특정 응답자와 바로 인터뷰합니다." />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div className="result-followup-grid">
             <form className="card" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }} onSubmit={submitFollowup}>
-              <div className="lbl-mono">후속질문 · 코호트 선택</div>
-              <select className="inp" value={followupCohort} onChange={(event) => setFollowupCohort(event.target.value)}>
+              <label className="lbl-mono" htmlFor="followup-cohort">후속질문 · 코호트 선택</label>
+              <select id="followup-cohort" className="inp" value={followupCohort} onChange={(event) => setFollowupCohort(event.target.value)}>
                 <option value="all">전체</option>
                 <option value="positive">긍정층</option>
                 <option value="negative">부정층</option>
@@ -243,17 +254,18 @@ export function MinsimResultsPage({ projectId, runId }: { projectId: string | nu
                   <option key={row.label} value={row.label}>{row.label}</option>
                 ))}
               </select>
-              <textarea className="inp" value={followupQuestion} onChange={(event) => setFollowupQuestion(event.target.value)} rows={3} />
-              <button className="btn primary" type="submit">↳ 후속질문 실행</button>
+              <label className="sr-only" htmlFor="followup-question">후속 질문</label>
+              <textarea id="followup-question" className="inp" value={followupQuestion} onChange={(event) => setFollowupQuestion(event.target.value)} rows={3} />
+              <button className="btn primary" type="submit" disabled={actionPending !== null}>{actionPending === 'followup' ? '질문하는 중…' : '후속질문 실행'}</button>
             </form>
 
             <form id="interview-panel" className="card" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }} onSubmit={submitInterview}>
-              <div className="lbl-mono">페르소나 인터뷰</div>
+              <label className="lbl-mono" htmlFor="interview-question">페르소나 인터뷰</label>
               <p className="muted" style={{ fontSize: 12.5, lineHeight: 1.55 }}>
                 {selectedQuote ? selectedQuote.label : '발언 카드나 군중 카드를 누르면 그 응답자와, 없으면 전체에서 1명을 샘플링합니다.'}
               </p>
-              <textarea className="inp" value={interviewQuestion} onChange={(event) => setInterviewQuestion(event.target.value)} rows={3} />
-              <button className="btn" type="submit">🗪 인터뷰</button>
+              <textarea id="interview-question" className="inp" value={interviewQuestion} onChange={(event) => setInterviewQuestion(event.target.value)} rows={3} />
+              <button className="btn" type="submit" disabled={actionPending !== null}><Chats size={16} /> {actionPending === 'interview' ? '인터뷰 중…' : '인터뷰'}</button>
             </form>
           </div>
 
@@ -313,15 +325,15 @@ export function MinsimResultsPage({ projectId, runId }: { projectId: string | nu
         <section style={{ padding: '40px 0 64px' }}>
           <SectionHead kicker="결과 피드백" title="이 결과, 쓸 만했나요?" />
           <form className="card" style={{ padding: 22 }} onSubmit={submitFeedback}>
-            <div className="col" style={{ gap: 6, marginBottom: 12 }}>
+            <label className="col" style={{ gap: 6, marginBottom: 12 }}>
               <span className="lbl">이 결과로 무엇을 할 예정인가요?</span>
               <input className="inp" value={intendedAction} onChange={(event) => setIntendedAction(event.target.value)} placeholder="예) A안은 폐기, B안 헤드라인으로 상세페이지 제작" />
-            </div>
-            <div className="col" style={{ gap: 6, marginBottom: 16 }}>
+            </label>
+            <label className="col" style={{ gap: 6, marginBottom: 16 }}>
               <span className="lbl">부족했던 점</span>
               <textarea className="inp" value={feedbackText} onChange={(event) => setFeedbackText(event.target.value)} placeholder="결과 해석, 질문 흐름, 보고서에서 아쉬웠던 점을 적어주세요." />
-            </div>
-            <button className="btn primary block" type="submit">피드백 저장</button>
+            </label>
+            <button className="btn primary block" type="submit" disabled={actionPending !== null}>{actionPending === 'feedback' ? '저장 중…' : '피드백 저장'}</button>
             {feedbackNotice && <p className="muted" style={{ fontSize: 12.5, marginTop: 10 }}>{feedbackNotice}</p>}
           </form>
         </section>
@@ -336,6 +348,16 @@ export function MinsimResultsPage({ projectId, runId }: { projectId: string | nu
 
 function Kicker({ children }: { children: React.ReactNode }) {
   return <div className="kicker">{children}</div>
+}
+
+function ResultDisclosure({ title, children }: { title: string; children: React.ReactNode }) {
+  const defaultOpen = typeof window === 'undefined' || !window.matchMedia('(max-width: 920px)').matches
+  return (
+    <details className="result-disclosure" open={defaultOpen || undefined}>
+      <summary>{title}<span aria-hidden="true">＋</span></summary>
+      <div className="result-disclosure-content">{children}</div>
+    </details>
+  )
 }
 
 function SectionHead({ kicker, title, sub, right }: { kicker: string; title: string; sub?: string; right?: React.ReactNode }) {
@@ -416,7 +438,7 @@ function Verdict({ report, onExport }: { report: MinsimReport; onExport: () => v
       <div className="spread" style={{ marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
         <Kicker>{run.gap === '집계 중' ? '분석 보고서' : '크리에이티브 비교 분석 보고서'}</Kicker>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1.55fr .9fr', gap: 22 }}>
+      <div className="result-verdict-grid">
         <div className="col" style={{ gap: 22 }}>
           <div>
             <span className="badge lime" style={{ marginBottom: 16 }}>먼저 선택 · {winner.label}</span>
@@ -425,7 +447,7 @@ function Verdict({ report, onExport }: { report: MinsimReport; onExport: () => v
               {run.verdictLine} {run.conclusion}
             </p>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 1, background: 'var(--border-soft)', border: '1px solid var(--border-soft)', borderRadius: 'var(--r)', overflow: 'hidden' }}>
+          <div className="result-metrics-grid" style={{ background: 'var(--border-soft)', border: '1px solid var(--border-soft)', borderRadius: 'var(--r)', overflow: 'hidden' }}>
             {metrics.map((metric) => (
               <div key={metric.l} style={{ background: 'var(--bg)', padding: '18px' }}>
                 <div className="lbl-mono" style={{ marginBottom: 10 }}>{metric.l}</div>
@@ -686,7 +708,8 @@ function AgeFullTable({ report }: { report: MinsimReport }) {
           </span>
         ))}
       </div>
-      <div className="card" style={{ padding: 20 }}>
+      <div className="card result-table-scroll" style={{ padding: 20 }}>
+        <div className="result-age-table" style={{ minWidth: 520 }}>
         <div style={{ display: 'grid', gridTemplateColumns: gridTemplate, gap: 12, alignItems: 'center', paddingBottom: 12, borderBottom: '1px solid var(--border)' }}>
           <span className="lbl-mono">연령</span>
           {legend.map((creative) => (
@@ -722,6 +745,7 @@ function AgeFullTable({ report }: { report: MinsimReport }) {
             )}
           </div>
         ))}
+        </div>
       </div>
     </section>
   )
@@ -980,7 +1004,7 @@ function EvidenceSection({ report, onOpen }: { report: MinsimReport; onOpen: (uu
   return (
     <section style={{ padding: '40px 0' }}>
       <SectionHead kicker="응답 근거" title="해석 근거 발언" sub="발언 카드를 누르면 그 응답자와 바로 인터뷰를 시작합니다." />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
+      <div className="result-evidence-grid">
         {report.quotes.map((quote) => {
           const color = OPT[quote.choice] ?? 'var(--opt-d)'
           return (
@@ -1014,7 +1038,7 @@ function Methodology({ report }: { report: MinsimReport }) {
   return (
     <section style={{ padding: '40px 0' }}>
       <SectionHead kicker="검증 정보" title="방법론과 신뢰 정보" />
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <div className="result-method-grid">
         <div className="card" style={{ padding: 20 }}>
           <div className="lbl-mono" style={{ marginBottom: 16 }}>표본 구성 · 연령대</div>
           <div className="col" style={{ gap: 9 }}>
@@ -1071,9 +1095,9 @@ function Crowd({ report, onOpen }: { report: MinsimReport; onOpen: (uuid: string
         right={
           <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
             {filters.map(([key, label]) => (
-              <span key={key} className={`chip sm${filter === key ? ' on' : ''}`} onClick={() => setFilter(key)} style={{ cursor: 'pointer' }}>
+              <button key={key} type="button" aria-pressed={filter === key} className={`chip sm${filter === key ? ' on' : ''}`} onClick={() => setFilter(key)}>
                 {label}
-              </span>
+              </button>
             ))}
           </div>
         }
@@ -1081,7 +1105,7 @@ function Crowd({ report, onOpen }: { report: MinsimReport; onOpen: (uuid: string
       <div className="lbl" style={{ marginBottom: 14 }}>
         대표 {Math.min(21, filtered.length)}명 표시 · 해당 코호트 {filtered.length}명 · 전체 응답 {report.run.panel}명 · <span className="faint">카드를 누르면 인터뷰</span>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 8 }}>
+      <div className="result-crowd-grid">
         {filtered.slice(0, 21).map((person, index) => {
           const color = OPT[person.choice] ?? 'var(--opt-d)'
           return (
