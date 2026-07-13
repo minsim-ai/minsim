@@ -4,7 +4,7 @@ type: execution-plan
 tags: [results, segments, map, churn, landing]
 created: 2026-07-13
 updated: 2026-07-13
-status: ready-to-deploy
+status: complete
 related: [[../design/segment-reaction-radar]], [[minsim-v2-ux-and-mcp]]
 ---
 
@@ -68,5 +68,6 @@ related: [[../design/segment-reaction-radar]], [[minsim-v2-ux-and-mcp]]
 
 - [x] Verification evidence: 206 pytest passed, 89.32% coverage, frontend lint/typecheck/build passed, 2 minsim fixtures passed.
 - [x] Browser evidence: local desktop 1440px and mobile 390px showed no horizontal overflow or broken intent suffixes; sort and regional detail interactions passed.
-- [ ] Commit:
-- [ ] Deployment:
+- [x] Commit: `6405268 feat: add segment reaction radar`.
+- [x] Deployment: API/worker restarted; external Mac Studio production check returned `status=ready` with Upstage Solar Pro 2 and one active RQ worker.
+- [x] External browser evidence: `https://arabesque.cc/` rendered the segment demo at 1440px and 390px without horizontal overflow; ReactGrab was absent from the production bundle.

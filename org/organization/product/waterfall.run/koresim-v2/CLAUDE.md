@@ -38,7 +38,7 @@ status: hardening-deployed-solar-live-pending
 - **Evaluation Framework**: [[docs/design/evaluation-framework]] — schema/import, deterministic fixture, live local run, provider comparison eval을 gate별로 분리한다.
 - **Persona Simulation Protocol Engine**: [[docs/design/persona-simulation-protocol-engine]] — `price_optimization` 안에서 versioned protocol로 `price_research_v2`를 확장한다.
 - **MCP Server**: [[docs/design/mcp-server-integration]] — 현재 custom MCP foundation은 Google 로그인 세션 전용이며 공유 Bearer key 경로는 폐기했다. 다음 단계는 official SDK Streamable HTTP + per-user remote OAuth resource server다. 실행계획: [[docs/execution/mcp-production-hardening-v1]].
-- **세그먼트 반응 레이더**: 이탈 예측의 유지/관망/이탈 의미를 A/B 선택지와 분리하고, 결과 상단의 신뢰 우선 지역 지도·성별 표본 범위와 공개 랜딩 예시를 구현했다. 로컬 전체 gate 206 tests/89.32% coverage와 desktop/mobile browser QA를 통과했으며 배포 절차 진행 중이다. 설계: [[docs/design/segment-reaction-radar]], 실행계획: [[docs/execution/segment-reaction-radar-v1]].
+- **세그먼트 반응 레이더**: 이탈 예측의 유지/관망/이탈 의미를 A/B 선택지와 분리하고, 결과 상단의 신뢰 우선 지역 지도·성별 표본 범위와 공개 랜딩 예시를 구현했다. 커밋 `6405268`로 배포됐고, 전체 gate 206 tests/89.32% coverage, desktop/mobile browser QA, 외부 Mac Studio readiness가 통과했다. 설계: [[docs/design/segment-reaction-radar]], 실행계획: [[docs/execution/segment-reaction-radar-v1]].
 
 ## 현재 배포 방식
 
