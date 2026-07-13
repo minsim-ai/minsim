@@ -552,10 +552,10 @@ function AgeFullTable({ report }: { report: MinsimReport }) {
   const { ageFull, creatives } = report
   if (ageFull.length === 0) return null
   const legend = [...creatives].sort((a, b) => a.id.localeCompare(b.id))
-  const gridTemplate = `80px repeat(${legend.length},46px) 1fr`
+  const gridTemplate = `minmax(72px, 1.2fr) repeat(${legend.length}, minmax(54px, .85fr)) minmax(52px, .75fr)`
   return (
     <section style={{ padding: '40px 0' }}>
-      <SectionHead kicker="연령 분포" title="연령대별 선호 — 전체" sub="각 연령대가 후보를 고른 비율입니다. 굵은 숫자가 해당 연령대의 1위." />
+      <SectionHead kicker="연령 분포" title="연령대별 선호 — 전체" sub="색이 진할수록 해당 후보의 선택 비율이 높습니다. 굵은 숫자가 연령대별 1위이며, n이 작은 집단은 참고용으로만 해석합니다." />
       <div className="row" style={{ gap: 16, marginBottom: 14, flexWrap: 'wrap' }}>
         {legend.map((creative) => (
           <span key={creative.id} className="row lbl" style={{ gap: 6, fontSize: 12, whiteSpace: 'nowrap' }}>
@@ -571,20 +571,29 @@ function AgeFullTable({ report }: { report: MinsimReport }) {
           {legend.map((creative) => (
             <span key={creative.id} className="lbl-mono" style={{ textAlign: 'right' }}>{creative.label}</span>
           ))}
-          <span className="lbl-mono" style={{ paddingLeft: 10 }}>분포</span>
+          <span className="lbl-mono" style={{ textAlign: 'right' }}>표본</span>
         </div>
         {ageFull.map((row) => (
           <div key={row.label} style={{ display: 'grid', gridTemplateColumns: gridTemplate, gap: 12, alignItems: 'center', padding: '13px 0', borderTop: '1px solid var(--border-soft)' }}>
             <span className="col" style={{ gap: 2 }}>
               <span style={{ fontSize: 13.5, fontWeight: 600 }}>{row.label}</span>
-              <span className="lbl" style={{ fontSize: 11 }}>{row.n}명</span>
+              {row.n < 10 && <span className="lbl" style={{ fontSize: 10, color: 'var(--fg-faint)' }}>소표본 참고</span>}
             </span>
             {row.pct ? (
               legend.map((creative) => (
                 <span
                   key={creative.id}
                   className="metric"
-                  style={{ textAlign: 'right', fontSize: 14, fontWeight: row.lead === creative.id ? 700 : 500, color: row.lead === creative.id ? 'var(--fg)' : 'var(--fg-faint)' }}
+                  style={{
+                    textAlign: 'right',
+                    padding: '8px 6px',
+                    borderRadius: 6,
+                    fontSize: 14,
+                    fontWeight: row.lead === creative.id ? 700 : 500,
+                    color: row.lead === creative.id ? 'var(--fg)' : 'var(--fg-faint)',
+                    background: `color-mix(in srgb, ${OPT[creative.id]} ${Math.max(8, Math.min(48, (row.pct?.[creative.id] ?? 0) * 0.55))}%, var(--bg))`,
+                  }}
+                  aria-label={`${row.label} ${creative.label} ${row.pct?.[creative.id] ?? 0}%`}
                 >
                   {row.pct?.[creative.id] ?? 0}%
                 </span>
@@ -592,13 +601,7 @@ function AgeFullTable({ report }: { report: MinsimReport }) {
             ) : (
               <span style={{ gridColumn: `2 / ${legend.length + 2}`, textAlign: 'center' }} className="lbl">응답 없음</span>
             )}
-            {row.pct ? (
-              <div style={{ paddingLeft: 10 }}>
-                <StackBar parts={legend.map((creative) => [creative.id, row.pct?.[creative.id] ?? 0])} h={14} />
-              </div>
-            ) : (
-              <span />
-            )}
+            <span className="lbl-mono" style={{ textAlign: 'right', fontSize: 11 }}>{row.n}명</span>
           </div>
         ))}
         </div>
@@ -836,21 +839,38 @@ function RegionDetailPanel({ region, onClear }: { region: MinsimRegion | null; o
 
 function Methodology({ report }: { report: MinsimReport }) {
   const { sampleAge, sampleRegion, run, disclaimer } = report
-  const maxAge = Math.max(1, ...sampleAge.map(([, n]) => n))
   const maxReg = Math.max(1, ...sampleRegion.map(([, n]) => n))
+  const totalAge = sampleAge.reduce((sum, [, n]) => sum + n, 0)
   return (
     <section style={{ padding: '40px 0' }}>
       <SectionHead kicker="검증 정보" title="방법론과 신뢰 정보" />
       <div className="result-method-grid">
         <div className="card" style={{ padding: 20 }}>
           <div className="lbl-mono" style={{ marginBottom: 16 }}>표본 구성 · 연령대</div>
-          <div className="col" style={{ gap: 9 }}>
+          <div
+            className="row"
+            role="img"
+            aria-label={`연령대별 표본 구성: ${sampleAge.map(([label, n]) => `${label} ${n}명`).join(', ')}`}
+            style={{ height: 16, borderRadius: 5, overflow: 'hidden', background: '#ECE9E3', marginBottom: 14 }}
+          >
+            {sampleAge.map(([label, n], index) => (
+              <span
+                key={label}
+                title={`${label} ${n}명`}
+                style={{
+                  width: `${totalAge ? (n / totalAge) * 100 : 0}%`,
+                  minWidth: n > 0 ? 2 : 0,
+                  background: index % 2 === 0 ? 'var(--fg-faint)' : 'var(--fg-dim)',
+                  opacity: 0.45 + (index % 2) * 0.18,
+                }}
+              />
+            ))}
+          </div>
+          <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
             {sampleAge.map(([label, n]) => (
-              <div key={label} className="row" style={{ gap: 12 }}>
-                <span className="lbl" style={{ width: 52, fontSize: 12 }}>{label}</span>
-                <div style={{ flex: 1 }}><Bar pct={(n / maxAge) * 100} /></div>
-                <span className="lbl-mono" style={{ width: 40, textAlign: 'right' }}>{n}명</span>
-              </div>
+              <span key={label} className="lbl" style={{ fontSize: 11 }}>
+                {label} <b style={{ color: 'var(--fg)', fontWeight: 600 }}>{n}명</b>{n < 10 ? ' · 참고' : ''}
+              </span>
             ))}
           </div>
         </div>
