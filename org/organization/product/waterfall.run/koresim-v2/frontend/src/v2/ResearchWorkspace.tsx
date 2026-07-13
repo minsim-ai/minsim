@@ -105,7 +105,8 @@ export function ResearchWorkspace({ projectId, runId, report }: ResearchWorkspac
     ? threads.find((thread) => thread.subject_uuid === selectedSubject.uuid) ?? null
     : null
   const choices = report.creatives.map((creative) => creative.id)
-  const cohortLabel = cohortName(cohort)
+  const outcomeLabel = (choice: string) => report.creatives.find((creative) => creative.id === choice)?.label ?? choice
+  const cohortLabel = cohortName(cohort, outcomeLabel, report.segment.mode)
   const suggestions = selectedSubject ? INTERVIEW_SUGGESTIONS : GROUP_SUGGESTIONS
 
   const selectSubject = (subject: ResearchSubject) => {
@@ -132,7 +133,7 @@ export function ResearchWorkspace({ projectId, runId, report }: ResearchWorkspac
     if (existing) return existing
     const created = await createProjectRunInterviewThread(projectId, runId, {
       subject_uuid: subject.uuid,
-      subject_label: subjectLabel(subject),
+      subject_label: subjectLabel(subject, outcomeLabel),
       subject_meta: subject.meta,
       context_quote: subject.quote,
     })
@@ -205,10 +206,10 @@ export function ResearchWorkspace({ projectId, runId, report }: ResearchWorkspac
             <span>{visibleSubjects.length}명</span>
           </div>
 
-          <div className="research-choice-filters" aria-label="선택안 필터">
+          <div className="research-choice-filters" aria-label="반응 필터">
             <button type="button" aria-pressed={choiceFilter === 'all'} className={choiceFilter === 'all' ? 'on' : ''} onClick={() => setChoiceFilter('all')}>전체</button>
             {choices.map((choice) => (
-              <button key={choice} type="button" aria-pressed={choiceFilter === choice} className={choiceFilter === choice ? 'on' : ''} onClick={() => setChoiceFilter(choice)}>{choice}안</button>
+              <button key={choice} type="button" aria-pressed={choiceFilter === choice} className={choiceFilter === choice ? 'on' : ''} onClick={() => setChoiceFilter(choice)}>{outcomeLabel(choice)}</button>
             ))}
           </div>
 
@@ -228,7 +229,7 @@ export function ResearchWorkspace({ projectId, runId, report }: ResearchWorkspac
                   <span className="research-subject-copy">
                     <span className="research-subject-head">
                       <strong>{subject.name}</strong>
-                      <span>{subject.choice ? `${subject.choice}안` : '응답자'}</span>
+                      <span>{subject.choice ? outcomeLabel(subject.choice) : '응답자'}</span>
                     </span>
                     {explorerMode === 'quotes' && <q>{subject.quote}</q>}
                     <small>{subject.meta}</small>
@@ -250,7 +251,7 @@ export function ResearchWorkspace({ projectId, runId, report }: ResearchWorkspac
                   <span className="research-avatar large" aria-hidden="true">{selectedSubject.name.slice(0, 1)}</span>
                   <div>
                     <span className="lbl-mono">1명 인터뷰</span>
-                    <h3>{subjectLabel(selectedSubject)}</h3>
+                    <h3>{subjectLabel(selectedSubject, outcomeLabel)}</h3>
                     <p>{selectedSubject.meta}</p>
                   </div>
                 </div>
@@ -294,7 +295,11 @@ export function ResearchWorkspace({ projectId, runId, report }: ResearchWorkspac
                     <option value="positive">긍정층</option>
                     <option value="negative">부정층</option>
                     <option value="confused">혼란층</option>
-                    {choices.map((choice) => <option key={choice} value={choice}>{choice}안 선택자</option>)}
+                    {choices.map((choice) => (
+                      <option key={choice} value={choice}>
+                        {outcomeLabel(choice)} {report.segment.mode === 'choice' ? '선택자' : '응답자'}
+                      </option>
+                    ))}
                   </select>
                 </label>
               )}
@@ -380,14 +385,14 @@ function FollowupStream({ entries, onInterview }: { entries: FollowupEntry[]; on
   )
 }
 
-function subjectLabel(subject: ResearchSubject): string {
-  return subject.choice ? `${subject.name} · ${subject.choice}안` : subject.name
+function subjectLabel(subject: ResearchSubject, outcomeLabel: (choice: string) => string): string {
+  return subject.choice ? `${subject.name} · ${outcomeLabel(subject.choice)}` : subject.name
 }
 
-function cohortName(value: string): string {
+function cohortName(value: string, outcomeLabel: (choice: string) => string, mode: MinsimReport['segment']['mode']): string {
   if (value === 'all') return '전체'
   if (value === 'positive') return '긍정층'
   if (value === 'negative') return '부정층'
   if (value === 'confused') return '혼란층'
-  return `${value}안 선택자`
+  return `${outcomeLabel(value)} ${mode === 'choice' ? '선택자' : '응답자'}`
 }

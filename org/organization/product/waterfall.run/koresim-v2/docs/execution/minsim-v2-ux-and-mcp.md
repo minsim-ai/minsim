@@ -31,6 +31,8 @@ The 2026-07-13 project/intake clarity pass adds these V2 interaction contracts:
 
 The result page uses `frontend/src/v2/resultAdapter.ts` as the boundary between backend data and minsim visualization. It converts the API envelope into verdict, metric cards, rank rows, segment matrices, evidence quotes, methodology, recommendations, and follow-up targets. `frontend/src/v2/ResearchWorkspace.tsx` combines evidence and respondent browsing with one target-aware composer: a cohort target runs fan-out follow-up, while an individual target uses a persisted cumulative interview thread.
 
+The 2026-07-13 segment reaction radar promotes regional and gender response from a folded appendix to a primary result surface. Churn results use semantic `유지/관망/이탈` labels without choice suffixes, default to confidence-first regional ranking, separate observed rates from sample reliability, expose missing gender coverage, and reuse the accessible Korea SVG map in a clearly labeled landing-page example. Design and validation record: [[../design/segment-reaction-radar]], [[segment-reaction-radar-v1]].
+
 ## Server-Persisted Flow
 
 The V2 frontend uses these project-scoped APIs:

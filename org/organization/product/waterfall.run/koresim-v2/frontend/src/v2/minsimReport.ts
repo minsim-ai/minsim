@@ -17,10 +17,18 @@ export type MinsimCreative = {
 export type MinsimRegion = {
   name: string
   svgId: string
+  leadId: string
   lead: string
   pct: string
+  pctValue: number
+  focusId: string
+  focusLabel: string
+  focusPct: number
+  deltaPoint: number
+  distribution: Record<string, number>
   n: number
   reliability: string
+  reliabilityRank: number
   why: string
   actions: string[]
 }
@@ -29,6 +37,7 @@ export type MinsimGender = {
   g: string
   icon: string
   n: number
+  leadId: string
   lead: string
   pct: string
   parts: [string, number][]
@@ -76,6 +85,13 @@ export type MinsimReport = {
   objections: MinsimObjection[]
   ageRows: MinsimAgeRow[]
   ageFull: MinsimAgeFull[]
+  segment: {
+    mode: 'choice' | 'intent'
+    focusId: string
+    focusLabel: string
+    overallPct: number
+    metricLabel: string
+  }
   gender: MinsimGender[]
   regions: MinsimRegion[]
   reco: { action: string; meta: string; bullets: string[] }
@@ -94,9 +110,9 @@ const OPT: Record<string, string> = {
 }
 
 const OUTCOME_COLORS: Record<string, string> = {
-  유지: 'var(--opt-a)',
-  관망: 'var(--opt-b)',
-  이탈: 'var(--opt-c)',
+  유지: 'var(--segment-retain)',
+  관망: 'var(--segment-watch)',
+  이탈: 'var(--segment-churn)',
 }
 
 const PROVINCE_SVG_ID: Record<string, string> = {
@@ -185,10 +201,14 @@ export function buildMinsimReport(result: RunResultEnvelope, options: { complete
   const actions = agent.actions.slice(0, 4)
   const watch = agent.watch.slice(0, 4)
 
+  const segmentMode = hasChoices ? 'choice' : 'intent'
+  const focusId = !hasChoices && outcomePct.이탈 !== undefined ? '이탈' : (winner?.id ?? ids[0] ?? '')
+  const focusLabel = outcomeLabel(focusId, hasChoices)
+  const overallFocusPct = round(outcomePct[focusId] ?? 0)
   const ageRows = buildAgeRows(result.segments)
   const ageFull = buildAgeFull(result.segments)
-  const gender = buildGender(result.segments)
-  const regions = buildRegions(result.segments)
+  const gender = buildGender(result.segments, hasChoices)
+  const regions = buildRegions(result.segments, hasChoices, focusId, overallFocusPct)
 
   const winnerLabel = winner?.label ?? '기준안'
   const reco = {
@@ -255,6 +275,13 @@ export function buildMinsimReport(result: RunResultEnvelope, options: { complete
     objections: buildObjections(result.raw_results, watch),
     ageRows,
     ageFull,
+    segment: {
+      mode: segmentMode,
+      focusId,
+      focusLabel,
+      overallPct: overallFocusPct,
+      metricLabel: focusId === '이탈' ? '이탈률' : `${focusLabel} 반응률`,
+    },
     gender,
     regions,
     reco,
@@ -411,7 +438,7 @@ function buildAgeFull(segments: JsonObject): MinsimAgeFull[] {
   })
 }
 
-function buildGender(segments: JsonObject): MinsimGender[] {
+function buildGender(segments: JsonObject, hasChoices: boolean): MinsimGender[] {
   const bySex = isRecord(segments.breakdown_by_sex) ? segments.breakdown_by_sex : {}
   return Object.keys(bySex).map((label) => {
     const counts = numberRecord((bySex as JsonObject)[label])
@@ -425,14 +452,20 @@ function buildGender(segments: JsonObject): MinsimGender[] {
       g: label,
       icon: isMale ? '♂' : '♀',
       n,
-      lead: top ? `${top[0]}안` : 'N/A',
+      leadId: top?.[0] ?? '',
+      lead: top ? outcomeLabel(top[0], hasChoices) : 'N/A',
       pct: top ? `${top[1]}%` : '0%',
       parts,
     }
   })
 }
 
-function buildRegions(segments: JsonObject): MinsimRegion[] {
+function buildRegions(
+  segments: JsonObject,
+  hasChoices: boolean,
+  focusId: string,
+  overallFocusPct: number,
+): MinsimRegion[] {
   const byProvince = isRecord(segments.breakdown_by_province) ? segments.breakdown_by_province : {}
   return Object.keys(byProvince)
     .map((name) => {
@@ -442,26 +475,59 @@ function buildRegions(segments: JsonObject): MinsimRegion[] {
       const top = entries[0]
       const lead = top ? top[0] : 'B'
       const pctNum = top && n > 0 ? round((top[1] / n) * 100) : 0
-      const leadLabel = `${lead}안`
-      const lowSample = n < 30
-      const why = lowSample
-        ? `표본이 작아(n=${n}) 편차가 큽니다. ${leadLabel} 우세는 방향성 참고치로만 해석하세요.`
-        : `${leadLabel} 선호가 ${pctNum}%로 가장 높은 지역 표본입니다. 이 panel 안에서 관측된 차이이며 시장 전체를 뜻하지 않습니다.`
-      const actions = lowSample
-        ? ['패널 확대 후 재확인 필요', `${leadLabel} 중심 메시지로 소규모 반응 확인`]
-        : [`${leadLabel} 중심 메시지로 지역 타겟 테스트`, '상위 반응 세그먼트에 같은 카피 우선 적용']
+      const leadLabel = outcomeLabel(lead, hasChoices)
+      const focusPct = n > 0 ? round(((counts[focusId] ?? 0) / n) * 100) : 0
+      const deltaPoint = round(focusPct - overallFocusPct)
+      const displayName = PROVINCE_SVG_ID[name] ?? name
+      const reliability = reliabilityForSample(n)
+      const isReferenceOnly = n < 10
+      const focusLabel = outcomeLabel(focusId, hasChoices)
+      const deltaText = `${deltaPoint >= 0 ? '+' : ''}${deltaPoint}pt`
+      const why = isReferenceOnly
+        ? `표본이 ${n}명뿐이라 편차가 큽니다. ${focusLabel} ${focusPct}%는 방향성 참고치로만 해석하세요.`
+        : hasChoices
+          ? `${displayName}의 ${focusLabel} 반응률은 ${focusPct}%로 전체보다 ${deltaText}입니다. 이 합성 패널에서 관측된 차이이며 시장 전체를 뜻하지 않습니다.`
+          : `${displayName}의 ${focusLabel} 비율은 ${focusPct}%로 전체보다 ${deltaText}입니다. 표본 ${n}명의 합성 패널 반응으로 해석하세요.`
+      const actions = isReferenceOnly
+        ? ['지역 표본을 늘려 다시 확인', `${focusLabel} 이유를 소규모 후속 질문으로 확인`]
+        : hasChoices
+          ? [`${focusLabel} 메시지로 지역 타겟 테스트`, '전체 대비 차이가 난 이유를 후속 질문으로 확인']
+          : [`${focusLabel} 트리거를 지역 코호트에 다시 질문`, '유지·관망으로 전환할 조건을 별도 확인']
+      const distribution = Object.fromEntries(
+        Object.entries(counts).map(([id, count]) => [id, n > 0 ? round((count / n) * 100) : 0]),
+      )
       return {
-        name,
-        svgId: PROVINCE_SVG_ID[name] ?? name,
+        name: displayName,
+        svgId: displayName,
+        leadId: lead,
         lead: leadLabel,
         pct: `${pctNum}%`,
+        pctValue: pctNum,
+        focusId,
+        focusLabel,
+        focusPct,
+        deltaPoint,
+        distribution,
         n,
-        reliability: n >= 50 ? '높음' : n >= 30 ? '보통' : '낮음',
+        reliability: reliability.label,
+        reliabilityRank: reliability.rank,
         why,
         actions,
       }
     })
     .sort((a, b) => b.n - a.n)
+}
+
+function outcomeLabel(id: string, hasChoices: boolean): string {
+  if (!id) return 'N/A'
+  return hasChoices ? `${id}안` : id
+}
+
+function reliabilityForSample(n: number): { label: string; rank: number } {
+  if (n >= 50) return { label: '높음', rank: 4 }
+  if (n >= 30) return { label: '보통', rank: 3 }
+  if (n >= 10) return { label: '낮음', rank: 2 }
+  return { label: '참고', rank: 1 }
 }
 
 function buildKeywords(rawResults: RawPersonaResult[], reasonsByChoice: Record<string, string[]>): { w: string; n: number }[] {
@@ -712,8 +778,11 @@ export function displayName(seed: string, sex: string): string {
 export function choiceOf(item: RawPersonaResult): string {
   const parsed = item.parsed
   if (parsed && typeof parsed.choice === 'string' && parsed.choice.trim()) return parsed.choice.trim().charAt(0)
+  if (parsed && typeof parsed.intent === 'string' && parsed.intent.trim()) return parsed.intent.trim()
   const match = /선택[:：]\s*([A-D])/.exec(item.response ?? '')
-  return match ? match[1] : ''
+  if (match) return match[1]
+  const intentMatch = /(?:대표)?의향[:：]\s*(유지|관망|이탈)/.exec(item.response ?? '')
+  return intentMatch ? intentMatch[1] : ''
 }
 
 function confidenceLabel(total: number, parseSuccessRate: number | null): string {

@@ -1,5 +1,7 @@
 import { useRef, useState, type KeyboardEvent } from 'react'
 import { AuthStatus } from './components/AuthStatus'
+import { InteractiveKoreaMap } from './v2/KoreaReactionMap'
+import type { MinsimRegion } from './v2/minsimReport'
 import { navigateTo } from './v2/navigation'
 
 const DEMO_PDF_PREVIEW_URL = 'https://drive.google.com/file/d/1cm-ydOpcMi6rslJOnmBaGoRp-eGarOgW/view?usp=sharing'
@@ -45,8 +47,24 @@ const audiences = [
   { n: '04', title: 'UX 리서처', body: '실제 인터뷰 전에 필요한 질문을 잡을 때' },
 ]
 
+const segmentDemoRegions: MinsimRegion[] = [
+  demoRegion('경기도', 62, 58, '이탈'),
+  demoRegion('서울특별시', 48, 64, '이탈'),
+  demoRegion('부산광역시', 25, 42, '관망'),
+  demoRegion('충청남도', 25, 48, '관망'),
+  demoRegion('경상남도', 22, 82, '이탈'),
+  demoRegion('인천광역시', 18, 56, '이탈'),
+]
+
+const segmentDemoLegend = [
+  { id: '유지', label: '유지', color: 'var(--segment-retain)' },
+  { id: '관망', label: '관망', color: 'var(--segment-watch)' },
+  { id: '이탈', label: '이탈', color: 'var(--segment-churn)' },
+]
+
 export function LandingPage() {
   const [draft, setDraft] = useState('')
+  const [demoRegionSelection, setDemoRegionSelection] = useState<MinsimRegion | null>(segmentDemoRegions[0])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const composingRef = useRef(false)
 
@@ -155,16 +173,59 @@ export function LandingPage() {
             ))}
           </div>
 
-          <aside className="minsim-result-preview" aria-label="결과 보고서 예시">
+        </section>
+
+        <hr className="hr" />
+
+        <section className="wrap minsim-section landing-segment-demo" aria-labelledby="landing-segment-title">
+          <div className="landing-segment-head">
             <div>
-              <span className="lbl-mono">결과 예시</span>
-              <strong>C안 선호 63%</strong>
-              <small>예시 데이터 · 실제 결과는 입력과 실행 표본에 따라 달라집니다.</small>
+              <p className="kicker">세그먼트 반응 예시</p>
+              <h2 id="landing-segment-title">전국 200명 중, 누가 이탈하려는지 먼저 확인하세요.</h2>
+              <p className="muted">비율만 줄 세우지 않고 지역별 표본과 신뢰도를 함께 보여줍니다.</p>
             </div>
-            <div className="minsim-preview-proof">
-              <span>표본 조건</span><span>세그먼트 비교</span><span>근거 발언</span><span>재현 seed</span>
+            <div className="landing-demo-actions">
+              <span>예시 데이터</span>
+              <button className="btn primary" type="button" onClick={() => start()}>내 서비스로 시뮬레이션 →</button>
             </div>
-          </aside>
+          </div>
+
+          <div className="landing-segment-kpis">
+            <article><span>전체 이탈률</span><strong>63.4%</strong><small>합성 패널 200명</small></article>
+            <article><span>신뢰 가능한 주의 지역</span><strong>서울 64%</strong><small>48명 · 신뢰 보통</small></article>
+            <article><span>관측 최고</span><strong>경남 82%</strong><small>22명 · 낮은 신뢰</small></article>
+          </div>
+
+          <div className="landing-segment-grid">
+            <div className="card landing-segment-map">
+              <InteractiveKoreaMap
+                regions={segmentDemoRegions}
+                selectedRegion={demoRegionSelection}
+                onSelect={setDemoRegionSelection}
+                legend={segmentDemoLegend}
+                metricLabel="이탈률"
+                label="예시 지역별 이탈 반응 지도"
+              />
+            </div>
+            <aside className="card landing-segment-rank" aria-label="예시 지역 반응 순위">
+              <div className="landing-segment-rank-head">
+                <span className="lbl-mono">신뢰 우선 지역</span>
+                <span>총 200명</span>
+              </div>
+              {segmentDemoRegions.slice(0, 4).map((region) => (
+                <button
+                  key={region.name}
+                  type="button"
+                  className={demoRegionSelection?.name === region.name ? 'on' : ''}
+                  onClick={() => setDemoRegionSelection(region)}
+                >
+                  <span><strong>{compactLandingRegion(region.name)}</strong><small>{region.focusLabel} · 신뢰 {region.reliability}</small></span>
+                  <span><b>{region.focusPct}%</b><small>{region.n}명</small></span>
+                </button>
+              ))}
+              <p>합성 페르소나의 관측 반응 예시이며 실제 고객 성과를 의미하지 않습니다.</p>
+            </aside>
+          </div>
         </section>
 
         <hr className="hr" />
@@ -228,4 +289,31 @@ function SectionHead({ kicker, title }: { kicker: string; title: string }) {
 function isComposing(event: KeyboardEvent<HTMLTextAreaElement>, composingRef: { current: boolean }): boolean {
   const nativeEvent = event.nativeEvent as globalThis.KeyboardEvent & { keyCode?: number }
   return composingRef.current || nativeEvent.isComposing || nativeEvent.keyCode === 229
+}
+
+function demoRegion(name: string, n: number, focusPct: number, leadId: '관망' | '이탈'): MinsimRegion {
+  const reliability = n >= 50 ? '높음' : n >= 30 ? '보통' : n >= 10 ? '낮음' : '참고'
+  const reliabilityRank = n >= 50 ? 4 : n >= 30 ? 3 : n >= 10 ? 2 : 1
+  return {
+    name,
+    svgId: name,
+    leadId,
+    lead: leadId,
+    pct: `${leadId === '이탈' ? focusPct : 100 - focusPct}%`,
+    pctValue: leadId === '이탈' ? focusPct : 100 - focusPct,
+    focusId: '이탈',
+    focusLabel: '이탈',
+    focusPct,
+    deltaPoint: Math.round((focusPct - 63.4) * 10) / 10,
+    distribution: { 유지: 0, 관망: 100 - focusPct, 이탈: focusPct },
+    n,
+    reliability,
+    reliabilityRank,
+    why: '홈페이지에서 제품 결과 형태를 설명하기 위한 예시 데이터입니다.',
+    actions: [],
+  }
+}
+
+function compactLandingRegion(name: string): string {
+  return name.replace('특별시', '').replace('광역시', '').replace(/도$/, '')
 }

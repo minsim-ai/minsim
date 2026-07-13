@@ -19,9 +19,9 @@ const OPT: Record<string, string> = {
   B: 'var(--opt-b)',
   C: 'var(--opt-c)',
   D: 'var(--opt-d)',
-  유지: 'var(--opt-a)',
-  관망: 'var(--opt-b)',
-  이탈: 'var(--opt-c)',
+  유지: 'var(--segment-retain)',
+  관망: 'var(--segment-watch)',
+  이탈: 'var(--segment-churn)',
 }
 
 type ResultsState = {
@@ -154,6 +154,7 @@ export function MinsimResultsPage({ projectId, runId }: { projectId: string | nu
       <div className="wrap">
         <nav className="result-section-nav" aria-label="결과 보고서 섹션">
           <a href="#result-summary">요약</a>
+          <a href="#result-segments">세그먼트</a>
           <a href="#result-evidence">응답·대화</a>
           <a href="#result-method">방법론</a>
         </nav>
@@ -161,10 +162,11 @@ export function MinsimResultsPage({ projectId, runId }: { projectId: string | nu
         <Verdict report={report} onExport={downloadExport} />
         <CoreCase report={report} />
         <DecisionSummary report={report} />
+        <div id="result-segments" className="result-anchor" />
+        <SegmentRadar report={report} />
         <ResultDisclosure title="AI 해석 보고서"><AiReport report={report} /></ResultDisclosure>
         <ResultDisclosure title="주요 지표 해석"><MarketResponse report={report} /></ResultDisclosure>
-        <ResultDisclosure title="연령대별 선호 전체표"><AgeFullTable report={report} /></ResultDisclosure>
-        <ResultDisclosure title="지역·성별 반응"><SegmentMatrix report={report} /></ResultDisclosure>
+        <ResultDisclosure title="연령대별 반응 전체표"><AgeFullTable report={report} /></ResultDisclosure>
         <ResultDisclosure title="기회·리스크 통합 맵"><OpportunityRiskMap report={report} /></ResultDisclosure>
         <ResearchWorkspace projectId={projectId} runId={runId} report={report} />
         <div id="result-method" />
@@ -224,10 +226,10 @@ function SectionHead({ kicker, title, sub, right }: { kicker: string; title: str
   )
 }
 
-function Bar({ pct, cls = '', h = 8 }: { pct: number; cls?: string; h?: number }) {
+function Bar({ pct, cls = '', h = 8, color }: { pct: number; cls?: string; h?: number; color?: string }) {
   return (
     <div className={`bar ${cls}`.trim()} style={{ height: h }}>
-      <i style={{ width: `${pct}%` }} />
+      <i style={{ width: `${pct}%`, background: color }} />
     </div>
   )
 }
@@ -242,12 +244,11 @@ function StackBar({ parts, h = 18 }: { parts: [string, number][]; h?: number }) 
   )
 }
 
-function ChoicePill({ id, on = false, suffix = '안' }: { id: string; on?: boolean; suffix?: string }) {
+function ChoicePill({ id, label, on = false, suffix = '안' }: { id: string; label?: string; on?: boolean; suffix?: string }) {
   const color = OPT[id] ?? 'var(--opt-d)'
   return (
     <span className="badge" style={{ background: on ? color : 'transparent', color: on ? '#FAFAF9' : color, border: `1px solid ${color}`, fontWeight: 700 }}>
-      {id}
-      {suffix}
+      {label ?? `${id}${suffix}`}
     </span>
   )
 }
@@ -277,22 +278,25 @@ function RatioBar({ parts }: { parts: [string, number][] }) {
 /* --------------------------------- sections -------------------------------- */
 
 function Verdict({ report, onExport }: { report: MinsimReport; onExport: () => void }) {
-  const { run, winner, runnerUp } = report
+  const { run, winner, runnerUp, segment } = report
   if (!winner) return null
+  const isIntentReport = segment.mode === 'intent'
   const metrics = [
     { l: '응답 표본', v: `${run.panel.toLocaleString('ko-KR')}명`, s: `유효 응답 ${run.valid.toLocaleString('ko-KR')}명` },
-    { l: '선호 격차', v: run.gap, s: runnerUp ? `1위−2위 (${winner.id}−${runnerUp.id})` : '1위 기준' },
+    isIntentReport
+      ? { l: segment.metricLabel, v: `${segment.overallPct}%`, s: `전체 합성 패널 중 ${segment.focusLabel}` }
+      : { l: '선호 격차', v: run.gap, s: runnerUp ? `1위−2위 (${winner.id}−${runnerUp.id})` : '1위 기준' },
     { l: '해석 상태', v: run.status, s: `구조화 성공 ${run.structured}` },
   ]
   return (
     <section style={{ paddingTop: 30, paddingBottom: 34 }}>
       <div className="spread" style={{ marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
-        <Kicker>{run.gap === '집계 중' ? '분석 보고서' : '크리에이티브 비교 분석 보고서'}</Kicker>
+        <Kicker>{isIntentReport ? '행동 의향 예측 보고서' : run.gap === '집계 중' ? '분석 보고서' : '크리에이티브 비교 분석 보고서'}</Kicker>
       </div>
       <div className="result-verdict-grid">
         <div className="col" style={{ gap: 22 }}>
           <div>
-            <span className="badge lime" style={{ marginBottom: 16 }}>먼저 선택 · {winner.label}</span>
+            <span className="badge lime" style={{ marginBottom: 16 }}>{isIntentReport ? '핵심 관측' : '먼저 선택'} · {winner.label}</span>
             <h1 style={{ fontSize: 'clamp(24px, 6.2vw, 38px)', lineHeight: 1.18, marginTop: 14, letterSpacing: '-.025em', fontWeight: 600 }}>{winner.text}</h1>
             <p className="muted" style={{ fontSize: 15, lineHeight: 1.65, marginTop: 16, maxWidth: 640 }}>
               {run.verdictLine} {run.conclusion}
@@ -498,6 +502,7 @@ function AiReport({ report }: { report: MinsimReport }) {
 
 function MarketResponse({ report }: { report: MinsimReport }) {
   const { creatives, winner, runnerUp, keywords } = report
+  const isIntentReport = report.segment.mode === 'intent'
   return (
     <section style={{ padding: '40px 0' }}>
       <div style={{ display: 'grid', gridTemplateColumns: '1.15fr .85fr', gap: 40 }}>
@@ -515,8 +520,8 @@ function MarketResponse({ report }: { report: MinsimReport }) {
                       <span className="lbl-mono" style={{ fontSize: 11 }}>±{creative.band}</span>
                     </span>
                   </div>
-                  <div className="lbl-mono">선호도 분포 · {creative.label} · {creative.count}명 · 재현 변동 ±{creative.band}%p</div>
-                  <Bar pct={creative.pct} cls={creative.id.toLowerCase()} />
+                  <div className="lbl-mono">{isIntentReport ? '행동 의향' : '선호도'} 분포 · {creative.label} · {creative.count}명 · 재현 변동 ±{creative.band}%p</div>
+                  <Bar pct={creative.pct} cls={creative.id.toLowerCase()} color={creative.color} />
                 </div>
               </div>
             ))}
@@ -526,10 +531,10 @@ function MarketResponse({ report }: { report: MinsimReport }) {
           <SectionHead kicker="인사이트" title="자동 추출" />
           {winner && (
             <div className="card" style={{ padding: 18, marginBottom: 12 }}>
-              <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>{winner.label}이 가장 많이 선택됐습니다</div>
+              <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>{winner.label}이 가장 많이 {isIntentReport ? '관측됐습니다' : '선택됐습니다'}</div>
               <p className="muted" style={{ fontSize: 13, lineHeight: 1.6 }}>
-                {winner.label}이 {winner.count}명({winner.pct}%)에게 선택돼 가장 강한 반응을 얻었습니다.
-                {runnerUp ? ` 2위 ${runnerUp.label}(${runnerUp.count}명·${runnerUp.pct}%)보다 ${report.run.gap} 더 많이 선택됐습니다.` : ''}
+                {winner.label}이 {winner.count}명({winner.pct}%)에게서 {isIntentReport ? '나타나 가장 큰 행동 의향 집단입니다.' : '선택돼 가장 강한 반응을 얻었습니다.'}
+                {runnerUp ? ` 다음 ${runnerUp.label}(${runnerUp.count}명·${runnerUp.pct}%)보다 ${report.run.gap} 높습니다.` : ''}
               </p>
             </div>
           )}
@@ -558,7 +563,11 @@ function AgeFullTable({ report }: { report: MinsimReport }) {
   const gridTemplate = `minmax(72px, 1.2fr) repeat(${legend.length}, minmax(54px, .85fr)) minmax(52px, .75fr)`
   return (
     <section style={{ padding: '40px 0' }}>
-      <SectionHead kicker="연령 분포" title="연령대별 선호 — 전체" sub="색이 진할수록 해당 후보의 선택 비율이 높습니다. 굵은 숫자가 연령대별 1위이며, n이 작은 집단은 참고용으로만 해석합니다." />
+      <SectionHead
+        kicker="연령 분포"
+        title={`연령대별 ${report.segment.mode === 'intent' ? '반응' : '선호'} — 전체`}
+        sub={`색이 진할수록 해당 ${report.segment.mode === 'intent' ? '행동 의향' : '후보의 선택'} 비율이 높습니다. 굵은 숫자가 연령대별 1위이며, n이 작은 집단은 참고용으로만 해석합니다.`}
+      />
       <div className="row" style={{ gap: 16, marginBottom: 14, flexWrap: 'wrap' }}>
         {legend.map((creative) => (
           <span key={creative.id} className="row lbl" style={{ gap: 6, fontSize: 12, whiteSpace: 'nowrap' }}>
@@ -613,21 +622,73 @@ function AgeFullTable({ report }: { report: MinsimReport }) {
   )
 }
 
-function SegmentMatrix({ report }: { report: MinsimReport }) {
-  const { gender, regions, creatives } = report
-  const [region, setRegion] = useState<MinsimRegion | null>(null)
+function SegmentRadar({ report }: { report: MinsimReport }) {
+  const { gender, regions, creatives, segment } = report
+  const [region, setRegion] = useState<MinsimRegion | null>(() => pickReliableRegion(regions))
+  const [sortBy, setSortBy] = useState<'confidence' | 'rate' | 'sample'>('confidence')
   const legend = [...creatives].sort((a, b) => a.id.localeCompare(b.id))
   const totalRegionN = regions.reduce((sum, item) => sum + item.n, 0)
+  const sortedRegions = [...regions].sort((a, b) => {
+    if (sortBy === 'rate') return b.focusPct - a.focusPct || b.n - a.n
+    if (sortBy === 'sample') return b.n - a.n || b.focusPct - a.focusPct
+    return b.reliabilityRank - a.reliabilityRank || b.n - a.n || b.focusPct - a.focusPct
+  })
+  const observedHighest = [...regions].sort((a, b) => b.focusPct - a.focusPct || b.n - a.n)[0] ?? null
+  const reliableHighest = pickReliableRegion(regions)
+  const female = gender.find((item) => /여/.test(item.g)) ?? null
+  const male = gender.find((item) => /남/.test(item.g)) ?? null
+  const genderTotal = gender.reduce((sum, item) => sum + item.n, 0)
+  const genderCoverage = female && male
+    ? `여성 ${female.n}명 · 남성 ${male.n}명`
+    : female
+      ? `여성 ${female.n}명 · 남성 0명`
+      : male
+        ? `여성 0명 · 남성 ${male.n}명`
+        : '성별 정보 없음'
+  const kpiLabel = segment.focusId === '이탈' ? '전체 이탈률' : `전체 ${segment.metricLabel}`
+  const mapLegend = legend.map((item) => ({ id: item.id, label: item.label, color: item.color }))
+
+  if (regions.length === 0 && gender.length === 0) return null
+
   return (
-    <section style={{ padding: '40px 0' }}>
-      <SectionHead kicker="세그먼트 분석" title="지역·성별 반응" />
-      <div className="row" style={{ gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
-        {legend.map((creative) => (
-          <span key={creative.id} className="row lbl" style={{ gap: 6, fontSize: 12 }}>
-            <span style={{ width: 10, height: 10, borderRadius: 3, background: creative.color }} />
-            {creative.label}
-          </span>
-        ))}
+    <section className="segment-radar" aria-label="세그먼트 반응 레이더">
+      <SectionHead
+        kicker="세그먼트 분석"
+        title="세그먼트 반응 레이더"
+        sub="높은 비율과 높은 신뢰도를 분리해, 어디를 먼저 확인해야 하는지 보여줍니다."
+        right={regions.length > 0 ? (
+          <label className="segment-sort">
+            <span>지역 정렬</span>
+            <select value={sortBy} onChange={(event) => setSortBy(event.target.value as typeof sortBy)}>
+              <option value="confidence">신뢰 우선</option>
+              <option value="rate">{segment.metricLabel} 순</option>
+              <option value="sample">표본 순</option>
+            </select>
+          </label>
+        ) : null}
+      />
+
+      <div className="segment-kpi-strip" aria-label="세그먼트 핵심 지표">
+        <article>
+          <span>{kpiLabel}</span>
+          <strong>{segment.overallPct}%</strong>
+          <small>합성 패널 전체</small>
+        </article>
+        <article>
+          <span>신뢰 가능한 주의 지역</span>
+          <strong>{reliableHighest ? `${reliableHighest.name} ${reliableHighest.focusPct}%` : '표본 보완 필요'}</strong>
+          <small>{reliableHighest ? `${reliableHighest.n}명 · 신뢰 ${reliableHighest.reliability}` : '30명 이상 지역 없음'}</small>
+        </article>
+        <article className={observedHighest && observedHighest.n < 10 ? 'is-reference' : ''}>
+          <span>관측 최고</span>
+          <strong>{observedHighest ? `${observedHighest.name} ${observedHighest.focusPct}%` : '—'}</strong>
+          <small>{observedHighest ? `${observedHighest.n}명 · ${observedHighest.n < 10 ? '소표본 참고' : `신뢰 ${observedHighest.reliability}`}` : '지역 정보 없음'}</small>
+        </article>
+        <article className={!female || !male ? 'is-reference' : ''}>
+          <span>성별 표본 범위</span>
+          <strong>{genderTotal.toLocaleString('ko-KR')}명</strong>
+          <small>{genderCoverage}{!female || !male ? ' · 성별 비교 불가' : ''}</small>
+        </article>
       </div>
 
       {regions.length > 0 && (
@@ -635,33 +696,40 @@ function SegmentMatrix({ report }: { report: MinsimReport }) {
           <div className="card region-map-card">
             <div className="spread" style={{ marginBottom: 14, gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
               <div className="col" style={{ gap: 3, minWidth: 0 }}>
-                <div className="lbl-mono">지역별 반응 지도 · 지역을 누르면 상세</div>
-                <span className="muted" style={{ fontSize: 12.5 }}>행정경계 SVG를 안별 색상과 반응 강도로 다시 그린 시도 지도</span>
+                <div className="lbl-mono">지역 반응 지도 · 지역을 누르면 상세</div>
+                <span className="muted" style={{ fontSize: 12.5 }}>색은 대표 반응, 진하기는 {segment.metricLabel}, 배지는 표본 신뢰도를 뜻합니다.</span>
               </div>
               <span className="region-confidence">{regions.length}개 시도</span>
             </div>
-            <InteractiveKoreaMap regions={regions} selectedRegion={region} onSelect={setRegion} />
+            <InteractiveKoreaMap
+              regions={regions}
+              selectedRegion={region}
+              onSelect={setRegion}
+              legend={mapLegend}
+              metricLabel={segment.metricLabel}
+            />
           </div>
           <div className="card region-side-card">
-            <RegionDetailPanel region={region} onClear={() => setRegion(null)} />
+            <RegionDetailPanel region={region} metricLabel={segment.metricLabel} onClear={() => setRegion(null)} />
             <div className="region-list-head">
               <span className="lbl-mono">지역 반응 순위</span>
               <span className="lbl">총 {totalRegionN}명</span>
             </div>
-            <div className="region-list-scroll">
-              {regions.map((item) => (
+            <div className="region-list-scroll" role="list" aria-label={`지역별 ${segment.metricLabel} 순위`}>
+              {sortedRegions.map((item) => (
                 <button
                   key={item.name}
                   type="button"
                   className={`region-list-button spread${region && region.name === item.name ? ' on' : ''}`}
                   onClick={() => setRegion(item)}
+                  role="listitem"
                 >
                   <div className="col" style={{ gap: 3 }}>
                     <span className="row" style={{ gap: 7 }}>
                       <span style={{ fontSize: 14, fontWeight: 600 }}>{item.name}</span>
-                      <ChoicePill id={item.lead.charAt(0)} on={Boolean(region && region.name === item.name)} />
+                      <ChoicePill id={item.leadId} label={item.lead} on={Boolean(region && region.name === item.name)} />
                     </span>
-                    <span className="lbl-mono">{item.lead} {item.pct} · 신뢰 {item.reliability}</span>
+                    <span className="lbl-mono">{segment.metricLabel} {item.focusPct}% · 신뢰 {item.reliability}</span>
                   </div>
                   <span className="row" style={{ gap: 8 }}>
                     <span className="muted" style={{ fontSize: 12.5 }}>{item.n}명</span>
@@ -675,23 +743,58 @@ function SegmentMatrix({ report }: { report: MinsimReport }) {
       )}
 
       {gender.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12 }}>
-          {gender.map((item) => (
-            <div key={item.g} className="card" style={{ padding: 18 }}>
-              <div className="row" style={{ gap: 12, marginBottom: 12 }}>
-                <div className="av" style={{ width: 34, height: 34, fontSize: 16 }}>{item.icon}</div>
-                <div className="col">
-                  <span style={{ fontWeight: 600, fontSize: 14 }}>{item.g}</span>
-                  <span className="lbl">{item.n}명 · {item.lead} {item.pct}</span>
-                </div>
-              </div>
-              <StackBar parts={item.parts} h={14} />
+        <div className="segment-gender-block">
+          <div className="spread segment-subhead">
+            <div>
+              <span className="lbl-mono">성별 반응</span>
+              <p>지역과 별도로 집계된 성별 분포입니다.</p>
             </div>
-          ))}
+            {(!female || !male) && <span className="segment-coverage-warning">한쪽 표본 없음 · 비교 불가</span>}
+          </div>
+          <div className="segment-gender-grid">
+            {gender.map((item) => (
+              <article key={item.g} className="card segment-gender-card">
+                <div className="spread" style={{ gap: 12, marginBottom: 12 }}>
+                  <div className="col">
+                    <span style={{ fontWeight: 650, fontSize: 15 }}>{normalizeGenderLabel(item.g)}</span>
+                    <span className="lbl">{item.n}명 · 대표 반응 {item.lead} {item.pct}</span>
+                  </div>
+                  <ChoicePill id={item.leadId} label={item.lead} />
+                </div>
+                <StackBar parts={item.parts} h={14} />
+              </article>
+            ))}
+            {!female && <GenderEmpty label="여성" />}
+            {!male && <GenderEmpty label="남성" />}
+          </div>
         </div>
       )}
     </section>
   )
+}
+
+function GenderEmpty({ label }: { label: string }) {
+  return (
+    <article className="card segment-gender-card is-empty">
+      <div className="col" style={{ gap: 5 }}>
+        <span style={{ fontWeight: 650, fontSize: 15 }}>{label}</span>
+        <span className="lbl">0명 · 이번 표본에서 관측되지 않음</span>
+      </div>
+      <div className="segment-empty-bar" aria-hidden="true" />
+    </article>
+  )
+}
+
+function pickReliableRegion(regions: MinsimRegion[]): MinsimRegion | null {
+  return [...regions]
+    .filter((item) => item.n >= 30)
+    .sort((a, b) => b.focusPct - a.focusPct || b.n - a.n)[0] ?? null
+}
+
+function normalizeGenderLabel(label: string): string {
+  if (/여/.test(label)) return '여성'
+  if (/남/.test(label)) return '남성'
+  return label
 }
 
 function OpportunityRiskMap({ report }: { report: MinsimReport }) {
@@ -790,7 +893,15 @@ function OpportunityRiskMap({ report }: { report: MinsimReport }) {
   )
 }
 
-function RegionDetailPanel({ region, onClear }: { region: MinsimRegion | null; onClear: () => void }) {
+function RegionDetailPanel({
+  region,
+  metricLabel,
+  onClear,
+}: {
+  region: MinsimRegion | null
+  metricLabel: string
+  onClear: () => void
+}) {
   if (!region) {
     return (
       <div className="region-detail-panel region-detail-empty">
@@ -808,7 +919,7 @@ function RegionDetailPanel({ region, onClear }: { region: MinsimRegion | null; o
           <span className="lbl-mono">지역 상세</span>
           <div className="row" style={{ gap: 9, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 19, fontWeight: 700 }}>{region.name}</span>
-            <ChoicePill id={region.lead.charAt(0)} on />
+            <ChoicePill id={region.leadId} label={region.lead} on />
           </div>
         </div>
         <div className="row" style={{ gap: 7 }}>
@@ -817,8 +928,9 @@ function RegionDetailPanel({ region, onClear }: { region: MinsimRegion | null; o
         </div>
       </div>
       <div className="region-metrics">
-        <span><span className="lbl-mono">1위안</span><b>{region.lead}</b></span>
-        <span><span className="lbl-mono">선호</span><b>{region.pct}</b></span>
+        <span><span className="lbl-mono">대표 반응</span><b>{region.lead}</b></span>
+        <span><span className="lbl-mono">{metricLabel}</span><b>{region.focusPct}%</b></span>
+        <span><span className="lbl-mono">전체 대비</span><b>{region.deltaPoint >= 0 ? '+' : ''}{region.deltaPoint}pt</b></span>
         <span><span className="lbl-mono">표본</span><b>{region.n}명</b></span>
       </div>
       <div style={{ marginBottom: 15 }}>
@@ -836,6 +948,7 @@ function RegionDetailPanel({ region, onClear }: { region: MinsimRegion | null; o
           ))}
         </div>
       </div>
+      <a className="btn primary region-followup-link" href="#result-evidence">이 지역 코호트에 후속 질문하기 →</a>
     </div>
   )
 }

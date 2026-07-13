@@ -94,6 +94,8 @@ const churnResultFixture: RunResultEnvelope = {
   ...minsimResultFixture,
   run_id: 'fixture-minsim-churn',
   simulation_type: 'churn_prediction',
+  sample_size: 164,
+  total_responses: 164,
   metrics: {
     intent_counts: { 유지: 2, 관망: 58, 이탈: 104 },
     intent_pct: { 유지: 1.2, 관망: 35.4, 이탈: 63.4 },
@@ -104,7 +106,42 @@ const churnResultFixture: RunResultEnvelope = {
       '30대': { 관망: 19, 이탈: 30 },
       '40대': { 관망: 18, 이탈: 46 },
     },
+    breakdown_by_sex: {
+      여자: { 유지: 2, 관망: 58, 이탈: 104 },
+    },
+    breakdown_by_province: {
+      경기: { 유지: 1, 관망: 21, 이탈: 29 },
+      서울: { 유지: 1, 관망: 13, 이탈: 23 },
+      경상남: { 유지: 0, 관망: 1, 이탈: 13 },
+      경상북: { 유지: 0, 관망: 2, 이탈: 12 },
+      부산: { 유지: 0, 관망: 6, 이탈: 3 },
+      인천: { 유지: 0, 관망: 4, 이탈: 5 },
+      대구: { 유지: 0, 관망: 3, 이탈: 5 },
+      강원: { 유지: 0, 관망: 1, 이탈: 3 },
+      충청남: { 유지: 0, 관망: 2, 이탈: 2 },
+      광주: { 유지: 0, 관망: 0, 이탈: 3 },
+      울산: { 유지: 0, 관망: 2, 이탈: 1 },
+      충청북: { 유지: 0, 관망: 1, 이탈: 2 },
+      전라남: { 유지: 0, 관망: 1, 이탈: 1 },
+      대전: { 유지: 0, 관망: 0, 이탈: 1 },
+      전북: { 유지: 0, 관망: 0, 이탈: 1 },
+      제주: { 유지: 0, 관망: 1, 이탈: 0 },
+    },
   },
+  raw_results: [
+    {
+      uuid: 'persona-churn-1',
+      persona: { name: '김영희', age: 67, sex: '여', province: '경기', occupation: '주부' },
+      response: '의향: 이탈\n이유: 가격이 오르면 가족과 다시 상의하고 싶습니다.',
+      parsed: { intent: '이탈', reason: '가격 인상 부담' },
+    },
+    {
+      uuid: 'persona-churn-2',
+      persona: { name: '박정자', age: 72, sex: '여', province: '서울', occupation: '은퇴' },
+      response: '의향: 관망\n이유: 돌봄 효과를 조금 더 확인하고 싶습니다.',
+      parsed: { intent: '관망', reason: '효과 검증 필요' },
+    },
+  ],
 }
 
 export function runMinsimResultFixtureCheck(): MinsimResultFixtureCheck {
@@ -141,10 +178,27 @@ export function runMinsimResultFixtureCheck(): MinsimResultFixtureCheck {
   if (churnReport.ageFull.some((row) => row.pct === null)) {
     failures.push('expected churn age rows to include intent percentages')
   }
+  if (churnReport.segment.mode !== 'intent' || churnReport.segment.focusId !== '이탈') {
+    failures.push('expected churn segment focus to use 이탈 intent')
+  }
+  if (churnReport.gender.some((item) => item.lead.endsWith('안'))) {
+    failures.push('expected churn gender labels without choice suffix')
+  }
+  if (churnReport.crowd.some((item) => !['이탈', '관망'].includes(item.choice))) {
+    failures.push('expected churn respondent intent labels in research workspace')
+  }
+  const gyeongnam = churnReport.regions.find((item) => item.name === '경상남도')
+  if (!gyeongnam || gyeongnam.focusPct !== 92.9 || gyeongnam.lead !== '이탈') {
+    failures.push('expected normalized Gyeongnam churn segment')
+  }
+  const jeju = churnReport.regions.find((item) => item.name === '제주특별자치도')
+  if (!jeju || jeju.reliability !== '참고') {
+    failures.push('expected sub-10 region to be marked 참고')
+  }
 
   return {
     ok: failures.length === 0,
-    checked: 1,
+    checked: 2,
     failures,
   }
 }
