@@ -96,31 +96,64 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
       <div className="v2-editor-grid">
         <label>
           <span>이름</span>
-          <input value={name} onChange={(event) => setName(event.target.value)} />
+          <input
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="예: 사주·점성술 AI 채팅 앱"
+          />
         </label>
         <label>
           <span>설명</span>
-          <input value={description} onChange={(event) => setDescription(event.target.value)} />
+          <input
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            placeholder="예: 사주와 별자리 해석을 대화형으로 제공하는 AI 앱"
+          />
         </label>
         <label className="v2-wide-field">
           <span>제품 컨텍스트</span>
-          <textarea value={productContext} onChange={(event) => setProductContext(event.target.value)} rows={5} />
+          <textarea
+            value={productContext}
+            onChange={(event) => setProductContext(event.target.value)}
+            placeholder="예: 생년월일과 고민을 바탕으로 사주·점성술 상담을 제공하는 AI 채팅 앱"
+            rows={5}
+          />
         </label>
         <label>
           <span>기능</span>
-          <textarea value={features} onChange={(event) => setFeatures(event.target.value)} rows={5} />
+          <textarea
+            value={features}
+            onChange={(event) => setFeatures(event.target.value)}
+            placeholder={'예: 사주 풀이\n별자리 운세\nAI 고민 상담'}
+            rows={5}
+          />
         </label>
         <label>
           <span>가격</span>
-          <textarea value={prices} onChange={(event) => setPrices(event.target.value)} rows={5} />
+          <textarea
+            value={prices}
+            onChange={(event) => setPrices(event.target.value)}
+            placeholder="예: 무료 3회 상담 · 프리미엄 월 9,900원"
+            rows={5}
+          />
         </label>
         <label className="v2-wide-field">
           <span>타겟 메모</span>
-          <textarea value={targetNotes} onChange={(event) => setTargetNotes(event.target.value)} rows={4} />
+          <textarea
+            value={targetNotes}
+            onChange={(event) => setTargetNotes(event.target.value)}
+            placeholder="예: 사주·별자리에 관심 있고 연애·진로 고민을 나누고 싶은 20~30대"
+            rows={4}
+          />
         </label>
         <label className="v2-wide-field">
           <span>대안/경쟁재</span>
-          <textarea value={alternatives} onChange={(event) => setAlternatives(event.target.value)} rows={4} />
+          <textarea
+            value={alternatives}
+            onChange={(event) => setAlternatives(event.target.value)}
+            placeholder="예: 점신, 포스텔러, 운세의 신"
+            rows={4}
+          />
         </label>
       </div>
 
