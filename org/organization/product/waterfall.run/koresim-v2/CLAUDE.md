@@ -4,7 +4,7 @@ type: protocol
 tags: [koresim, project-tracker, roadmap]
 created: 2026-04-30
 updated: 2026-07-13
-status: hardening-complete-solar-live-pending
+status: hardening-deployed-solar-live-pending
 ---
 
 # KoreaSim Project — 작업 가이드
@@ -135,6 +135,7 @@ Current status:
 - Live external Gemini 9-simulation 200-person validation passed through `https://arabesque.cc/api/runs`: 1,800 total responses, 3 parse failures, no failed runs, artifact `docs/verification/external-gemini-9-simulations-200-2026-05-03.json`.
 - Public `arabesque.cc` route gate passed with `/`, `/app`, `/results`, `/api/health`, and `/api/config` returning origin responses without Cloudflare Access markers. External SSE replay returned snapshot/progress events for a completed 200-person run.
 - Historical note: May 2026 Ollama artifacts remain for audit evidence only and do not represent the current supported provider policy.
+- AI hardening commit `6da43ef` was deployed on 2026-07-13. The external Mac Studio readiness check passed for the landing page, redacted public health/config, app-auth boundary, Redis, one active RQ worker, SQLite, and Cloudflare Tunnel.
 - Solar activation blocker: `UPSTAGE_API_KEY` is not present in the current runtime, so no live Solar result is claimed yet.
 
 ## 전체 Phase 진행 현황

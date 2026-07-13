@@ -4,7 +4,7 @@ type: phase-plan
 tags: [phase-7, llm-gateway, litellm, langgraph, observability, multi-llm]
 created: 2026-05-02
 updated: 2026-07-13
-status: implementation-complete-solar-live-pending
+status: hardening-deployed-solar-live-pending
 related: [[CLAUDE]], [[README]], [[../design/llm-gateway-orchestration]], [[../design/data-governance-and-io-boundary]], [[../execution/phase-7-llm-gateway-orchestration]], [[../execution/ai-system-hardening-solar-v1]], [[../runbooks/llm-solar-langfuse-operations]]
 ---
 
@@ -159,6 +159,10 @@ current provider policy.
 - 2026-07-13: strict provider/alias validation, Solar LiteLLM aliases, actual
   Analysis → Report → QA graph, QA gate, and metadata telemetry were implemented.
 - 2026-07-13: runtime inspection found no `UPSTAGE_API_KEY`; live Solar validation remains pending.
+- 2026-07-13: hardening commit `6da43ef` was deployed to the Mac Studio origin;
+  the external readiness check passed for `https://arabesque.cc`, Redis/RQ,
+  SQLite, app-level auth boundaries, redacted public health/config, and the
+  Cloudflare Tunnel. The live provider remained Gemini by design.
 
 ## Risks
 

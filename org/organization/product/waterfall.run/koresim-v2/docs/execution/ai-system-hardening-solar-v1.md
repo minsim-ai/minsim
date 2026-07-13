@@ -4,7 +4,7 @@ type: execution-plan
 tags: [ai-system, solar, security, intake, orchestration, trust]
 created: 2026-07-13
 updated: 2026-07-13
-status: implementation-complete-deployment-pending
+status: deployed-solar-live-pending
 related: [[../design/llm-gateway-orchestration]], [[ai-agent-improvement-loop-v1]], [[agentic-intake-layer-v2]]
 ---
 
@@ -15,7 +15,7 @@ related: [[../design/llm-gateway-orchestration]], [[ai-agent-improvement-loop-v1
 - [x] Execution plan id: `ai-system-hardening-solar-v1`
 - [x] Target phase: Phase 5/7 post-demo productization
 - [x] Owner: Codex
-- [x] Status: implementation-complete-deployment-pending
+- [x] Status: deployed-solar-live-pending
 - [x] Created/updated: 2026-07-13
 
 ## 1. Objective
@@ -63,7 +63,7 @@ related: [[../design/llm-gateway-orchestration]], [[ai-agent-improvement-loop-v1
 - [x] interactive LLM action rate limit and follow-up sample cap
 - [x] LLM metadata-only telemetry and error redaction
 - [x] tests and architecture/runbook documentation
-- [ ] project-scoped commit and live deployment
+- [x] project-scoped commit and live deployment
 
 ### External validation dependency
 
@@ -89,7 +89,7 @@ related: [[../design/llm-gateway-orchestration]], [[ai-agent-improvement-loop-v1
 - [x] synthetic panel 범위를 넘어 시장 전체를 단정하지 않는다.
 - [x] 후보 생성·후속 질문에 사용자별 rate limit이 적용된다.
 - [x] `uv run python scripts/verify.py`가 통과한다.
-- [ ] 프로젝트 범위만 커밋하고 live readiness가 통과한다.
+- [x] 프로젝트 범위만 커밋하고 live readiness가 통과한다.
 
 ## 5. Validation Log
 
@@ -104,3 +104,10 @@ related: [[../design/llm-gateway-orchestration]], [[ai-agent-improvement-loop-v1
   creative/result/agent evals, frontend lint/typecheck/production build.
 - 2026-07-13: runtime credential inspection found no `UPSTAGE_API_KEY`; Solar
   live execution remains an external dependency and is not marked complete.
+- 2026-07-13: project-scoped implementation commit `6da43ef` created.
+- 2026-07-13: React production build completed, `com.koresim.api` and
+  `com.koresim.worker` restarted, and external Mac Studio readiness passed for
+  `https://arabesque.cc`: public landing/health/config ready, protected runs
+  returned 401 when unauthenticated, Redis/RQ/SQLite/tunnel ready, one RQ worker
+  active. The inspected live provider remains Gemini until an Upstage key is
+  provisioned.
