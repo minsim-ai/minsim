@@ -1,7 +1,6 @@
 """Streamable HTTP-style MCP endpoint backed by FastAPI JSON-RPC."""
 from __future__ import annotations
 
-import hmac
 import os
 from json import JSONDecodeError
 from typing import Any
@@ -38,7 +37,7 @@ async def oauth_protected_resource_metadata(request: Request) -> dict[str, Any]:
         "resource_name": "KoreaSim MCP",
         "authorization_servers": [base_url],
         "scopes_supported": ["koresim:mcp"],
-        "bearer_methods_supported": ["header", "cookie"],
+        "authentication_methods": ["google_session_cookie"],
         "koresim_login_url": f"{base_url}/api/auth/google/login?next=/app",
     }
 
@@ -164,7 +163,7 @@ def _unauthorized(request: Request) -> JSONResponse:
         status_code=401,
         content={
             "error": "AUTH_REQUIRED",
-            "message": "A KoreaSim MCP API key or Google login is required.",
+            "message": "Google login is required to use KoreaSim MCP.",
             "login_url": f"{_base_url(request)}/api/auth/google/login?next=/app",
         },
         headers={
@@ -197,35 +196,11 @@ def _origin_allowed(request: Request) -> bool:
 
 def _user_record(request: Request):
     user = read_session_user(request)
-    if user is None:
-        user = _api_key_user(request)
     if user is None and auth_required() and local_dev_auto_login_enabled(request):
         user = local_dev_user()
     if user is None:
         return None
     return _store(request).upsert_user_from_auth(user, free_run_limit=_free_run_limit())
-
-
-def _api_key_user(request: Request) -> dict[str, Any] | None:
-    configured_key = os.getenv("KORESIM_MCP_API_KEY", "").strip()
-    email = os.getenv("KORESIM_MCP_API_KEY_EMAIL", "").strip().lower()
-    if len(configured_key) < 32 or not email:
-        return None
-
-    scheme, separator, provided_key = request.headers.get("Authorization", "").partition(" ")
-    if not separator or scheme.lower() != "bearer" or not provided_key:
-        return None
-    if not hmac.compare_digest(provided_key.strip().encode(), configured_key.encode()):
-        return None
-
-    return {
-        "id": os.getenv("KORESIM_MCP_API_KEY_ID", "default").strip() or "default",
-        "email": email,
-        "name": os.getenv("KORESIM_MCP_API_KEY_NAME", "KoreaSim MCP API Client").strip()
-        or "KoreaSim MCP API Client",
-        "picture": None,
-        "provider": "mcp_api_key",
-    }
 
 
 def _store(request: Request) -> SQLiteRunStore:

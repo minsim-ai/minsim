@@ -4,7 +4,7 @@ type: design-doc
 tags: [mcp, streamable-http, oauth, tools, remote-client]
 created: 2026-07-13
 updated: 2026-07-13
-status: active-private-pilot-oauth-pending
+status: active-session-only-oauth-pending
 related: [[../../README]], [[../execution/minsim-v2-ux-and-mcp]], [[../execution/mcp-production-hardening-v1]], [[data-governance-and-io-boundary]], [[harness-engineering-controls]]
 ---
 
@@ -40,11 +40,10 @@ Target:
 - `tests/test_mcp_http.py`의 3개 focused test가 통과한다.
 - live protected-resource metadata는 `resource=https://arabesque.cc/mcp`를 반환한다.
 - 인증 없는 live `initialize` 요청은 `401`과 `WWW-Authenticate`를 반환한다.
-- private-pilot Bearer key는 web session과 분리된 MCP identity로 매핑되며,
-  constant-time key comparison과 Origin allowlist를 적용한다.
-- 2026-07-13 external private-pilot smoke에서 authenticated initialize, tools/list,
-  list_projects가 HTTP 200으로 통과했고 invalid key는 401, untrusted Origin은 403을
-  반환했다.
+- 공유 private-pilot Bearer key 경로는 폐기됐다. 현재 MCP는 signed Google-login
+  session cookie가 있는 사용자만 허용하고, Bearer-only 요청은 401을 반환한다.
+- session-authenticated initialize/tools/resources와 redacted export tests가 통과하며,
+  Origin allowlist는 로그인 상태에도 적용된다.
 - 최초 구현 commit은 `553856c` (`feat: add authenticated mcp endpoint`), 문서 commit은
   `c211082` (`docs: document minsim v2 ux and mcp`)다.
 
@@ -53,7 +52,7 @@ Target:
 | 영역 | 현재 | 목표 |
 | --- | --- | --- |
 | Transport | custom FastAPI JSON-RPC handler | official stable MCP SDK Streamable HTTP |
-| Auth credential | signed browser session cookie + private-pilot MCP API key | OAuth 2.1-compatible audience-bound Bearer token |
+| Auth credential | signed Google-login session cookie only; shared key retired | OAuth 2.1-compatible per-user audience-bound Bearer token |
 | Authorization server | metadata가 same-origin issuer를 가리키지만 RFC 8414/OIDC token flow 없음 | 실제 discovery, PKCE, token issuance/validation |
 | Token binding | MCP audience 검증 없음 | `https://arabesque.cc/mcp` audience/resource 검증 |
 | Protocol lifecycle | server가 protocol version을 고정 반환 | client version negotiation + protocol header 검증 |
@@ -108,16 +107,18 @@ persona sampling, result-agent orchestration, or persistence policy.
 ### Web auth
 
 The existing Google OAuth login and signed HTTP-only cookie remain valid for the
-React web application. A browser cookie is not the production remote MCP credential.
+React web application and the current session-only MCP interim. A browser cookie is
+not the final production remote MCP credential and must never be copied into client
+configuration or logs.
 
 ### Remote MCP auth
 
-2026-07-13 private pilot은 `KORESIM_MCP_API_KEY`를 Bearer header로 받고, 별도
-`mcp_api_key` user identity로 매핑한다. 이 키는 Upstage provider key와 완전히
-분리하며 최소 32자여야 한다. 서버는 키를 로그/응답에 넣지 않고 constant-time으로
-비교한다. `Origin` header가 있으면 `KORESIM_MCP_ALLOWED_ORIGINS`와 origin base URL
-중 하나와 일치해야 한다. 이 방식은 제한된 운영자 발급 pilot credential이며,
-일반 사용자용 OAuth 완료를 의미하지 않는다.
+2026-07-13 보안 정책 변경으로 shared `KORESIM_MCP_API_KEY` 인증은 제거됐다.
+현재 custom endpoint는 `read_session_user()`가 검증한 signed Google-login session만
+`UserRecord`로 매핑한다. Bearer header만 제공한 요청은 설정에 과거 키가 남아 있어도
+401이며, 로그인된 요청도 `Origin`이 allowlist와 일치하지 않으면 403이다. 이는
+“로그인한 사용자만”을 강제하는 안전한 interim이며 일반 MCP host용 OAuth 완료를
+의미하지 않는다.
 
 Production OAuth target에서는 MCP server가 OAuth resource server로 동작하고 다음을
 검증한다.

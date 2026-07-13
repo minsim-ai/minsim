@@ -4,7 +4,7 @@ type: execution-plan
 tags: [mcp, oauth, streamable-http, interoperability, security]
 created: 2026-07-13
 updated: 2026-07-13
-status: private-api-key-pilot-deployed-oauth-pending
+status: session-only-ready-to-deploy-oauth-pending
 related: [[../design/mcp-server-integration]], [[minsim-v2-ux-and-mcp]], [[../design/data-governance-and-io-boundary]], [[../design/harness-engineering-controls]], [[../runbooks/app-auth-operations]]
 ---
 
@@ -16,7 +16,7 @@ related: [[../design/mcp-server-integration]], [[minsim-v2-ux-and-mcp]], [[../de
 - [x] Target phase: Phase 5/7 post-demo productization
 - [x] Related design doc: [[../design/mcp-server-integration]]
 - [x] Owner: Codex + product owner
-- [x] Status: private API-key pilot deployed; full OAuth pending
+- [x] Status: shared API-key retired; session-only deployment pending; full OAuth pending
 - [x] Created: 2026-07-13
 - [x] Updated: 2026-07-13
 
@@ -162,12 +162,12 @@ related: [[../design/mcp-server-integration]], [[minsim-v2-ux-and-mcp]], [[../de
 - [ ] Record required client hosts and their E2E ownership.
 - [ ] Select authorization-server approach and document issuer, token audience,
   client registration model, consent, revocation, and account mapping.
-- [x] Private pilot Bearer token selected before general OAuth rollout.
+- [x] Product owner replaced the private Bearer pilot with a logged-in-session-only boundary.
 - [ ] Confirm scope names and which tools require each scope.
 
 ### 5.1 Characterization and protocol tests
 
-- [x] Expand `tests/test_mcp_http.py` for cookie auth, Bearer pilot auth, invalid key,
+- [x] Expand `tests/test_mcp_http.py` for cookie auth, legacy Bearer rejection,
   Origin rejection, tools/resources, and redacted export behavior.
 - [ ] Add official SDK client integration test for initialize/list/call/read.
 - [ ] Add protocol negotiation, notification, invalid JSON-RPC, Accept/content-type,
@@ -195,7 +195,7 @@ related: [[../design/mcp-server-integration]], [[minsim-v2-ux-and-mcp]], [[../de
 - [ ] Update `docs/runbooks/app-auth-operations.md` with setup, rotation, revoke, and
   incident rollback procedures.
 
-Private pilot slice:
+Retired private-pilot slice and session-only replacement:
 
 - [x] Accept a dedicated `KORESIM_MCP_API_KEY` Bearer credential without using or
   exposing `UPSTAGE_API_KEY`.
@@ -204,6 +204,10 @@ Private pilot slice:
 - [x] Reject untrusted browser `Origin` headers.
 - [x] Generate/store the production pilot key outside git and restart the API.
 - [x] Complete authenticated external initialize/tools/list smoke tests.
+- [x] Remove the shared Bearer authentication branch and reject the retired key even
+  when legacy environment variables are still present.
+- [x] Require a signed Google-login session for every MCP tool/resource/prompt request.
+- [x] Remove shared MCP key placeholders and client setup instructions.
 
 ### 5.4 Tool/resource/prompt contract completion
 
@@ -232,7 +236,8 @@ Private pilot slice:
 - [ ] Update [[minsim-v2-ux-and-mcp]] from foundation wording to the validated protocol
   and client setup.
 - [ ] Update [[../design/mcp-server-integration]] decisions and actual auth provider.
-- [x] Add README and `.env.example` private-pilot connection/configuration guidance.
+- [x] Replace README and `.env.example` private-pilot guidance with session-only login
+  requirements and an explicit general-client OAuth limitation.
 - [ ] Add MCP operator runbook and client connection examples without real secrets.
 - [ ] Record validation evidence only after each command/client flow passes.
 
@@ -343,7 +348,7 @@ uv run python scripts/check_mac_studio_production.py --external --timeout-second
 
 | Risk | Level | Mitigation |
 | --- | --- | --- |
-| Existing Google cookie auth is mistaken for MCP OAuth | High | Separate web cookie and MCP Bearer boundaries |
+| Existing Google cookie auth is mistaken for MCP OAuth | High | Label session-only access as interim; block general client setup until per-user OAuth |
 | Self-built authorization server introduces security flaws | High | Prefer managed AS; require separate review if first-party |
 | Client retries duplicate paid runs/follow-ups | High | idempotency key + persistent dedupe |
 | Raw personas/results leak through resources | High | redacted DTO + leak fixtures + output allowlist |
@@ -375,6 +380,10 @@ uv run python scripts/check_mac_studio_production.py --external --timeout-second
 - [x] 2026-07-13: external Bearer pilot initialize, tools/list, and list_projects
   returned HTTP 200; 9 tools were advertised; invalid key returned 401 and untrusted
   Origin returned 403.
+- [x] 2026-07-13: product owner retired the shared Bearer pilot. Focused TDD first
+  proved the configured legacy key still returned 200, then the implementation removed
+  that branch; `tests/test_mcp_http.py` now passes 6 tests with session auth accepted,
+  legacy Bearer rejected at 401, and authenticated untrusted Origin rejected at 403.
 - [ ] Official client authenticated interoperability has not yet been demonstrated.
 - [ ] Production OAuth token flow has not yet been implemented or validated.
 

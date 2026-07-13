@@ -13,7 +13,7 @@ KoreaSim is a Korean AI human-behavior simulation product built on NVIDIA Nemotr
 - Runtime persistence: SQLite job/result store
 - Job execution: RQ worker backed by Redis
 - Realtime progress: Server-Sent Events, with polling fallback
-- Remote MCP: `https://arabesque.cc/mcp` is exposed through the same Cloudflare Tunnel. The current private pilot accepts a dedicated KoreaSim MCP Bearer API key; browser Google login remains available, while standards-complete OAuth is tracked as follow-up hardening.
+- Remote MCP: `https://arabesque.cc/mcp` is exposed through the same Cloudflare Tunnel, but every MCP request requires a valid KoreaSim Google-login session. The retired shared Bearer key is rejected; standards-complete per-user OAuth for general MCP hosts remains follow-up hardening.
 - Result trust layer: quality indicators, sample summary, seed, and disclaimer are part of the common result schema from the start
 - LLM strategy: production routes to Upstage `solar-pro2` behind a provider-agnostic `LLMClient`. The external MCP 10 → 50 → 200 gate passed after provider-aware bounded backoff was added. LiteLLM is optional, Gemini is explicit rollback compatibility, Ollama is not a supported runtime fallback, and observability is metadata-only.
 - Agentic intake strategy: React planner v3 is the V2 planning source-of-truth. Natural-language goals become provenance-tagged slots, `IntakeContextEnvelope`, and `safe_intake_summary`; FastAPI persists sessions and rejects unreviewed assumptions.
@@ -453,60 +453,46 @@ The endpoint uses Streamable HTTP-style MCP JSON-RPC and the same project servic
 SQLite ownership checks, Redis/RQ queue, quota ledger, and redacted export path as
 the web application.
 
-### Keep the two API keys separate
+### Login boundary
 
 - `UPSTAGE_API_KEY` is a server-side provider credential used only by KoreaSim to call
   Upstage Solar Pro 2. Never give it to an MCP client.
-- `KORESIM_MCP_API_KEY` is the separate Bearer credential issued to a remote MCP
-  client. It does not grant direct access to Upstage.
+- KoreaSim does not issue or accept a shared `KORESIM_MCP_API_KEY`.
+- Every MCP request must carry the signed HTTP-only session created by KoreaSim's
+  Google login. Requests without that session, including legacy Bearer-only requests,
+  return HTTP 401.
+- Project ownership, run quota, and redacted export rules use the signed-in user's
+  normal KoreaSim identity.
 
 The server-side `UPSTAGE_API_KEY` is installed outside Git, production routes to
 Solar Pro 2, and the external 10 → 50 → 200 gate passed. Operational evidence and
 rate-limit remediation are recorded in
 `docs/runbooks/llm-solar-langfuse-operations.md`.
 
-### Server-side private pilot configuration
+### Sign in before using MCP
 
-Real values belong only in `.env`, the shell environment, or a secret manager:
+Open the KoreaSim login flow in a browser:
 
-```bash
-KORESIM_MCP_API_KEY=<random-secret-at-least-32-characters>
-KORESIM_MCP_API_KEY_ID=external-pilot
-KORESIM_MCP_API_KEY_EMAIL=mcp-pilot@example.com
-KORESIM_MCP_API_KEY_NAME="KoreaSim MCP Pilot"
-KORESIM_MCP_ALLOWED_ORIGINS=https://arabesque.cc
+```text
+https://arabesque.cc/api/auth/google/login?next=/app
 ```
 
-Restart the API after rotating the key. Do not commit the key or put it in a client
-configuration file that will be committed.
+After login, cookie-aware same-origin integrations may call `/mcp`. The session cookie
+is HTTP-only: do not copy it into source files, CLI configuration, chat, or logs.
 
 ### Connect from Codex
 
-Put the issued MCP key in the client shell environment, then register the remote
-server without copying the secret into the Codex configuration:
+Direct Codex remote registration is intentionally unavailable in the session-only
+interim because Codex does not reuse the KoreaSim browser cookie. Do not configure the
+retired shared Bearer key. Codex and other general MCP hosts will be enabled only after
+the tracked per-user OAuth flow validates issuer, audience, expiry, and scope.
+
+### Verify the login requirement
+
+An unauthenticated request must return HTTP 401 and a Google login URL:
 
 ```bash
-export KORESIM_MCP_API_KEY='<issued-by-the-KoreaSim-operator>'
-codex mcp add koresim \
-  --url https://arabesque.cc/mcp \
-  --bearer-token-env-var KORESIM_MCP_API_KEY
-```
-
-Inspect the saved connection:
-
-```bash
-codex mcp get koresim
-```
-
-The environment variable must be available whenever Codex starts.
-
-### Verify with curl
-
-Initialize the MCP connection without printing the key:
-
-```bash
-curl https://arabesque.cc/mcp \
-  -H "Authorization: Bearer $KORESIM_MCP_API_KEY" \
+curl -i https://arabesque.cc/mcp \
   -H 'Content-Type: application/json' \
   -H 'Accept: application/json, text/event-stream' \
   --data '{
@@ -517,34 +503,6 @@ curl https://arabesque.cc/mcp \
       "protocolVersion": "2025-11-25",
       "capabilities": {},
       "clientInfo": {"name": "koresim-readme", "version": "1.0"}
-    }
-  }'
-```
-
-List tools:
-
-```bash
-curl https://arabesque.cc/mcp \
-  -H "Authorization: Bearer $KORESIM_MCP_API_KEY" \
-  -H 'Content-Type: application/json' \
-  -H 'Accept: application/json, text/event-stream' \
-  --data '{"jsonrpc":"2.0","id":"tools-1","method":"tools/list","params":{}}'
-```
-
-List the authenticated MCP identity's projects:
-
-```bash
-curl https://arabesque.cc/mcp \
-  -H "Authorization: Bearer $KORESIM_MCP_API_KEY" \
-  -H 'Content-Type: application/json' \
-  -H 'Accept: application/json, text/event-stream' \
-  --data '{
-    "jsonrpc": "2.0",
-    "id": "projects-1",
-    "method": "tools/call",
-    "params": {
-      "name": "koresim.list_projects",
-      "arguments": {}
     }
   }'
 ```
@@ -562,9 +520,10 @@ Available tools:
 - `koresim.ask_interview`
 
 Run creation uses the normal KoreaSim queue and quota. Export remains redacted and
-does not return `raw_results`. The API-key path is a single-identity private pilot;
-multi-user OAuth 2.1, audience-bound tokens, idempotency, and broader client
-interoperability remain tracked in `docs/execution/mcp-production-hardening-v1.md`.
+does not return `raw_results`. The current session-only path is a secure interim for
+logged-in users, not standards-complete remote MCP OAuth. Multi-user OAuth 2.1,
+audience-bound tokens, idempotency, and broader client interoperability remain tracked
+in `docs/execution/mcp-production-hardening-v1.md`.
 
 ## Common API Contract
 

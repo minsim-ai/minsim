@@ -52,6 +52,9 @@ def test_mcp_unauthenticated_response_advertises_protected_resource(monkeypatch)
     assert metadata.status_code == 200
     assert metadata.json()["resource"] == "https://arabesque.test/mcp"
     assert metadata.json()["authorization_servers"] == ["https://arabesque.test"]
+    assert metadata.json()["authentication_methods"] == ["google_session_cookie"]
+    assert "bearer_methods_supported" not in metadata.json()
+    assert response.json()["message"] == "Google login is required to use KoreaSim MCP."
 
 
 def test_mcp_initialize_tools_and_resources_after_login(tmp_path, monkeypatch) -> None:
@@ -84,7 +87,7 @@ def test_mcp_initialize_tools_and_resources_after_login(tmp_path, monkeypatch) -
     assert "MCP Project" in resource.json()["result"]["contents"][0]["text"]
 
 
-def test_mcp_bearer_api_key_authenticates_external_client(tmp_path, monkeypatch) -> None:
+def test_mcp_rejects_legacy_shared_bearer_even_when_configured(tmp_path, monkeypatch) -> None:
     store = SQLiteRunStore(tmp_path / "runs.sqlite3")
     client = TestClient(
         create_app(store=store, enqueue_run_func=lambda run_id: f"job-{run_id}"),
@@ -98,12 +101,10 @@ def test_mcp_bearer_api_key_authenticates_external_client(tmp_path, monkeypatch)
         json=_rpc("initialize"),
     )
 
-    assert response.status_code == 200
-    assert response.json()["result"]["serverInfo"]["name"] == "koresim-v2"
+    assert response.status_code == 401
+    assert response.json()["error"] == "AUTH_REQUIRED"
     user = store.get_user("mcp_api_key:external-pilot")
-    assert user is not None
-    assert user.email == "mcp-pilot@arabesque.test"
-    assert user.provider == "mcp_api_key"
+    assert user is None
 
 
 def test_mcp_rejects_invalid_bearer_api_key(tmp_path, monkeypatch) -> None:
@@ -123,17 +124,16 @@ def test_mcp_rejects_invalid_bearer_api_key(tmp_path, monkeypatch) -> None:
     assert response.json()["error"] == "AUTH_REQUIRED"
 
 
-def test_mcp_rejects_untrusted_origin_even_with_valid_api_key(tmp_path, monkeypatch) -> None:
+def test_mcp_rejects_untrusted_origin_even_with_valid_login_session(tmp_path, monkeypatch) -> None:
     client = TestClient(
         create_app(store=SQLiteRunStore(tmp_path / "runs.sqlite3")),
         base_url="https://arabesque.test",
     )
-    token = _configure_api_key(monkeypatch)
+    _login(client, monkeypatch)
 
     response = client.post(
         "/mcp",
         headers={
-            "Authorization": f"Bearer {token}",
             "Origin": "https://attacker.example",
         },
         json=_rpc("initialize"),
