@@ -15,7 +15,7 @@ KoreaSim is a Korean AI human-behavior simulation product built on NVIDIA Nemotr
 - Realtime progress: Server-Sent Events, with polling fallback
 - Remote MCP: `https://arabesque.cc/mcp` is exposed through the same Cloudflare Tunnel. The current private pilot accepts a dedicated KoreaSim MCP Bearer API key; browser Google login remains available, while standards-complete OAuth is tracked as follow-up hardening.
 - Result trust layer: quality indicators, sample summary, seed, and disclaimer are part of the common result schema from the start
-- LLM strategy: Upstage `solar-pro2` is the production target behind a provider-agnostic `LLMClient`; Gemini remains the explicit temporary live backend until an Upstage credential is provisioned. LiteLLM is optional, Ollama is not a supported runtime fallback, and observability is metadata-only.
+- LLM strategy: Upstage `solar-pro2` is the production target behind a provider-agnostic `LLMClient`. The server-side credential is installed and an isolated 10-person Solar run passed; the production process remains on the previous Gemini configuration until the ordered 10 → 50 → 200 live activation gate completes. LiteLLM is optional, Ollama is not a supported runtime fallback, and observability is metadata-only.
 - Agentic intake strategy: React planner v3 is the V2 planning source-of-truth. Natural-language goals become provenance-tagged slots, `IntakeContextEnvelope`, and `safe_intake_summary`; FastAPI persists sessions and rejects unreviewed assumptions.
 - Data governance: full `raw_results` can be stored/returned in the protected product, but external provider and observability payloads default to minimal metadata
 
@@ -52,113 +52,186 @@ flowchart LR
   SSE --> User
 ```
 
-## Agent Flow
+## Agentic Workflow
 
-The agent system is intentionally split into two parts:
+KoreaSim의 현재 agentic workflow는 하나의 자유형 autonomous agent가 모든 일을
+처리하는 구조가 아니다. 실행 전에는 검증 가능한 React planner가 입력 상태와
+다음 행동을 결정하고, 실행 중에는 RQ/async batch가 50~200명 페르소나 fan-out을
+담당하며, 집계가 끝난 뒤에 실제 LangGraph `Analysis -> Report -> QA` agent chain이
+리포트를 만든다.
 
-- Intake before the run: understand the user's goal, ask for missing information, and build safe structured input.
-- Result agents after the run: analyze the completed aggregate result, write the report, and check the output.
+프로젝트를 저장하는 것만으로는 LLM 호출이나 리포트 생성이 시작되지 않는다.
+사용자가 `새 시뮬레이션`에서 유형을 선택하고 intake 검토를 마친 뒤 실행해야 하며,
+`Run history`는 그렇게 생성된 run의 상태와 결과를 보여준다.
 
-```text
-[사용자]
-   |
-   v
-[무엇을 알고 싶은지 입력]
-예: "가격을 얼마로 해야 할까요?"
-    "캠페인 전략을 만들고 싶어요."
-   |
-   v
-[입력 정리 단계]
-- 사용자의 목표 파악
-- 어떤 시뮬레이션이 맞는지 판단
-- 부족한 정보 확인
-   |
-   v
-[더 물어볼지 판단]
-   |
-   +--> 정보가 부족함
-   |       |
-   |       v
-   |   [질문 1개만 하기]
-   |   예: "어떤 제품인가요?"
-   |
-   +--> 여러 정보가 필요함
-   |       |
-   |       v
-   |   [짧은 입력폼 보여주기]
-   |
-   +--> 후보가 필요함
-   |       |
-   |       v
-   |   [문구/가격/채널 후보 만들기]
-   |       |
-   |       v
-   |   [사용자에게 확인받기]
-   |
-   +--> 준비 완료
-           |
-           v
-[실행용 입력 만들기]
-- 사용자가 직접 말한 정보
-- AI가 추론한 정보
-- AI가 만든 후보
-- 기본값
-을 구분해서 저장
-           |
-           v
-[시뮬레이션 실행]
-           |
-           v
-[50~200명의 가상 한국인 페르소나에게 질문]
-           |
-           v
-[응답 수집]
-           |
-           v
-[결과 집계]
-예:
-- 어떤 선택지가 가장 많이 선택됐는지
-- 연령/성별/지역별 차이가 있는지
-- 응답 품질은 괜찮은지
-           |
-           v
-[분석 AI]
-- 숫자 결과를 해석
-- 중요한 발견 정리
-           |
-           v
-[리포트 AI]
-- 사용자가 읽기 쉬운 보고서로 정리
-- 추천 행동 제안
-           |
-           v
-[검수 AI]
-- 과장된 결론이 없는지 확인
-- 표본이 작으면 "방향성 참고"로 표시
-           |
-           v
-[최종 결과 저장]
-           |
-           v
-[결과 화면에 표시]
+```mermaid
+flowchart TD
+  PROJECT["저장된 프로젝트 컨텍스트"] --> TYPE["시뮬레이션 유형 선택"]
+  TYPE --> SEED["프로젝트 필드를 user provenance slot으로 초기화"]
+  GOAL["자연어 목표"] --> ROUTER["Intent Router"]
+  ROUTER --> PLANNER["React Intake Planner v3"]
+  SEED --> PLANNER
 
+  PLANNER --> GAP{"다음 행동"}
+  GAP -->|critical 1개 부족| ASK["질문 1개"]
+  GAP -->|여러 필드 부족| FORM["동적 입력폼"]
+  GAP -->|creative 후보 필요| CANDIDATE["LLM 후보 생성"]
+  GAP -->|가정 검토 필요| REVIEW["Human review"]
+  GAP -->|입력 오류| REPAIR["입력 수정"]
+  ASK --> PLANNER
+  FORM --> PLANNER
+  CANDIDATE --> REVIEW
+  REVIEW --> PLANNER
+  REPAIR --> PLANNER
 
-중요한 원칙
---------------------------------------------------
-1. 사용자가 말한 정보와 AI가 추론한 정보는 분리해서 저장합니다.
+  GAP -->|run_ready| CONTEXT["Run payload + IntakeContextEnvelope"]
+  CONTEXT --> API["FastAPI schema/review/quota validation"]
+  API --> DB["SQLite run + intake persistence"]
+  API --> RQ["Redis / RQ worker"]
+  RQ --> SAMPLE["Nemotron persona sampling"]
+  SAMPLE --> FANOUT["Async batch 50~200 persona LLM calls"]
+  FANOUT --> AGG["Aggregate result envelope"]
 
-2. AI가 마음대로 가정한 내용은 결과에 몰래 섞지 않습니다.
-   필요한 경우 사용자에게 먼저 확인받습니다.
+  AGG --> ANALYSIS["AnalysisAgent"]
+  ANALYSIS --> REPORT["ReportAgent"]
+  REPORT --> QA["QAAgent"]
+  QA --> GATE["Quality gate"]
+  GATE --> RESULT["Result + agent_runs + checkpoints 저장"]
+  RESULT --> UI["Results UI"]
 
-3. 50~200명 응답 생성은 기존 방식 그대로 둡니다.
-   이 부분을 복잡한 agent 구조로 바꾸지 않습니다.
-
-4. Agent는 응답이 모두 끝난 뒤,
-   결과를 해석하고 보고서를 만들고 검수하는 역할입니다.
-
-5. Langfuse에는 민감한 원문 데이터가 아니라
-   실행 상태, 모델 정보, 점수 같은 메타데이터만 보냅니다.
+  CONTEXT -. "safe_intake_summary only" .-> ANALYSIS
+  AGG -. "raw_results 제외" .-> ANALYSIS
+  FANOUT -. "metadata only" .-> LANGFUSE["Langfuse"]
+  ANALYSIS -. "metadata only" .-> LANGFUSE
 ```
+
+### 1. 프로젝트 컨텍스트가 intake로 들어가는 방식
+
+프로젝트 화면의 필드는 저장 시점에는 일반 프로젝트 데이터다. 새 시뮬레이션을
+시작하면 선택한 simulation type에 맞는 slot으로 변환되며, 모두 `source=user`,
+`evidence=saved project context`로 기록된다. 저장된 값으로 이미 충족된 critical
+slot은 다시 묻지 않는다.
+
+| 프로젝트 필드 | 공통/주요 slot | simulation별 추가 사용 |
+| --- | --- | --- |
+| 이름 | 프로젝트 식별자 | 시장 세분화 `category`, 브랜드 인식 `brand_name`, 이탈 예측 `service_name`, 경쟁 포지셔닝의 첫 번째 `product` |
+| 설명·제품 컨텍스트 | `product_description`, `product_context` | 제품 출시 `product_concept`, 시장 세분화 `product_family`, 경쟁 포지셔닝 `category_context` |
+| 기능 | `key_features` | 제품 출시의 핵심 기능 입력 |
+| 가격 | `price_points` | 가격 최적화의 비교 가격 후보 |
+| 타겟 메모 | `target_customers` | 제품 출시 `target_use_case`; 인구통계 문구는 지원 범위 내에서 `target_filter`로 변환 |
+| 대안/경쟁재 | simulation별 컨텍스트 | 경쟁 포지셔닝 `products`, 브랜드 인식 `comparison_brands`, 이탈 예측 `competitor_offer` |
+
+현재 `target_filter` 자동 추출은 연령대, 여성/남성, 서울/경기 표현을 지원한다.
+예를 들어 `20~40대 여성`은 20~49세 여성 패널 조건으로 정규화된다. 자유 형식
+타겟 문장 전체가 데이터셋의 임의 필드 검색으로 변환되는 것은 아니다.
+
+프로젝트 기반 V2 경로에서는 사용자가 simulation type을 명시적으로 고르므로 그
+선택이 우선한다. 명시적 선택이 없는 intake에서는 keyword-scored intent router가
+9개 simulation pack 중 후보를 정하고 `TaskFrame`에 목표, 결정 질문, 후보 유형,
+confidence와 evidence를 남긴다.
+
+### 2. React Intake Planner v3
+
+현재 V2 planning source of truth는 `intake-planner:v3-20260713`이다. planner는 LLM에
+다음 행동을 전적으로 맡기지 않고 slot requirement와 상태에 따라 아래 action 중
+하나를 결정한다.
+
+- `ask_question`: 책임 있게 실행하는 데 필요한 critical slot 하나를 질문한다.
+- `show_form`: 여러 structured field가 비어 있을 때 한 번에 짧은 폼을 보여준다.
+- `candidate_review`: Creative Testing 후보가 없을 때 후보와 가정을 사용자에게 보여준다.
+- `confirm_assumptions`: 생성·추론된 중요 가정을 실행 전에 승인받는다.
+- `repair_input`: 표본 수, 후보 개수 등 잘못된 입력을 수정하게 한다.
+- `run_ready`: 검증 가능한 `RunCreateRequest`와 provenance를 만든다.
+
+Creative Testing의 candidate review에서는 `/api/intake/candidates`를 통해 LLM 후보를
+요청하고, 15초 timeout 또는 provider 실패 시 deterministic 기본 후보를 유지한다.
+현재 이 live candidate-generation 연결은 creative headline 경로에 한정된다. 다른
+simulation pack의 `canGenerate` 표시는 review 가능한 보완 정책을 뜻하며, 모든 빈
+필드를 LLM이 자동 조사하거나 생성한다는 뜻은 아니다.
+
+Planner 기본값도 provenance slot으로 명시된다. 공통 기본값은 `sample_size=200`,
+`seed=42`이며, 시장 세분화는 `n_segments=6`, 캠페인 전략은
+`budget=100000000`을 추가한다.
+
+### 3. Provenance, human review, safe context
+
+모든 intake slot은 다음 출처 중 하나를 유지한다.
+
+| source | 의미 |
+| --- | --- |
+| `user` | 사용자가 직접 입력했거나 저장된 프로젝트에서 가져온 사실 |
+| `inferred` | 입력으로부터 추론한 값 |
+| `generated` | AI 또는 후보 생성기가 만든 값 |
+| `default` | 버전이 있는 시스템 기본값 |
+
+실행 직전 frontend는 task frame, provenance, planner/router version,
+`safe_intake_summary`를 포함하는 `IntakeContextEnvelope`를 만든다. FastAPI는 schema와
+simulation input을 다시 검증하고 `unreviewed_assumption_count > 0`이면 run 생성을
+거부한다. Intake snapshot은 `/api/intake/sessions`에 저장되고 생성된 run과 연결된다.
+
+`safe_intake_summary`에는 사용자 목표, 결정 질문, simulation type, 출처별 facts,
+검토된 가정, 생성 후보, 제약과 source counts만 들어간다. 원본 대화 transcript,
+provider prompt, persona row, raw persona response는 포함하지 않는다.
+
+### 4. Persona simulation execution
+
+FastAPI가 run을 SQLite에 먼저 저장하고 Redis/RQ job을 enqueue한다. Worker는 seed와
+target filter로 Nemotron 한국 페르소나를 표본화하고 provider-neutral `LLMClient`를
+통해 50~200개 persona response를 async batch로 생성한다. 각 응답은 partial result와
+progress event로 저장되어 SSE와 polling 복구에 사용된다.
+
+이 fan-out은 의도적으로 LangGraph node fan-out이 아니다. RQ가 장시간 실행·복구를,
+simulation engine이 병렬 persona 호출·parsing·집계를 담당한다. 운영 목표 provider는
+Upstage `solar-pro2`이며, credentialed live validation 전까지 Gemini가 임시 live
+backend다. Ollama runtime fallback은 지원하지 않는다.
+
+### 5. Result-agent LangGraph
+
+집계된 result envelope가 완성된 뒤 worker가 실제 compiled LangGraph를 실행한다.
+
+1. `AnalysisAgent` (`analysis:v2-20260512`)가 metrics, segments, quality와 warning을
+   근거로 요약, 핵심 발견, segment note를 만든다.
+2. `ReportAgent` (`report:v2-20260512`)가 aggregate result와 prior analysis를 받아
+   headline, 우선순위별 recommendation, risk와 mitigation을 만든다.
+3. `QAAgent` (`qa:v2-20260512`)가 schema, 근거, parse failure, 표본 한계를 검수하고
+   `pass`, `directional_only`, `warning`, `fail` 중 severity를 반환한다.
+
+Agent prompt allowlist에는 run metadata, sample/quality, metrics, segments, insights,
+warnings와 `safe_intake_summary`만 들어간다. `raw_results`, persona UUID/full row, raw
+model response, raw intake transcript는 제외된다. 프로젝트 입력은 리포트의 목표와
+맥락을 맞추는 데 사용하고, 결론의 직접 증거는 aggregate metrics여야 한다.
+
+각 node의 LLM/parse 실패에는 deterministic fallback이 적용되어 run 자체는 복구할
+수 있다. 단 fallback agent가 있거나 QA가 통과하지 못하면
+`quality.review_required=true`가 되고 warning이 결과에 추가되며, A등급 결과는
+B등급으로 내려간다. Node output, prompt version, provider metadata, deterministic
+score는 `agent_runs`에, 단계별 graph state는 `orchestration_checkpoints`에 저장된다.
+
+### 6. 정확한 agentic 경계
+
+| 영역 | 현재 구현 | LLM 사용 |
+| --- | --- | --- |
+| 프로젝트 저장 | 컨텍스트 CRUD와 run history | 없음 |
+| Intent/slot/next action | 버전 고정 React planner와 deterministic validation | 기본적으로 없음 |
+| Creative 후보 생성 | API를 통한 후보 생성 + human review + local fallback | 있음 |
+| Persona simulation | 50~200명 response 생성과 parsing | 있음 |
+| Result workflow | LangGraph `Analysis -> Report -> QA` | 있음; 실패 시 명시적 fallback |
+| Queue/recovery/persistence | FastAPI + Redis/RQ + SQLite | 없음 |
+| Langfuse | latency, token, model, status 등 metadata trace | 원문 payload 전송 없음 |
+
+따라서 KoreaSim의 “agentic”은 무제한 자율 실행이 아니라, deterministic control
+plane과 제한된 LLM 역할, human checkpoint, 결과 품질 게이트를 결합한 workflow다.
+
+주요 구현 source of truth:
+
+- Project seed: [`frontend/src/v2/projectIntake.ts`](frontend/src/v2/projectIntake.ts)
+- Planner/router/payload: [`frontend/src/intake/planner.ts`](frontend/src/intake/planner.ts), [`frontend/src/intake/router.ts`](frontend/src/intake/router.ts), [`frontend/src/intake/payloadBuilder.ts`](frontend/src/intake/payloadBuilder.ts)
+- V2 intake UI/session/run link: [`frontend/src/v2/MinsimIntakeFlow.tsx`](frontend/src/v2/MinsimIntakeFlow.tsx)
+- API validation: [`src/api/schemas.py`](src/api/schemas.py), [`src/api/routes.py`](src/api/routes.py)
+- RQ simulation worker: [`src/jobs/worker.py`](src/jobs/worker.py)
+- Result-agent graph: [`src/orchestration/llm_agents.py`](src/orchestration/llm_agents.py)
+- Result envelope and quality scoring: [`src/jobs/result_envelope.py`](src/jobs/result_envelope.py), [`src/orchestration/agent_scoring.py`](src/orchestration/agent_scoring.py)
+- Durable storage: [`src/jobs/store.py`](src/jobs/store.py)
 
 ## Repository Map
 
@@ -261,11 +334,11 @@ The agent system is intentionally split into two parts:
 ### Phase 7: LLM Gateway and Agentic Orchestration
 
 - Add provider-agnostic `LLMClient`
-- Use Upstage `solar-pro2` as the target provider; keep Gemini only as explicit temporary compatibility until credentialed validation
+- Use Upstage `solar-pro2` as the target provider; keep Gemini only as explicit rollback compatibility after credentialed validation
 - Keep optional LiteLLM `koresim/solar-*` aliases; do not use Ollama as runtime fallback
 - Add metadata observability first
 - Run Analysis → Report → QA as the actual LangGraph result workflow while RQ/async batch owns persona fan-out
-- Current code gate includes strict backend/alias validation, QA quality gates, Solar aliases, and metadata telemetry. Live Solar activation remains pending only on an Upstage credential and provider validation.
+- Current code gate includes strict backend/alias validation, QA quality gates, Solar aliases, and metadata telemetry. The credential and isolated 10-person gate passed on 2026-07-13; production activation and external 10 → 50 → 200 validation remain pending.
 
 ## Engineering Method
 
@@ -386,9 +459,10 @@ the web application.
 - `KORESIM_MCP_API_KEY` is the separate Bearer credential issued to a remote MCP
   client. It does not grant direct access to Upstage.
 
-The current production runtime still uses Gemini because no `UPSTAGE_API_KEY` has
-been provisioned. Solar activation requires the server-side key and the 10 → 50 →
-200 persona validation sequence in
+The server-side `UPSTAGE_API_KEY` is installed outside Git, and an isolated
+10-person Solar run passed. The currently running production processes stay on
+their previous Gemini configuration until restart and the 10 → 50 → 200 persona
+validation sequence in
 `docs/runbooks/llm-solar-langfuse-operations.md`.
 
 ### Server-side private pilot configuration
