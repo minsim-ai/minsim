@@ -44,6 +44,9 @@ Target:
   session cookie가 있는 사용자만 허용하고, Bearer-only 요청은 401을 반환한다.
 - session-authenticated initialize/tools/resources와 redacted export tests가 통과하며,
   Origin allowlist는 로그인 상태에도 적용된다.
+- 2026-07-13 production deployment에서 anonymous initialize와 Bearer-only initialize는
+  모두 401, protected-resource metadata는 `google_session_cookie`만 반환했고 Google
+  login 시작은 accounts.google.com으로 303 redirect됐다.
 - 최초 구현 commit은 `553856c` (`feat: add authenticated mcp endpoint`), 문서 commit은
   `c211082` (`docs: document minsim v2 ux and mcp`)다.
 

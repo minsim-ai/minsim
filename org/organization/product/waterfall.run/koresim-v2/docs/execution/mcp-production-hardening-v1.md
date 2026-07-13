@@ -4,7 +4,7 @@ type: execution-plan
 tags: [mcp, oauth, streamable-http, interoperability, security]
 created: 2026-07-13
 updated: 2026-07-13
-status: session-only-ready-to-deploy-oauth-pending
+status: session-only-deployed-oauth-pending
 related: [[../design/mcp-server-integration]], [[minsim-v2-ux-and-mcp]], [[../design/data-governance-and-io-boundary]], [[../design/harness-engineering-controls]], [[../runbooks/app-auth-operations]]
 ---
 
@@ -16,7 +16,7 @@ related: [[../design/mcp-server-integration]], [[minsim-v2-ux-and-mcp]], [[../de
 - [x] Target phase: Phase 5/7 post-demo productization
 - [x] Related design doc: [[../design/mcp-server-integration]]
 - [x] Owner: Codex + product owner
-- [x] Status: shared API-key retired; session-only deployment pending; full OAuth pending
+- [x] Status: shared API-key retired; session-only deployed; full OAuth pending
 - [x] Created: 2026-07-13
 - [x] Updated: 2026-07-13
 
@@ -384,13 +384,19 @@ uv run python scripts/check_mac_studio_production.py --external --timeout-second
   proved the configured legacy key still returned 200, then the implementation removed
   that branch; `tests/test_mcp_http.py` now passes 6 tests with session auth accepted,
   legacy Bearer rejected at 401, and authenticated untrusted Origin rejected at 403.
+- [x] 2026-07-13: focused auth/project regression passed 23 tests, then the full gate
+  passed 206 tests with 89.32% coverage and frontend lint/typecheck/build.
+- [x] 2026-07-13: commit `db4e610` deployed; production readiness passed. External
+  anonymous and Bearer-only initialize both returned 401, metadata advertised only
+  `google_session_cookie`, and Google login start returned a safe 303 redirect to
+  accounts.google.com. Evidence: `docs/verification/mcp-session-only-auth-boundary-2026-07-13.json`.
 - [ ] Official client authenticated interoperability has not yet been demonstrated.
 - [ ] Production OAuth token flow has not yet been implemented or validated.
 
 ### Completion log
 
-- [ ] Implementation completed:
-- [ ] Full verification passed:
-- [ ] Production MCP canary passed:
-- [ ] Docs/status updated:
-- [ ] Known gaps:
+- [x] Session-only security slice implementation completed: shared Bearer removed.
+- [x] Session-only security slice full verification passed: 206 tests, 89.32% coverage.
+- [x] Session-only external negative canary passed: anonymous/Bearer-only 401.
+- [x] Session-only docs/status updated.
+- [ ] Overall hardening known gaps: official SDK and per-user remote OAuth remain.
