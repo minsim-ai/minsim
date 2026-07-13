@@ -43,6 +43,7 @@ related: [[minsim-v2-ux-and-mcp]], [[../design/agentic-intake-workflows/intake-l
 - [x] 입력 글자 크기와 폭을 읽기 쉬운 수준으로 조정한다.
 - [x] React Grab을 Vite 개발 환경 전용 dev dependency로 설치한다.
 - [x] V2 loading 경로에 기존 3D 합성 패널 진행 화면을 연결하고 reduced-motion에는 정적 화면을 유지한다.
+- [x] 이탈 예측 결과의 연령별 표는 `유지`·`관망`·`이탈` 의향별 색상 셀을 표시하고, A/B 후보 전용 집계를 전제하지 않는다.
 
 ### Out of scope
 
@@ -74,6 +75,12 @@ related: [[minsim-v2-ux-and-mcp]], [[../design/agentic-intake-workflows/intake-l
 - [x] `x.com` 한 개 입력도 보존하며 같은 질문을 반복하지 않고 prefilled 1열 폼으로 이동한다.
 - [x] 기존 가격 후보의 첫 질문 동작을 유지하는 회귀 범위까지 `npm run check:intake` 126 fixtures로 확인했다.
 - [x] 로컬 브라우저에서 질문 문구, `x.com` 보존, 구조화 폼 전환, 자유 입력 composer 제거를 확인했다.
+
+### 2026-07-13 churn age heatmap regression
+
+- [x] `intent_counts`/`intent_pct`가 있는 이탈 예측 결과에서 `유지`·`관망`·`이탈` 항목을 결과 열로 정규화했다.
+- [x] 연령별 의향 비율을 기존 색상 강도 셀과 굵은 1위 표기로 렌더링한다.
+- [x] `npm run check:minsim` fixture는 이탈 예측의 세 의향 열과 연령별 백분율을 회귀 검증한다.
 
 ## 6. Completion Log
 

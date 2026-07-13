@@ -93,6 +93,12 @@ const OPT: Record<string, string> = {
   D: 'var(--opt-d)',
 }
 
+const OUTCOME_COLORS: Record<string, string> = {
+  유지: 'var(--opt-a)',
+  관망: 'var(--opt-b)',
+  이탈: 'var(--opt-c)',
+}
+
 const PROVINCE_SVG_ID: Record<string, string> = {
   서울: '서울특별시',
   부산: '부산광역시',
@@ -134,25 +140,30 @@ export function buildMinsimReport(result: RunResultEnvelope, options: { complete
   const metrics = isRecord(result.metrics) ? result.metrics : {}
   const choiceCounts = numberRecord(metrics.choice_counts)
   const choicePct = numberRecord(metrics.choice_pct)
+  const intentCounts = numberRecord(metrics.intent_counts)
+  const intentPct = numberRecord(metrics.intent_pct)
   const creativeTexts = stringArray(metrics.creatives)
   const reasonsByChoice = recordOfStringArray(metrics.reasons_by_choice)
-  const validChoiceTotal = Object.values(choiceCounts).reduce((sum, count) => sum + count, 0)
+  const hasChoices = Object.keys(choiceCounts).length > 0
+  const outcomeCounts = hasChoices ? choiceCounts : intentCounts
+  const outcomePct = hasChoices ? choicePct : intentPct
+  const validChoiceTotal = Object.values(outcomeCounts).reduce((sum, count) => sum + count, 0)
 
-  const ids = Object.keys(choiceCounts).length
-    ? Object.keys(choiceCounts).sort()
-    : ['A', 'B', 'C'].filter((id) => id in choicePct)
+  const ids = Object.keys(outcomeCounts).length
+    ? Object.keys(outcomeCounts).sort()
+    : hasChoices ? ['A', 'B', 'C'].filter((id) => id in outcomePct) : Object.keys(outcomePct).sort()
   const creatives: MinsimCreative[] = ids.map((id, index) => {
-    const count = choiceCounts[id] ?? 0
-    const pct = round(choicePct[id] ?? 0)
+    const count = outcomeCounts[id] ?? 0
+    const pct = round(outcomePct[id] ?? 0)
     return {
       id,
-      label: `${id}안`,
-      text: creativeTexts[index] ?? `${id}안`,
+      label: hasChoices ? `${id}안` : id,
+      text: hasChoices ? (creativeTexts[index] ?? `${id}안`) : id,
       angle: '',
       pct,
       count,
       band: wilsonMarginPct(count, validChoiceTotal),
-      color: OPT[id] ?? 'var(--opt-d)',
+      color: OPT[id] ?? OUTCOME_COLORS[id] ?? 'var(--opt-d)',
       winner: false,
     }
   })

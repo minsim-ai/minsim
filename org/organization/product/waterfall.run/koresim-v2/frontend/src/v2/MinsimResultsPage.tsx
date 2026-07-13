@@ -19,6 +19,9 @@ const OPT: Record<string, string> = {
   B: 'var(--opt-b)',
   C: 'var(--opt-c)',
   D: 'var(--opt-d)',
+  유지: 'var(--opt-a)',
+  관망: 'var(--opt-b)',
+  이탈: 'var(--opt-c)',
 }
 
 type ResultsState = {
@@ -559,7 +562,7 @@ function AgeFullTable({ report }: { report: MinsimReport }) {
       <div className="row" style={{ gap: 16, marginBottom: 14, flexWrap: 'wrap' }}>
         {legend.map((creative) => (
           <span key={creative.id} className="row lbl" style={{ gap: 6, fontSize: 12, whiteSpace: 'nowrap' }}>
-            <span style={{ width: 10, height: 10, borderRadius: 3, background: OPT[creative.id], flex: 'none' }} />
+            <span style={{ width: 10, height: 10, borderRadius: 3, background: creative.color, flex: 'none' }} />
             {creative.label}
           </span>
         ))}
@@ -591,7 +594,7 @@ function AgeFullTable({ report }: { report: MinsimReport }) {
                     fontSize: 14,
                     fontWeight: row.lead === creative.id ? 700 : 500,
                     color: row.lead === creative.id ? 'var(--fg)' : 'var(--fg-faint)',
-                    background: `color-mix(in srgb, ${OPT[creative.id]} ${Math.max(8, Math.min(48, (row.pct?.[creative.id] ?? 0) * 0.55))}%, var(--bg))`,
+                    background: `color-mix(in srgb, ${creative.color} ${Math.max(8, Math.min(48, (row.pct?.[creative.id] ?? 0) * 0.55))}%, var(--bg))`,
                   }}
                   aria-label={`${row.label} ${creative.label} ${row.pct?.[creative.id] ?? 0}%`}
                 >
@@ -621,7 +624,7 @@ function SegmentMatrix({ report }: { report: MinsimReport }) {
       <div className="row" style={{ gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
         {legend.map((creative) => (
           <span key={creative.id} className="row lbl" style={{ gap: 6, fontSize: 12 }}>
-            <span style={{ width: 10, height: 10, borderRadius: 3, background: OPT[creative.id] }} />
+            <span style={{ width: 10, height: 10, borderRadius: 3, background: creative.color }} />
             {creative.label}
           </span>
         ))}

@@ -90,6 +90,23 @@ export const minsimResultFixture: RunResultEnvelope = {
   },
 }
 
+const churnResultFixture: RunResultEnvelope = {
+  ...minsimResultFixture,
+  run_id: 'fixture-minsim-churn',
+  simulation_type: 'churn_prediction',
+  metrics: {
+    intent_counts: { 유지: 2, 관망: 58, 이탈: 104 },
+    intent_pct: { 유지: 1.2, 관망: 35.4, 이탈: 63.4 },
+  },
+  segments: {
+    breakdown_by_age: {
+      '20대': { 유지: 2, 관망: 21, 이탈: 28 },
+      '30대': { 관망: 19, 이탈: 30 },
+      '40대': { 관망: 18, 이탈: 46 },
+    },
+  },
+}
+
 export function runMinsimResultFixtureCheck(): MinsimResultFixtureCheck {
   const view = adaptRunResult(minsimResultFixture)
   const report = buildMinsimReport(minsimResultFixture)
@@ -114,6 +131,15 @@ export function runMinsimResultFixtureCheck(): MinsimResultFixtureCheck {
   }
   if (!report.objections.some((item) => item.reason.includes('가격') && item.pct > 0)) {
     failures.push('expected price objection derived from persona reasons')
+  }
+
+  const churnReport = buildMinsimReport(churnResultFixture)
+  const churnLabels = churnReport.creatives.map((creative) => creative.label).sort()
+  if (churnLabels.join(',') !== '관망,유지,이탈') {
+    failures.push(`expected churn intent columns, got ${churnLabels.join(',') || 'none'}`)
+  }
+  if (churnReport.ageFull.some((row) => row.pct === null)) {
+    failures.push('expected churn age rows to include intent percentages')
   }
 
   return {
