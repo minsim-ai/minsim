@@ -4,7 +4,7 @@ type: execution-plan
 tags: [results, interview, followup, ui]
 created: 2026-07-13
 updated: 2026-07-13
-status: in-progress
+status: complete
 related: [[../design/results-research-workspace]], [[minsim-v2-ux-and-mcp]]
 ---
 
@@ -24,7 +24,7 @@ related: [[../design/results-research-workspace]], [[minsim-v2-ux-and-mcp]]
 - [x] 프로젝트/run 소유권을 확인하는 thread list/create/message API.
 - [x] 실제 raw result UUID를 쓰는 응답자 데이터.
 - [x] 발언/응답자 탐색, 코호트 필터, 집단 질문, 누적 채팅 통합 UI.
-- [ ] desktop/mobile 브라우저 회귀 검증.
+- [x] desktop/mobile 브라우저 회귀 검증.
 
 ### Out of scope
 
@@ -65,17 +65,17 @@ related: [[../design/results-research-workspace]], [[minsim-v2-ux-and-mcp]]
 - [x] Follow-up interview prompt history test.
 - [x] Frontend lint/typecheck/build.
 - [x] `uv run python scripts/verify.py` full gate.
-- [ ] agent-browser desktop/mobile happy path and console error check.
-- [ ] production deployment smoke check.
+- [x] agent-browser desktop/mobile happy path and console error check.
+- [x] production deployment smoke check.
 
 ## Acceptance Criteria
 
-- [ ] 근거 발언과 응답자 목록이 같은 섹션의 보기 전환으로 제공된다.
-- [ ] 군중감 카드가 클릭한 실제 응답자 UUID를 사용한다.
-- [ ] 집단 질문 응답에서 특정 응답자를 개인 인터뷰 대상으로 전환할 수 있다.
-- [ ] 같은 응답자의 두 번째 질문이 첫 문답을 포함한 맥락으로 실행된다.
-- [ ] 페이지 새로고침 후 저장된 인터뷰 문답이 복구된다.
-- [ ] 모바일에서 탐색과 대화가 가로 overflow 없이 사용 가능하다.
+- [x] 근거 발언과 응답자 목록이 같은 섹션의 보기 전환으로 제공된다.
+- [x] 군중감 카드가 클릭한 실제 응답자 UUID를 사용한다.
+- [x] 집단 질문 응답에서 특정 응답자를 개인 인터뷰 대상으로 전환할 수 있다.
+- [x] 같은 응답자의 두 번째 질문이 첫 문답을 포함한 맥락으로 실행된다.
+- [x] 페이지 새로고침 후 저장된 인터뷰 문답이 복구된다.
+- [x] 모바일에서 탐색과 대화가 가로 overflow 없이 사용 가능하다.
 
 ## Rollback
 
@@ -85,8 +85,8 @@ related: [[../design/results-research-workspace]], [[minsim-v2-ux-and-mcp]]
 
 ## Completion Log
 
-- [ ] Implementation completed:
-- [ ] Tests run:
-- [ ] Browser evidence:
-- [ ] Commit:
-- [ ] Deployment:
+- [x] Implementation completed: persistent interview store/API and unified React workspace.
+- [x] Tests run: focused 25 passed; full gate 196 passed with 88.92% coverage; frontend lint/typecheck/build passed.
+- [x] Browser evidence: production desktop/mobile, two cumulative turns, refresh restore (4 messages), no page/workspace overflow, empty console/errors.
+- [x] Commit: `0a1d6e1 feat: add persistent results research workspace`.
+- [x] Deployment: API/worker restarted; external Mac Studio production check returned `status=ready`.
