@@ -6,7 +6,8 @@ from typing import Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from src.config import MAX_SAMPLE_SIZE
+from src.config import INTERACTIVE_FOLLOWUP_MAX_SAMPLE_SIZE, MAX_SAMPLE_SIZE
+from src.llm.router import validate_requested_model_alias
 
 
 class APIModel(BaseModel):
@@ -44,6 +45,7 @@ class ErrorCode(StrEnum):
     RUN_NOT_CANCELABLE = "RUN_NOT_CANCELABLE"
     QUEUE_UNAVAILABLE = "QUEUE_UNAVAILABLE"
     FREE_QUOTA_EXHAUSTED = "FREE_QUOTA_EXHAUSTED"
+    INTERACTIVE_RATE_LIMITED = "INTERACTIVE_RATE_LIMITED"
     WORKER_INTERRUPTED = "WORKER_INTERRUPTED"
     LLM_UNAVAILABLE = "LLM_UNAVAILABLE"
     LLM_TIMEOUT = "LLM_TIMEOUT"
@@ -201,7 +203,7 @@ class IntakeContextEnvelope(APIModel):
     schema_version: str = "intake-context/v1"
     intake_session_id: str = Field(min_length=1, max_length=160)
     router_version: str = Field(default="goal-router:v1", max_length=80)
-    planner_version: str = Field(default="intake-planner:v2-20260513", max_length=80)
+    planner_version: str = Field(default="intake-planner:v3-20260713", max_length=80)
     task_frame: dict[str, Any] = Field(default_factory=dict)
     provenance: dict[str, Any] = Field(default_factory=dict)
     safe_intake_summary: SafeIntakeSummary
@@ -245,6 +247,13 @@ class RunCreateRequest(APIModel):
         model = SIMULATION_INPUT_MODELS[self.simulation_type]
         if not isinstance(self.input, model):
             self.input = model.model_validate(self.input)
+        if self.model_alias:
+            self.model_alias = validate_requested_model_alias(self.model_alias)
+        if (
+            self.intake_context
+            and self.intake_context.safe_intake_summary.unreviewed_assumption_count > 0
+        ):
+            raise ValueError("Intake assumptions must be reviewed before a run can start.")
         return self
 
 
@@ -580,7 +589,7 @@ class RunFeedbackResponse(APIModel):
 class ProjectRunFollowupRequest(APIModel):
     question: str = Field(min_length=1, max_length=500)
     cohort: str = Field(default="all", max_length=80)
-    sample_size: int = Field(default=12, ge=1, le=50)
+    sample_size: int = Field(default=12, ge=1, le=INTERACTIVE_FOLLOWUP_MAX_SAMPLE_SIZE)
 
 
 class FollowupAnswer(APIModel):

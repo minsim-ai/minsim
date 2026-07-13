@@ -67,7 +67,7 @@ export function MinsimLoadingPage({
   const { project, run } = state
   const status = run?.status ?? 'queued'
   const pct = run ? Math.max(4, Math.min(100, run.progress_pct)) : 4
-  const total = run?.total_count || 500
+  const total = run?.total_count || 200
   const done = run ? run.done_count : Math.round((pct / 100) * total)
   const phase = PHASES.find(([, threshold]) => pct < threshold) ?? PHASES[PHASES.length - 1]
   const phaseLabel =

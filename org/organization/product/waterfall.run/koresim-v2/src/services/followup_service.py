@@ -69,7 +69,15 @@ def run_followup(
     if sample_size is not None:
         personas = personas[: max(1, sample_size)]
 
-    simulator = BatchSimulator(purpose="marketing", llm_client=_simulator_client(llm_client))
+    simulator = BatchSimulator(
+        purpose="marketing",
+        llm_client=_simulator_client(llm_client),
+        trace_metadata={
+            "run_id": original_run.get("run_id"),
+            "simulation_type": original_run.get("simulation_type"),
+            "interactive_action": "project_followup",
+        },
+    )
     results = asyncio.run(simulator.run(personas, _followup_prompt(question)))
 
     answers: list[dict[str, Any]] = []
@@ -104,6 +112,7 @@ def run_interview_turn(
     history: list[dict[str, Any]] | None = None,
     context_quote: str = "",
     llm_client: Any | None = None,
+    trace_metadata: dict[str, object] | None = None,
 ) -> dict[str, Any]:
     """Run one turn for a persisted interview with the same synthetic persona."""
 
@@ -128,7 +137,14 @@ def run_interview_turn(
         history=history or [],
     )
 
-    simulator = BatchSimulator(purpose="marketing", llm_client=_simulator_client(llm_client))
+    simulator = BatchSimulator(
+        purpose="marketing",
+        llm_client=_simulator_client(llm_client),
+        trace_metadata={
+            **(trace_metadata or {}),
+            "interactive_action": "interview_message",
+        },
+    )
     results = asyncio.run(simulator.run([persona], prompt))
     if not results or results[0].error or not results[0].response:
         error = results[0].error if results else "No response"

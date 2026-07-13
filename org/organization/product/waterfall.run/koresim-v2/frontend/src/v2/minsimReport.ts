@@ -60,8 +60,8 @@ export type MinsimReport = {
   runnerUp: MinsimCreative | null
   creatives: MinsimCreative[]
   optColor: Record<string, string>
-  sentiment: { pos: number; neu: number; neg: number }
-  intent: { buy: number; consider: number; no: number }
+  sentiment: { pos: number; neu: number; neg: number } | null
+  intent: { buy: number; consider: number; no: number } | null
   core: {
     conclusion: string
     positives: TitleBody[]
@@ -136,6 +136,7 @@ export function buildMinsimReport(result: RunResultEnvelope, options: { complete
   const choicePct = numberRecord(metrics.choice_pct)
   const creativeTexts = stringArray(metrics.creatives)
   const reasonsByChoice = recordOfStringArray(metrics.reasons_by_choice)
+  const validChoiceTotal = Object.values(choiceCounts).reduce((sum, count) => sum + count, 0)
 
   const ids = Object.keys(choiceCounts).length
     ? Object.keys(choiceCounts).sort()
@@ -150,7 +151,7 @@ export function buildMinsimReport(result: RunResultEnvelope, options: { complete
       angle: '',
       pct,
       count,
-      band: Math.max(2, Math.min(6, Math.round(24 / Math.sqrt(Math.max(1, count))))),
+      band: wilsonMarginPct(count, validChoiceTotal),
       color: OPT[id] ?? 'var(--opt-d)',
       winner: false,
     }
@@ -166,8 +167,8 @@ export function buildMinsimReport(result: RunResultEnvelope, options: { complete
   const total = result.total_responses
   const status = confidenceLabel(total, parseSuccessRate)
 
-  const sentiment = deriveSentiment(result.raw_results, winner?.pct ?? 40)
-  const intent = deriveIntent(result.raw_results, sentiment)
+  const sentiment = deriveSentiment(result.raw_results)
+  const intent = deriveIntent(result.raw_results)
 
   const findings = agent.findings.slice(0, 4)
   const actions = agent.actions.slice(0, 4)
@@ -200,7 +201,7 @@ export function buildMinsimReport(result: RunResultEnvelope, options: { complete
   return {
     run: {
       panel: total,
-      valid: total,
+      valid: Math.max(0, total - result.parse_failed),
       gap: gapPoint === null ? '집계 중' : `+${gapPoint}pt`,
       gapPoint,
       seed: result.seed,
@@ -292,6 +293,12 @@ function buildAgentView(result: RunResultEnvelope): AgentView {
       return asString(item) ? [{ title: String(item), body: '' }] : []
     }),
     ...stringArray(qa.review_notes).map((note) => ({ title: note, body: '' })),
+    ...stringArray(qa.warnings).map((warning) => ({ title: warning, body: 'AI QA 경고' })),
+    ...Object.entries(agents).flatMap(([name, output]) => (
+      isRecord(output) && output.mode === 'fallback'
+        ? [{ title: `${name} 단계가 fallback으로 처리됨`, body: asString(output.fallback_reason) ?? '원본 AI 단계 실패' }]
+        : []
+    )),
   ]
 
   return {
@@ -312,7 +319,7 @@ function buildJudgeBody(
   const lines: string[] = []
   if (winner && runnerUp && gapPoint !== null) {
     lines.push(
-      `${runnerUp.label}(${runnerUp.pct}%)보다 ${gapPoint}%포인트 더 많이 선택돼, 전체 시장 방향은 안정적입니다.`,
+      `이 synthetic panel에서는 ${runnerUp.label}(${runnerUp.pct}%)보다 ${gapPoint}%포인트 더 많이 선택됐습니다. 실제 시장 일반화 전 추가 검증이 필요합니다.`,
     )
   } else if (winner) {
     lines.push(`${winner.label}가 ${winner.pct}%로 가장 강한 반응을 얻었습니다.`)
@@ -321,31 +328,24 @@ function buildJudgeBody(
   return lines
 }
 
-function deriveSentiment(rawResults: RawPersonaResult[], topPct: number): { pos: number; neu: number; neg: number } {
+function deriveSentiment(rawResults: RawPersonaResult[]): { pos: number; neu: number; neg: number } | null {
   const scores = rawResults.map(scoreOf).filter((value): value is number => value !== null)
   if (scores.length >= 5) {
     const pos = pctOf(scores.filter((score) => score >= 4).length, scores.length)
     const neg = pctOf(scores.filter((score) => score <= 2).length, scores.length)
     return { pos, neg, neu: Math.max(0, 100 - pos - neg) }
   }
-  const pos = Math.min(72, Math.round(topPct * 1.05))
-  const neg = Math.max(8, Math.round((100 - topPct) * 0.42))
-  return { pos, neu: Math.max(0, 100 - pos - neg), neg }
+  return null
 }
 
-function deriveIntent(
-  rawResults: RawPersonaResult[],
-  sentiment: { pos: number; neg: number },
-): { buy: number; consider: number; no: number } {
+function deriveIntent(rawResults: RawPersonaResult[]): { buy: number; consider: number; no: number } | null {
   const intents = rawResults.map(intentOf).filter((value): value is string => value !== null)
   if (intents.length >= 5) {
     const buy = pctOf(intents.filter((value) => value === 'buy').length, intents.length)
     const no = pctOf(intents.filter((value) => value === 'no').length, intents.length)
     return { buy, no, consider: Math.max(0, 100 - buy - no) }
   }
-  const buy = Math.round((sentiment.pos || 40) * 0.62)
-  const no = Math.round((sentiment.neg || 20) * 1.1)
-  return { buy, consider: Math.max(0, 100 - buy - no), no }
+  return null
 }
 
 function scoreOf(item: RawPersonaResult): number | null {
@@ -435,7 +435,7 @@ function buildRegions(segments: JsonObject): MinsimRegion[] {
       const lowSample = n < 30
       const why = lowSample
         ? `표본이 작아(n=${n}) 편차가 큽니다. ${leadLabel} 우세는 방향성 참고치로만 해석하세요.`
-        : `${leadLabel} 선호가 ${pctNum}%로 가장 높은 지역입니다. 표본 ${n}명 기준으로 방향성이 안정적입니다.`
+        : `${leadLabel} 선호가 ${pctNum}%로 가장 높은 지역 표본입니다. 이 panel 안에서 관측된 차이이며 시장 전체를 뜻하지 않습니다.`
       const actions = lowSample
         ? ['패널 확대 후 재확인 필요', `${leadLabel} 중심 메시지로 소규모 반응 확인`]
         : [`${leadLabel} 중심 메시지로 지역 타겟 테스트`, '상위 반응 세그먼트에 같은 카피 우선 적용']
@@ -577,7 +577,7 @@ function buildOppRisk(
   return {
     cols: OPP_RISK_COLS,
     rows,
-    note: '↑ 지표는 높을수록 기회, ↓ 지표는 높을수록 리스크입니다. 수치는 0–100 상대값(응답 분포·점수·거절 사유 기반 추정).',
+    note: '제품 검증 전용 휴리스틱 v1입니다. 0–100 상대값은 응답 분포·점수·키워드 빈도로 계산한 우선순위 참고치이며 시장 확률이나 전환율이 아닙니다.',
   }
 }
 
@@ -586,11 +586,20 @@ function oppRiskNote(v: number[], sweet: boolean): string {
   const opportunity = acceptance + need
   const risks: [string, number][] = [['가격', price], ['신뢰', trust], ['경쟁', competition]]
   const [topRiskName, topRiskValue] = risks.sort((a, b) => b[1] - a[1])[0]
-  if (sweet && topRiskValue < 45) return '기회 최고 · 바로 전환 가능한 핵심 세그먼트'
-  if (opportunity >= 150) return topRiskValue >= 45 ? `기회 크나 ${topRiskName} 저항 동반 · 조건 설계 필요` : '안정적 기회 · 우선 공략 대상'
+  if (sweet && topRiskValue < 45) return '상대 반응 높음 · 후속 검증 우선 세그먼트'
+  if (opportunity >= 150) return topRiskValue >= 45 ? `상대 반응은 높으나 ${topRiskName} 저항 동반` : '상대 반응 높음 · 실제 고객 검증 필요'
   if (need >= 60 && acceptance < 55) return `니즈는 크나 ${topRiskName} 저항이 발목`
   if (opportunity >= 110) return `니즈는 있으나 ${topRiskName} 리스크가 관건`
   return '관망 우세 · 근거 보강 후 재확인 필요'
+}
+
+function wilsonMarginPct(successes: number, total: number): number {
+  if (total <= 0) return 0
+  const z = 1.96
+  const p = successes / total
+  const denominator = 1 + (z * z) / total
+  const margin = (z * Math.sqrt((p * (1 - p)) / total + (z * z) / (4 * total * total))) / denominator
+  return round(margin * 100)
 }
 
 function buildObjections(rawResults: RawPersonaResult[], watch: TitleBody[]): MinsimObjection[] {
@@ -637,7 +646,7 @@ function buildCrowd(rawResults: RawPersonaResult[]): MinsimReport['crowd'] {
     .slice(0, 50)
     .map((item) => {
       const persona = item.persona
-      const sex = typeof persona.sex === 'string' ? persona.sex : '여자'
+      const sex = typeof persona.sex === 'string' ? persona.sex : '미상'
       const reason = item.parsed && typeof item.parsed.reason === 'string' ? item.parsed.reason : ''
       return {
         uuid: item.uuid,
@@ -658,7 +667,7 @@ function buildQuotes(rawResults: RawPersonaResult[]): MinsimReport['quotes'] {
     .slice(0, 12)
     .map((item) => {
       const persona = item.persona
-      const sex = typeof persona.sex === 'string' ? persona.sex : '여자'
+      const sex = typeof persona.sex === 'string' ? persona.sex : '미상'
       const metaParts = [
         /남/.test(sex) ? '남' : '여',
         typeof persona.age === 'number' ? `${persona.age}세` : null,
@@ -683,7 +692,7 @@ function extractReason(response: string): string {
 }
 
 export function displayName(seed: string, sex: string): string {
-  const pool = /남/.test(sex) ? NAMES_M : NAMES_F
+  const pool = /남/.test(sex) ? NAMES_M : /여/.test(sex) ? NAMES_F : [...NAMES_F, ...NAMES_M]
   let hash = 0
   for (let i = 0; i < seed.length; i += 1) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0
   return pool[hash % pool.length]

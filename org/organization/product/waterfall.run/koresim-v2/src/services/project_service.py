@@ -36,6 +36,7 @@ from src.jobs.store import SQLiteRunStore
 from src.services.errors import ServiceError, require_authenticated_user
 from src.services.export_service import build_run_export_response
 from src.services.followup_service import run_followup, run_interview_turn
+from src.services.llm_usage_service import consume_interactive_llm_action
 from src.services.run_service import create_run_for_user
 
 
@@ -233,7 +234,13 @@ class ProjectService:
         payload: ProjectRunFollowupRequest,
         llm_client: object | None = None,
     ) -> ProjectRunFollowupResponse:
+        user = require_authenticated_user(user)
         run = self._owned_project_run(user, project_id, run_id)
+        consume_interactive_llm_action(
+            store=self.store,
+            user=user,
+            action_type="project_followup",
+        )
         result = self.store.get_result(run_id)
         if result is None:
             raise ServiceError(
@@ -244,6 +251,8 @@ class ProjectService:
             )
         body = run_followup(
             original_run={
+                "run_id": run.run_id,
+                "simulation_type": run.simulation_type,
                 "seed": run.seed,
                 "sample_size": run.sample_size,
                 "target_filter": run.target_filter,
@@ -328,6 +337,11 @@ class ProjectService:
     ) -> InterviewThreadResponse:
         user = require_authenticated_user(user)
         run = self._owned_project_run(user, project_id, run_id)
+        consume_interactive_llm_action(
+            store=self.store,
+            user=user,
+            action_type="interview_message",
+        )
         thread = self.store.get_interview_thread(user_id=user.user_id, thread_id=thread_id)
         if thread is None or thread.project_id != project_id or thread.run_id != run_id:
             raise ServiceError(
@@ -347,6 +361,10 @@ class ProjectService:
                 history=history,
                 context_quote=thread.context_quote,
                 llm_client=llm_client,
+                trace_metadata={
+                    "run_id": run.run_id,
+                    "simulation_type": run.simulation_type,
+                },
             )
         except ValueError as exc:
             raise ServiceError(

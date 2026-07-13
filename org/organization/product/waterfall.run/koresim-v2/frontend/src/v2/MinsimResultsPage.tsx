@@ -277,7 +277,7 @@ function Verdict({ report, onExport }: { report: MinsimReport; onExport: () => v
   const { run, winner, runnerUp } = report
   if (!winner) return null
   const metrics = [
-    { l: '응답 표본', v: `${run.panel.toLocaleString('ko-KR')}명`, s: `요청 표본 ${run.valid.toLocaleString('ko-KR')}명 해석 가능` },
+    { l: '응답 표본', v: `${run.panel.toLocaleString('ko-KR')}명`, s: `유효 응답 ${run.valid.toLocaleString('ko-KR')}명` },
     { l: '선호 격차', v: run.gap, s: runnerUp ? `1위−2위 (${winner.id}−${runnerUp.id})` : '1위 기준' },
     { l: '해석 상태', v: run.status, s: `구조화 성공 ${run.structured}` },
   ]
@@ -339,12 +339,20 @@ function CoreCase({ report }: { report: MinsimReport }) {
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
         <div className="card" style={{ padding: 20 }}>
-          <div className="lbl-mono" style={{ marginBottom: 14 }}>긍정 · 중립 · 부정 비율 <span className="faint">· 보조 추정</span></div>
-          <RatioBar parts={[['긍정', sentiment.pos], ['중립', sentiment.neu], ['부정', sentiment.neg]]} />
+          <div className="lbl-mono" style={{ marginBottom: 14 }}>긍정 · 중립 · 부정 비율 <span className="faint">· 직접 관측</span></div>
+          {sentiment ? (
+            <RatioBar parts={[['긍정', sentiment.pos], ['중립', sentiment.neu], ['부정', sentiment.neg]]} />
+          ) : (
+            <p className="faint">직접 수집된 감정 점수가 5건 미만이라 표시하지 않습니다.</p>
+          )}
         </div>
         <div className="card" style={{ padding: 20 }}>
-          <div className="lbl-mono" style={{ marginBottom: 14 }}>구매 의향 <span className="faint">· 보조 추정</span></div>
-          <RatioBar parts={[['구매', intent.buy], ['고려', intent.consider], ['거절', intent.no]]} />
+          <div className="lbl-mono" style={{ marginBottom: 14 }}>구매 의향 <span className="faint">· 직접 관측</span></div>
+          {intent ? (
+            <RatioBar parts={[['구매', intent.buy], ['고려', intent.consider], ['거절', intent.no]]} />
+          ) : (
+            <p className="faint">직접 수집된 구매 의향 응답이 5건 미만이라 표시하지 않습니다.</p>
+          )}
         </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>

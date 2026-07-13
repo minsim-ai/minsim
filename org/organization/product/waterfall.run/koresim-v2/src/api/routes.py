@@ -83,21 +83,16 @@ from src.config import (
     ENABLE_LLM_AGENTS,
     LLM_BACKEND,
     MAX_SAMPLE_SIZE,
-    MODEL_ANALYSIS_DEFAULT,
-    MODEL_PERSONA_DEFAULT,
-    MODEL_PERSONA_STRONG,
-    MODEL_REPAIR_DEFAULT,
-    MODEL_REPORT_DEFAULT,
 )
 from src.jobs.events import format_heartbeat, format_snapshot, format_sse_event
-from src.jobs.models import RunEventType, RunRecord, RunStatusValue
-from src.jobs.models import UserRecord
+from src.jobs.models import IntakeSessionRecord, RunEventType, RunRecord, RunStatusValue, UserRecord
 from src.jobs.store import SQLiteRunStore
 from src.llm.base import LLMClientProtocol, LLMMessage, LLMRequest
 from src.llm.factory import create_llm_client
 from src.runtime.health import collect_runtime_health
 from src.services.errors import ServiceError
 from src.services.export_service import build_run_export_response
+from src.services.llm_usage_service import consume_interactive_llm_action
 from src.services.project_service import ProjectService
 from src.services.run_service import create_run_for_user
 from src.simulations.registry import enabled_simulation_types, simulation_metadata
@@ -135,6 +130,34 @@ def _service_error(exc: ServiceError) -> HTTPException:
         exc.status_code,
         ErrorResponse(code=code, message=exc.message, details=exc.details),
     )
+
+
+def _save_intake_snapshot(
+    request: Request,
+    *,
+    session_id: str,
+    status: str,
+    snapshot: dict[str, Any],
+    event_type: str,
+    user: UserRecord | None,
+) -> IntakeSessionRecord:
+    try:
+        return _store(request).save_intake_session(
+            session_id=session_id,
+            status=status,
+            snapshot=snapshot,
+            event_type=event_type,
+            user=user,
+        )
+    except PermissionError as exc:
+        raise _error(
+            404,
+            ErrorResponse(
+                code=ErrorCode.INVALID_REQUEST,
+                message="Intake session was not found.",
+                details={"session_id": session_id},
+            ),
+        ) from exc
 
 
 def _free_run_limit() -> int:
@@ -387,7 +410,18 @@ async def api_health(request: Request) -> dict[str, object]:
     return {
         "ok": runtime["ok"],
         "service": "koresim-api",
-        "scope": "protected-detail",
+        "scope": "public-minimal",
+        "status": "ready" if runtime["ok"] else "unhealthy",
+    }
+
+
+@router.get("/api/internal/health")
+async def api_internal_health(request: Request) -> dict[str, object]:
+    runtime = collect_runtime_health(_store(request))
+    return {
+        "ok": runtime["ok"],
+        "service": "koresim-api",
+        "scope": "authenticated-detail",
         "sqlite": runtime["sqlite"],
         "redis": runtime["redis"],
         "queue": runtime["queue"],
@@ -409,16 +443,6 @@ async def api_config() -> dict[str, object]:
         "simulation_types": [simulation_type.value for simulation_type in SimulationType],
         "enabled_simulation_types": enabled_simulation_types(),
         "simulation_metadata": simulation_metadata(),
-        "llm_backend": LLM_BACKEND,
-        "model_aliases": {
-            "persona_default": MODEL_PERSONA_DEFAULT,
-            "persona_strong": MODEL_PERSONA_STRONG,
-            "analysis_default": MODEL_ANALYSIS_DEFAULT,
-            "report_default": MODEL_REPORT_DEFAULT,
-            "schema_repair": MODEL_REPAIR_DEFAULT,
-        },
-        "langgraph_enabled": ENABLE_LANGGRAPH,
-        "llm_agents_enabled": ENABLE_LLM_AGENTS,
         "auth": {
             "session_url": "/api/auth/session",
             "login_url": "/api/auth/google/login",
@@ -639,7 +663,8 @@ async def save_intake_session(
 ) -> IntakeSessionResponse:
     session_id = payload.session_id or f"intake-{uuid4()}"
     user = _user_record_for_request(request)
-    record = _store(request).save_intake_session(
+    record = _save_intake_snapshot(
+        request,
         session_id=session_id,
         status=payload.status,
         snapshot=payload.snapshot,
@@ -678,7 +703,7 @@ async def list_intake_history(request: Request, limit: int = 20) -> IntakeHistor
     return IntakeHistoryResponse(items=[_intake_history_response(record) for record in records])
 
 
-@router.post("/api/intake/advance")
+@router.post("/api/intake/advance", deprecated=True)
 async def advance_intake_session(
     request: Request,
     payload: IntakeAdvanceRequest,
@@ -690,7 +715,8 @@ async def advance_intake_session(
         event=payload.event,
     )
     user = _user_record_for_request(request)
-    _store(request).save_intake_session(
+    _save_intake_snapshot(
+        request,
         session_id=session_id,
         status=str(advanced["status"]),
         snapshot=advanced["snapshot"],
@@ -717,7 +743,8 @@ async def update_intake_session(
     payload: IntakeSessionSaveRequest,
 ) -> IntakeSessionResponse:
     user = _user_record_for_request(request)
-    record = _store(request).save_intake_session(
+    record = _save_intake_snapshot(
+        request,
         session_id=session_id,
         status=payload.status,
         snapshot=payload.snapshot,
@@ -791,6 +818,14 @@ async def generate_intake_candidates(
     request: Request,
     payload: IntakeCandidateRequest,
 ) -> IntakeCandidateResponse:
+    try:
+        consume_interactive_llm_action(
+            store=_store(request),
+            user=_user_record_for_request(request),
+            action_type="intake_candidate_generation",
+        )
+    except ServiceError as exc:
+        raise _service_error(exc) from exc
     llm_response = await _llm_client(request).generate(
         LLMRequest(
             task_type="intake_candidate_generation",

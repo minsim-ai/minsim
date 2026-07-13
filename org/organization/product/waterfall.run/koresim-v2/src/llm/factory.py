@@ -9,6 +9,7 @@ from src.config import (
     LLM_GATEWAY_API_KEY,
     LLM_GATEWAY_BASE_URL,
     MODEL_PERSONA_DEFAULT,
+    SUPPORTED_LLM_BACKENDS,
     UPSTAGE_API_KEY,
     UPSTAGE_BASE_URL,
     UPSTAGE_MODEL,
@@ -20,6 +21,9 @@ from src.llm.tracing import with_tracing
 
 
 def create_llm_client() -> LLMClientProtocol:
+    if LLM_BACKEND not in SUPPORTED_LLM_BACKENDS:
+        supported = ", ".join(sorted(SUPPORTED_LLM_BACKENDS))
+        raise RuntimeError(f"Unsupported LLM_BACKEND={LLM_BACKEND!r}. Supported values: {supported}.")
     if LLM_BACKEND == "fake":
         return with_tracing(FakeLLMClient())
     if LLM_BACKEND == "upstage":
@@ -41,11 +45,13 @@ def create_llm_client() -> LLMClientProtocol:
                 use_request_model_alias=True,
             )
         )
-    return with_tracing(
-        OpenAICompatibleAdapter(
-            provider="gemini",
-            model=GEMINI_MODEL,
-            base_url=GEMINI_BASE_URL,
-            api_key=GEMINI_API_KEY,
+    if LLM_BACKEND == "gemini":
+        return with_tracing(
+            OpenAICompatibleAdapter(
+                provider="gemini",
+                model=GEMINI_MODEL,
+                base_url=GEMINI_BASE_URL,
+                api_key=GEMINI_API_KEY,
+            )
         )
-    )
+    raise AssertionError(f"Unhandled LLM backend: {LLM_BACKEND}")

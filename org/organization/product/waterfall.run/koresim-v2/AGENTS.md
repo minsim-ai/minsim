@@ -20,7 +20,7 @@ Do not treat unrelated Obsidian vault changes as part of this project unless the
 - Public domain plan: `https://arabesque.cc`.
 - Route policy: `/` and safe status/documentation endpoints are publicly reachable through Cloudflare Tunnel. Cloudflare Access allowlists are no longer part of the current demo target; `/app*`, `/results*`, and run/preset/export APIs use app-level Google auth when configured.
 - Queue and persistence: Redis + RQ worker, SQLite job/result store.
-- LLM direction: provider-agnostic `LLMClient`, LiteLLM Proxy, Gemini first external provider, Ollama local fallback, Langfuse metadata-only observability.
+- LLM direction: provider-agnostic `LLMClient`, Upstage `solar-pro2` production target, optional LiteLLM Proxy, Gemini temporary live compatibility until the Upstage credential is provisioned, no Ollama runtime fallback, Langfuse metadata-only observability.
 
 ## Live Deployment
 
@@ -84,16 +84,16 @@ When working on KoreaSim's LLM/agent structure, treat these files as the source 
 - `docs/phases/phase-7-llm-gateway-orchestration.md` — validated Phase 7 gate, current agent orchestration status, validation evidence, and deferred scope.
 - `docs/execution/ai-agent-improvement-loop-v1.md` — `agent_runs` storage, prompt versions, eval harness, artifact contract, and run-level checkpoint persistence.
 - `docs/execution/agentic-intake-layer-v2.md` — current intake-agent execution plan and validation log.
-- `docs/design/agentic-intake-workflows/intake-layer-v2-contract.md` — `IntakeContextEnvelope`, `safe_intake_summary`, `/api/intake/advance`, and result-agent safe context contract.
+- `docs/design/agentic-intake-workflows/intake-layer-v2-contract.md` — React planner v3 source-of-truth, `IntakeContextEnvelope`, `safe_intake_summary`, session persistence, deprecated `/api/intake/advance`, and result-agent safe context contract.
 - `docs/design/agentic-intake-workflows/universal-agentic-intake-workflow.md` — goal-first intake workflow, slot/provenance model, and planner policy.
 - `docs/design/agentic-intake-workflows/simulation-intake-pack-standard.md` — common intake engine plus simulation-specific pack contract.
 - `docs/design/agentic-intake-workflows/intake-evaluation-fixtures-plan.md` — intake regression fixture categories and pass/fail criteria.
-- `docs/runbooks/llm-gemini-langfuse-operations.md` — Gemini/LiteLLM/Langfuse operational setup and metadata-only observability policy.
+- `docs/runbooks/llm-solar-langfuse-operations.md` — Solar/LiteLLM/Langfuse activation, rollback, credential, and metadata-only observability policy.
 
 Current architectural boundary:
 
 - Do not move persona fanout into LangGraph by default. Keep 50-200 persona response generation in the existing RQ worker and async batch simulator.
-- LangGraph is used for run-level orchestration/checkpointing and intake checkpoint shape, not per-persona branching.
+- LangGraph is used for the actual Analysis → Report → QA result workflow and checkpointing, not per-persona branching.
 - Result-level agents operate after aggregate result envelopes are complete: `AnalysisAgent`, `ReportAgent`, and `QAAgent`.
 - Intake agent behavior converts user goals into structured slots and `safe_intake_summary`; result agents may use only safe summaries, not raw chat transcripts.
 - Langfuse payloads remain metadata-only by default.
@@ -103,7 +103,8 @@ Overall flow:
 ```mermaid
 flowchart TD
   U["User natural-language goal"] --> FE["React Goal-first Intake UI"]
-  FE --> INTAKE["Intake Planner / /api/intake/advance"]
+  FE --> INTAKE["React Intake Planner v3"]
+  INTAKE --> ISTORE["/api/intake/sessions persistence"]
   INTAKE --> ROUTER["Intent Router"]
   ROUTER --> PACK["Simulation Intake Pack"]
   PACK --> SLOTS["Slot Extraction + Provenance"]
@@ -123,17 +124,17 @@ flowchart TD
   RUNAPI --> RQ["Redis / RQ worker"]
   RQ --> SIM["Simulation engine"]
   SIM --> PERSONAS["Persona sampler"]
-  SIM --> LLM["LLMClient -> LiteLLM/Gemini/Ollama"]
+  SIM --> LLM["LLMClient -> Upstage Solar target / Gemini temporary"]
   LLM --> RAW["50-200 persona responses"]
   RAW --> AGG["Aggregate result envelope"]
-  AGG --> GRAPH["Run-level LangGraph checkpoint"]
-  AGG --> ANALYSIS["AnalysisAgent"]
+  AGG --> GRAPH["Result-agent LangGraph"]
+  GRAPH --> ANALYSIS["AnalysisAgent"]
   ANALYSIS --> REPORT["ReportAgent"]
   REPORT --> QA["QAAgent"]
   CTX -. "safe context only" .-> ANALYSIS
   CTX -. "safe context only" .-> REPORT
   CTX -. "safe context only" .-> QA
-  QA --> RESULT["Persist result + agent_runs"]
+  QA --> RESULT["Persist result + agent_runs + checkpoints"]
   RESULT --> UI["ResultsPage / API artifact"]
   LLM -. "metadata only" .-> LF["Langfuse"]
   ANALYSIS -. "prompt/model/score metadata" .-> LF
@@ -205,7 +206,7 @@ Avoid broad framework skills that impose a separate product operating system unl
 ## Secrets And Credentials
 
 - Never commit `.env`, API keys, Cloudflare certs, tunnel JSON credentials, tunnel tokens, Langfuse keys, or provider credentials.
-- Real Gemini, Cloudflare, LiteLLM, and Langfuse secrets belong only in local `.env`, shell environment, or a secret manager.
+- Real Upstage, Gemini, Cloudflare, LiteLLM, and Langfuse secrets belong only in local `.env`, shell environment, or a secret manager.
 - `.env.example` may contain names and placeholders only.
 - If a secret appears in chat, code, docs, logs, or git history, treat it as compromised and rotate it.
 
@@ -253,5 +254,5 @@ Phase 1, Phase 2, Phase 5, Phase 6, and Phase 7 gates are validated for the publ
 
 - PR/main release operation after CI approval.
 - app-level auth polish and login-backed E2E expansion.
-- local large-model Ollama validation if `gemma3:27b` is available.
+- Upstage credential provisioning and Solar Pro 2 live validation/benchmark.
 - V2 research/product features such as consistency scoring, report export policy, advanced crowd visualization, account/org/billing, and legal/data-retention policy.

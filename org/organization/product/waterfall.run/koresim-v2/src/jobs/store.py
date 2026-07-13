@@ -200,6 +200,17 @@ class SQLiteRunStore:
                 CREATE INDEX IF NOT EXISTS idx_usage_ledger_run_event
                     ON usage_ledger (run_id, event_type);
 
+                CREATE TABLE IF NOT EXISTS interactive_llm_usage (
+                    action_id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    action_type TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (user_id) REFERENCES users (user_id)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_interactive_llm_usage_user_action_created
+                    ON interactive_llm_usage (user_id, action_type, created_at);
+
                 CREATE TABLE IF NOT EXISTS run_events (
                     event_id TEXT PRIMARY KEY,
                     run_id TEXT NOT NULL,
@@ -888,7 +899,7 @@ class SQLiteRunStore:
             counts["interview_messages"] = counts.get("interview_messages", 0) + cursor.rowcount
             cursor = conn.execute("DELETE FROM interview_threads WHERE user_id = ?", (user_id,))
             counts["interview_threads"] = counts.get("interview_threads", 0) + cursor.rowcount
-            for table in ("analytics_events", "user_feedback", "result_followups", "usage_ledger", "intake_sessions", "runs"):
+            for table in ("analytics_events", "user_feedback", "result_followups", "interactive_llm_usage", "usage_ledger", "intake_sessions", "runs"):
                 cursor = conn.execute(f"DELETE FROM {table} WHERE user_id = ?", (user_id,))
                 counts[table] = counts.get(table, 0) + cursor.rowcount
             cursor = conn.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
@@ -918,7 +929,7 @@ class SQLiteRunStore:
                 ).fetchall()
             ]
             counts: dict[str, int] = {"runs": len(run_ids)}
-            for table in ("analytics_events", "admin_audit_events"):
+            for table in ("analytics_events", "admin_audit_events", "interactive_llm_usage"):
                 row = conn.execute(
                     f"SELECT COUNT(*) AS value FROM {table} WHERE created_at < ?",
                     (cutoff,),
@@ -959,7 +970,7 @@ class SQLiteRunStore:
                     counts[table] = cursor.rowcount
                 cursor = conn.execute(f"DELETE FROM runs WHERE run_id IN ({placeholders})", run_ids)
                 counts["runs"] = cursor.rowcount
-            for table in ("analytics_events", "admin_audit_events"):
+            for table in ("analytics_events", "admin_audit_events", "interactive_llm_usage"):
                 cursor = conn.execute(f"DELETE FROM {table} WHERE created_at < ?", (cutoff,))
                 counts[table] = cursor.rowcount
         return {
@@ -1130,6 +1141,46 @@ class SQLiteRunStore:
             can_create_run=quota_bypass or used_runs < free_run_limit,
             quota_bypass=quota_bypass,
         )
+
+    def try_consume_interactive_llm_action(
+        self,
+        *,
+        user_id: str,
+        action_type: str,
+        limit: int,
+        window_seconds: int = 3600,
+    ) -> tuple[bool, int]:
+        """Atomically reserve one bounded interactive LLM action."""
+
+        self.init_db()
+        safe_limit = max(1, limit)
+        cutoff = (datetime.now(UTC) - timedelta(seconds=max(1, window_seconds))).isoformat()
+        now = _utc_now()
+        with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            row = conn.execute(
+                """
+                SELECT COUNT(*) AS value
+                FROM interactive_llm_usage
+                WHERE user_id = ? AND action_type = ? AND created_at >= ?
+                """,
+                (user_id, action_type, cutoff),
+            ).fetchone()
+            used = int(row["value"] if row else 0)
+            if used >= safe_limit:
+                return False, 0
+            conn.execute(
+                """
+                INSERT INTO interactive_llm_usage (action_id, user_id, action_type, created_at)
+                VALUES (?, ?, ?, ?)
+                """,
+                (str(uuid4()), user_id, action_type, now),
+            )
+            conn.execute(
+                "DELETE FROM interactive_llm_usage WHERE created_at < ?",
+                ((datetime.now(UTC) - timedelta(days=30)).isoformat(),),
+            )
+        return True, max(0, safe_limit - used - 1)
 
     def reserve_free_run(self, user_id: str, run_id: str, *, reason: str) -> None:
         self._append_usage_event(
@@ -2030,7 +2081,11 @@ class SQLiteRunStore:
                 "SELECT created_at, user_id FROM intake_sessions WHERE session_id = ?",
                 (session_id,),
             ).fetchone()
-            if existing and user and existing["user_id"] and existing["user_id"] != user.user_id:
+            if (
+                existing
+                and existing["user_id"]
+                and (user is None or existing["user_id"] != user.user_id)
+            ):
                 raise PermissionError(f"Intake session belongs to a different user: {session_id}")
             created_at = existing["created_at"] if existing else now
             conn.execute(
@@ -2095,8 +2150,14 @@ class SQLiteRunStore:
             ).fetchone()
             if row is None:
                 raise KeyError(session_id)
-            if user_id is not None and row["user_id"] != user_id:
+            if row["user_id"] != user_id:
                 raise KeyError(session_id)
+            run_row = conn.execute(
+                "SELECT user_id FROM runs WHERE run_id = ?",
+                (run_id,),
+            ).fetchone()
+            if run_row is None or run_row["user_id"] != row["user_id"]:
+                raise KeyError(run_id)
             snapshot = _json_loads(row["snapshot_json"], {})
             if isinstance(snapshot, dict):
                 snapshot = {**snapshot, "run_id": run_id}
@@ -2134,7 +2195,7 @@ class SQLiteRunStore:
             ).fetchone()
         if row is None:
             return None
-        if user_id is not None and row["user_id"] != user_id:
+        if row["user_id"] != user_id:
             return None
         return IntakeSessionRecord(
             session_id=row["session_id"],
@@ -2156,7 +2217,7 @@ class SQLiteRunStore:
     ) -> list[IntakeSessionRecord]:
         self.init_db()
         safe_limit = max(1, min(limit, 100))
-        where_clause = "WHERE user_id = ?" if user_id is not None else ""
+        where_clause = "WHERE user_id = ?" if user_id is not None else "WHERE user_id IS NULL"
         values: list[Any] = [user_id] if user_id is not None else []
         values.append(safe_limit)
         with self._connect() as conn:
@@ -2192,7 +2253,7 @@ class SQLiteRunStore:
     ) -> list[IntakeHistoryRecord]:
         self.init_db()
         safe_limit = max(1, min(limit, 100))
-        where_clause = "WHERE user_id = ?" if user_id is not None else ""
+        where_clause = "WHERE user_id = ?" if user_id is not None else "WHERE user_id IS NULL"
         values: list[Any] = [user_id] if user_id is not None else []
         values.append(safe_limit)
         with self._connect() as conn:

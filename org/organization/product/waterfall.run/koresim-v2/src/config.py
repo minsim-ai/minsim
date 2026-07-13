@@ -18,9 +18,10 @@ PARQUET_PATH = Path(
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 RUNTIME_DATA_DIR = Path(os.getenv("RUNTIME_DATA_DIR", str(PROJECT_ROOT / "data" / "runtime")))
 SQLITE_PATH = Path(os.getenv("SQLITE_PATH", str(RUNTIME_DATA_DIR / "koresim.sqlite3")))
-ENABLE_LANGGRAPH = os.getenv("ENABLE_LANGGRAPH", "false").lower() == "true"
+ENABLE_LANGGRAPH = os.getenv("ENABLE_LANGGRAPH", "true").lower() == "true"
 ENABLE_LLM_AGENTS = os.getenv("ENABLE_LLM_AGENTS", "true").lower() == "true"
-LLM_BACKEND = os.getenv("LLM_BACKEND", "gemini")
+SUPPORTED_LLM_BACKENDS = frozenset({"fake", "gemini", "litellm", "upstage"})
+LLM_BACKEND = os.getenv("LLM_BACKEND", "upstage").strip().lower()
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_BASE_URL = os.getenv(
@@ -29,18 +30,67 @@ GEMINI_BASE_URL = os.getenv(
 )
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")
 
-MODEL_PERSONA_DEFAULT = os.getenv("MODEL_PERSONA_DEFAULT", GEMINI_MODEL)
+UPSTAGE_API_KEY = os.getenv("UPSTAGE_API_KEY", "")
+UPSTAGE_BASE_URL = os.getenv("UPSTAGE_BASE_URL", "https://api.upstage.ai/v1")
+UPSTAGE_MODEL = os.getenv("UPSTAGE_MODEL", "solar-pro2")
+
+_DEFAULT_MODEL_ALIASES = {
+    "upstage": {
+        "persona": UPSTAGE_MODEL,
+        "analysis": UPSTAGE_MODEL,
+        "report": UPSTAGE_MODEL,
+        "repair": UPSTAGE_MODEL,
+    },
+    "litellm": {
+        "persona": "koresim/solar-persona",
+        "analysis": "koresim/solar-analysis",
+        "report": "koresim/solar-report",
+        "repair": "koresim/solar-repair",
+    },
+    "gemini": {
+        "persona": GEMINI_MODEL,
+        "analysis": GEMINI_MODEL,
+        "report": GEMINI_MODEL,
+        "repair": GEMINI_MODEL,
+    },
+    "fake": {
+        "persona": "koresim-fake-v1",
+        "analysis": "koresim-fake-v1",
+        "report": "koresim-fake-v1",
+        "repair": "koresim-fake-v1",
+    },
+}.get(LLM_BACKEND, {})
+
+MODEL_PERSONA_DEFAULT = os.getenv(
+    "MODEL_PERSONA_DEFAULT", _DEFAULT_MODEL_ALIASES.get("persona", UPSTAGE_MODEL)
+)
 MODEL_PERSONA_STRONG = os.getenv("MODEL_PERSONA_STRONG", MODEL_PERSONA_DEFAULT)
-MODEL_ANALYSIS_DEFAULT = os.getenv("MODEL_ANALYSIS_DEFAULT", MODEL_PERSONA_DEFAULT)
-MODEL_REPORT_DEFAULT = os.getenv("MODEL_REPORT_DEFAULT", MODEL_PERSONA_DEFAULT)
-MODEL_REPAIR_DEFAULT = os.getenv("MODEL_REPAIR_DEFAULT", MODEL_PERSONA_DEFAULT)
+MODEL_ANALYSIS_DEFAULT = os.getenv(
+    "MODEL_ANALYSIS_DEFAULT", _DEFAULT_MODEL_ALIASES.get("analysis", MODEL_PERSONA_DEFAULT)
+)
+MODEL_REPORT_DEFAULT = os.getenv(
+    "MODEL_REPORT_DEFAULT", _DEFAULT_MODEL_ALIASES.get("report", MODEL_PERSONA_DEFAULT)
+)
+MODEL_REPAIR_DEFAULT = os.getenv(
+    "MODEL_REPAIR_DEFAULT", _DEFAULT_MODEL_ALIASES.get("repair", MODEL_PERSONA_DEFAULT)
+)
+ALLOWED_MODEL_ALIASES = frozenset(
+    {
+        MODEL_PERSONA_DEFAULT,
+        MODEL_PERSONA_STRONG,
+        MODEL_ANALYSIS_DEFAULT,
+        MODEL_REPORT_DEFAULT,
+        MODEL_REPAIR_DEFAULT,
+    }
+)
 
 LLM_GATEWAY_BASE_URL = os.getenv("LLM_GATEWAY_BASE_URL", "http://127.0.0.1:4000/v1")
 LLM_GATEWAY_API_KEY = os.getenv("LLM_GATEWAY_API_KEY", "")
 
-UPSTAGE_API_KEY = os.getenv("UPSTAGE_API_KEY", "")
-UPSTAGE_BASE_URL = os.getenv("UPSTAGE_BASE_URL", "https://api.upstage.ai/v1")
-UPSTAGE_MODEL = os.getenv("UPSTAGE_MODEL", "solar-pro2")
+INTERACTIVE_LLM_ACTIONS_PER_HOUR = int(os.getenv("INTERACTIVE_LLM_ACTIONS_PER_HOUR", "20"))
+INTERACTIVE_FOLLOWUP_MAX_SAMPLE_SIZE = int(
+    os.getenv("INTERACTIVE_FOLLOWUP_MAX_SAMPLE_SIZE", "12")
+)
 
 OBSERVABILITY_PROVIDER = os.getenv("OBSERVABILITY_PROVIDER", "none")
 LLM_TRACE_MODE = os.getenv("LLM_TRACE_MODE", "metadata_only")

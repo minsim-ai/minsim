@@ -103,6 +103,35 @@ def test_llm_factory_selects_backend(monkeypatch, backend: str, expected_class: 
     assert client.__class__.__name__ == expected_class
 
 
+def test_llm_factory_rejects_unknown_backend(monkeypatch) -> None:
+    monkeypatch.setenv("LLM_BACKEND", "ollama")
+    monkeypatch.setenv("OBSERVABILITY_PROVIDER", "none")
+
+    import src.config
+    import src.llm.factory
+
+    importlib.reload(src.config)
+    factory = importlib.reload(src.llm.factory)
+
+    with pytest.raises(RuntimeError, match="Unsupported LLM_BACKEND"):
+        factory.create_llm_client()
+
+
+def test_model_router_rejects_unconfigured_override(monkeypatch) -> None:
+    monkeypatch.setenv("MODEL_PERSONA_DEFAULT", "solar-pro2")
+    monkeypatch.setenv("MODEL_PERSONA_STRONG", "solar-pro2")
+
+    import src.config
+    import src.llm.router
+
+    importlib.reload(src.config)
+    router = importlib.reload(src.llm.router)
+
+    assert router.validate_requested_model_alias("solar-pro2") == "solar-pro2"
+    with pytest.raises(ValueError, match="not allowed"):
+        router.validate_requested_model_alias("unapproved-expensive-model")
+
+
 def test_fake_llm_backend_returns_parseable_persona_response(monkeypatch) -> None:
     monkeypatch.setenv("LLM_BACKEND", "fake")
     monkeypatch.setenv("OBSERVABILITY_PROVIDER", "none")

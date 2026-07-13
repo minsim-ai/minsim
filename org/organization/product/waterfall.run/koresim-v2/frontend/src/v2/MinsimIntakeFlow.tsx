@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
-import { generateIntakeCandidates } from '../api/intake'
+import { generateIntakeCandidates, linkIntakeSessionRun, saveIntakeSession } from '../api/intake'
 import { createProjectRun, getProject } from '../api/projects'
 import { advanceIntakeSession, createInitialIntakeSession } from '../intake/planner'
 import { buildGenericSimulationPayload, validateCreativeTestingPayload } from '../intake/payloadBuilder'
 import { createSlot, upsertSlot } from '../intake/slotUtils'
 import type { CreativeCandidate, DynamicFormField, IntakeSession, IntakeSlotValue } from '../intake/types'
-import type { ProjectResponse, SimulationType } from '../types/api'
+import type { JsonObject, ProjectResponse, SimulationType } from '../types/api'
 import { navigateTo } from './navigation'
 
 export function MinsimIntakeFlow({
@@ -35,6 +35,20 @@ export function MinsimIntakeFlow({
     if (!project) return
     setSession((current) => withProjectDefaults(current, project, type))
   }, [project, type])
+
+  useEffect(() => {
+    if (!project || session.turnCount === 0) return
+    const timeout = window.setTimeout(() => {
+      void saveIntakeSession({
+        session_id: session.id,
+        status: session.status,
+        snapshot: session as unknown as JsonObject,
+      }).catch(() => {
+        // Recovery persistence is retried before run creation and must not interrupt typing.
+      })
+    }, 350)
+    return () => window.clearTimeout(timeout)
+  }, [project, session])
 
   const payload = useMemo(() => buildGenericSimulationPayload(session), [session])
   const creativeErrors = payload.simulation_type === 'creative_testing' ? validateCreativeTestingPayload(payload) : []
@@ -141,11 +155,21 @@ export function MinsimIntakeFlow({
       return
     }
     try {
+      await saveIntakeSession({
+        session_id: session.id,
+        status: session.status,
+        snapshot: session as unknown as JsonObject,
+      })
       const response = await createProjectRun(projectId, {
         ...payload,
         simulation_type: type,
         run_label: `${project?.name ?? 'Project'} ${new Date().toLocaleDateString('ko-KR')}`,
       })
+      try {
+        await linkIntakeSessionRun(session.id, { run_id: response.run.run_id })
+      } catch {
+        // The run is already durable; a failed recovery link must not hide its result.
+      }
       navigateTo(`/loading?project_id=${encodeURIComponent(projectId)}&run_id=${encodeURIComponent(response.run.run_id)}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -241,6 +265,7 @@ export function MinsimIntakeFlow({
           <SummaryRow label="고객" value={slotStringArray(session, 'target_customers').join(', ') || '—'} />
           <SummaryRow label="장점" value={slotString(session, 'main_benefit') || '—'} />
           <SummaryRow label="후보" value={candidateSummary(session)} />
+          <SummaryRow label="패널" value={`${payload.sample_size ?? 200}명`} />
           <SummaryRow label="상태" value={statusLabel(action?.type ?? null)} />
         </aside>
       </div>
@@ -354,13 +379,23 @@ function ActionPanel({
   }
 
   if (action.type === 'run_ready') {
+    const defaults = action.assumptions.filter((assumption) => assumption.source === 'default')
     return (
       <div className="minsim-action-card run-ready">
         <div className="minsim-action-head">
           <span className="lbl-mono">실행 준비 완료</span>
           <p>{action.message}</p>
         </div>
-        <button type="button" onClick={onRun}>시뮬레이션 시작 →</button>
+        {defaults.length > 0 && (
+          <div className="minsim-assumption-list" aria-label="실행 기본값">
+            {defaults.map((assumption) => (
+              <span className="chip sm" key={`default-${assumption.slotId}`}>
+                {assumptionLabel(assumption.slotId)}: {formatAssumptionValue(assumption.value)}
+              </span>
+            ))}
+          </div>
+        )}
+        <button type="button" onClick={onRun}>조건 확인하고 시뮬레이션 시작 →</button>
       </div>
     )
   }
@@ -380,6 +415,16 @@ function ActionPanel({
   }
 
   return null
+}
+
+function assumptionLabel(slotId: string): string {
+  return ({ sample_size: '패널 크기', seed: '패널 시드', n_segments: '세그먼트 수', budget: '예산' } as Record<string, string>)[slotId] ?? slotId
+}
+
+function formatAssumptionValue(value: unknown): string {
+  if (typeof value === 'number') return value.toLocaleString('ko-KR')
+  if (Array.isArray(value)) return value.join(', ')
+  return String(value)
 }
 
 function CandidateReviewPanel({
@@ -491,17 +536,17 @@ function withProjectDefaults(session: IntakeSession, project: ProjectResponse, t
   const projectText = stringFromProject(project)
   let slots = session.slots
   if (projectText) {
-    slots = upsertSlot(slots, createSlot('product_description', projectText, 'default', 0.9, 'project', false))
-    slots = upsertSlot(slots, createSlot('product_context', projectText, 'default', 0.9, 'project', false))
+    slots = upsertSlot(slots, createSlot('product_description', projectText, 'user', 0.99, 'project context', false))
+    slots = upsertSlot(slots, createSlot('product_context', projectText, 'user', 0.99, 'project context', false))
   }
   if (project.features.length > 0) {
-    slots = upsertSlot(slots, createSlot('key_features', project.features, 'default', 0.9, 'project', false))
+    slots = upsertSlot(slots, createSlot('key_features', project.features, 'user', 0.99, 'project context', false))
   }
   if (project.prices.length > 0) {
-    slots = upsertSlot(slots, createSlot('price_points', project.prices, 'default', 0.9, 'project', false))
+    slots = upsertSlot(slots, createSlot('price_points', project.prices, 'user', 0.99, 'project context', false))
   }
   if (project.alternatives.length > 0) {
-    slots = upsertSlot(slots, createSlot('products', project.alternatives, 'default', 0.72, 'project', false))
+    slots = upsertSlot(slots, createSlot('products', project.alternatives, 'user', 0.99, 'project context', false))
   }
   return {
     ...session,

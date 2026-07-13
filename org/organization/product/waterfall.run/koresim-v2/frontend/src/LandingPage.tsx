@@ -25,7 +25,7 @@ const examples = [
 
 const stats = [
   { value: '5단계', label: '입력에서 다음 액션까지' },
-  { value: '8-500명', label: '자유롭게 조정하는 패널' },
+  { value: '50-200명', label: '현재 지원하는 합성 패널' },
   { value: '~24초', label: '한 번의 시뮬레이션 평균' },
   { value: '100만', label: '한국 페르소나 풀' },
 ]

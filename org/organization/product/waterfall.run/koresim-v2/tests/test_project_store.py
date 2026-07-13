@@ -147,3 +147,29 @@ def test_interview_thread_persists_ordered_exchanges(tmp_path) -> None:
     assert [message.ordinal for message in messages] == [0, 1, 2, 3]
     assert messages[1].metadata == {"provider": "fake"}
     assert store.list_interview_threads(user_id=owner.user_id, run_id=run.run_id)[0].thread_id == thread.thread_id
+
+
+def test_interactive_llm_action_limit_is_atomic_per_user_and_action(tmp_path) -> None:
+    store = SQLiteRunStore(tmp_path / "runs.sqlite3")
+    owner = _user(store, "owner")
+
+    assert store.try_consume_interactive_llm_action(
+        user_id=owner.user_id,
+        action_type="project_followup",
+        limit=2,
+    ) == (True, 1)
+    assert store.try_consume_interactive_llm_action(
+        user_id=owner.user_id,
+        action_type="project_followup",
+        limit=2,
+    ) == (True, 0)
+    assert store.try_consume_interactive_llm_action(
+        user_id=owner.user_id,
+        action_type="project_followup",
+        limit=2,
+    ) == (False, 0)
+    assert store.try_consume_interactive_llm_action(
+        user_id=owner.user_id,
+        action_type="interview_message",
+        limit=2,
+    ) == (True, 1)
