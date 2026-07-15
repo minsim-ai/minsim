@@ -90,6 +90,141 @@ export const minsimResultFixture: RunResultEnvelope = {
   },
 }
 
+const marketSegmentationFixture: RunResultEnvelope = {
+  ...minsimResultFixture,
+  run_id: 'fixture-minsim-market-segmentation',
+  simulation_type: 'market_segmentation',
+  sample_size: 40,
+  total_responses: 40,
+  parse_failed: 0,
+  metrics: {
+    category: '캘리그래피 및 도장 서비스',
+    segment_counts: {
+      '감성선물 찾는 직장인': 9,
+      '추억선물 찾는 중장년층': 6,
+      '감성 소품 수집가': 5,
+      '감성선물 준비족': 4,
+      '추억선물 실용구매층': 3,
+      '감성 선물 찾는 실용파': 2,
+      '추억기록 소확행족': 2,
+      '감성선물 찾는 예비부부': 2,
+      '제주 감성 수집가': 1,
+      '추억공예 취향층': 1,
+      '추억 기록 희망자': 1,
+      '감성선물 실용구매층': 1,
+      '추억선물 장인': 1,
+      '추억선물 취향층': 1,
+      '감성 선물 준비족': 1,
+    },
+    segment_pct: {
+      '감성선물 찾는 직장인': 22.5,
+      '추억선물 찾는 중장년층': 15,
+      '감성 소품 수집가': 12.5,
+      '감성선물 준비족': 10,
+      '추억선물 실용구매층': 7.5,
+      '감성 선물 찾는 실용파': 5,
+      '추억기록 소확행족': 5,
+      '감성선물 찾는 예비부부': 5,
+      '제주 감성 수집가': 2.5,
+      '추억공예 취향층': 2.5,
+      '추억 기록 희망자': 2.5,
+      '감성선물 실용구매층': 2.5,
+      '추억선물 장인': 2.5,
+      '추억선물 취향층': 2.5,
+      '감성 선물 준비족': 2.5,
+    },
+    recommended_first_target: '감성선물 찾는 직장인',
+    needs: [{ label: '특별한 기념품 제작', count: 9 }],
+    pains: [{ label: '제작 시간과 비용 부담', count: 22 }],
+  },
+  segments: {
+    breakdown_by_age: {
+      '20대': { '감성선물 찾는 직장인': 5, '감성 소품 수집가': 2, '감성선물 준비족': 1 },
+      '30대': { '감성선물 찾는 직장인': 3, '감성선물 찾는 예비부부': 2, '감성 소품 수집가': 2 },
+      '40대': { '추억선물 찾는 중장년층': 2, '추억선물 실용구매층': 2, '감성선물 찾는 직장인': 1 },
+      '50대': { '추억선물 찾는 중장년층': 4, '추억기록 소확행족': 2 },
+    },
+    breakdown_by_sex: {
+      남자: { '감성선물 찾는 직장인': 4, '추억선물 찾는 중장년층': 3, '감성 소품 수집가': 2 },
+      여자: { '감성선물 찾는 직장인': 5, '추억선물 찾는 중장년층': 3, '감성선물 준비족': 3 },
+    },
+    breakdown_by_province: {
+      경기: { '감성선물 찾는 직장인': 4, '감성선물 준비족': 3, '감성 소품 수집가': 2 },
+      서울: { '추억선물 찾는 중장년층': 4, '감성선물 찾는 직장인': 3, '추억선물 실용구매층': 2 },
+      부산: { '감성선물 찾는 직장인': 2, '감성 소품 수집가': 1 },
+      제주: { '제주 감성 수집가': 1, '감성 선물 찾는 실용파': 1 },
+    },
+  },
+  insights: [{ title: 'first_target', choice: '감성선물 찾는 직장인', count: 9, pct: 22.5 }],
+  raw_results: [
+    {
+      uuid: 'persona-seg-1',
+      persona: { name: '김민수', age: 34, sex: '남', province: '서울', occupation: '기획자' },
+      response: '세그먼트: 감성선물 찾는 직장인\n니즈: 특별한 기념품 제작\n페인: 제작 시간과 비용 부담\n이유: 기념일에 개성 있는 선물이 필요하다.',
+      parsed: {
+        segment: '감성선물 찾는 직장인',
+        need: '특별한 기념품 제작',
+        pain: '제작 시간과 비용 부담',
+        reason: '기념일에 개성 있는 선물이 필요하다.',
+      },
+    },
+    {
+      uuid: 'persona-seg-2',
+      persona: { name: '이서연', age: 52, sex: '여', province: '경기', occupation: '주부' },
+      response: '세그먼트: 추억선물 찾는 중장년층\n니즈: 추억 기록\n페인: 가격 부담\n이유: 손글씨 품질이 걱정된다.',
+      parsed: {
+        segment: '추억선물 찾는 중장년층',
+        need: '추억 기록',
+        pain: '가격 부담',
+        reason: '손글씨 품질이 걱정된다.',
+      },
+    },
+  ],
+  orchestration: {
+    agents: {
+      analysis: {
+        summary: "캘리그래피 시장에서 '감성선물 찾는 직장인'이 1순위 타깃으로 추천됩니다.",
+        key_findings: [
+          {
+            finding: "가장 높은 니즈는 '특별한 기념품 제작'(9건)으로, 개인화된 선물 제작에 대한 수요 확인",
+            evidence: "needs.count=9, needs.label='특별한 기념품 제작'",
+            metric_key: 'needs',
+            confidence: 0.8,
+          },
+          {
+            finding: "가장 큰 페인 포인트는 '제작 시간과 비용 부담'(22건)",
+            evidence: "pains.count=22, pains.label='제작 시간과 비용 부담'",
+            metric_key: 'pains',
+            confidence: 0.8,
+          },
+          {
+            finding: "'감성선물 찾는 직장인'(9건)이 가장 큰 타깃 세그먼트",
+            evidence: 'segment_counts.감성선물_찾는_직장인=9, segment_pct.감성선물_찾는_직장인=22.5',
+            metric_key: 'segment_counts',
+            confidence: 0.7,
+          },
+        ],
+      },
+      report: {
+        headline: '감성 선물 수요 대응 및 비용 효율성 강화',
+        recommendations: [
+          { action: '개인화 선물 패키지 개발', reason: '직장인 타깃과 기념품 니즈가 겹칩니다.' },
+        ],
+        risks: [
+          { risk: '품질 일관성 저하', mitigation: '샘플 테스트와 공정 표준화를 병행합니다.' },
+        ],
+      },
+      qa: { warnings: [] },
+    },
+  },
+  safe_intake_summary: {
+    ...minsimResultFixture.safe_intake_summary!,
+    simulation_type: 'market_segmentation',
+    user_goal: '캘리그래피 시장 세그먼트 파악',
+    decision_question: '어떤 타깃 세그먼트가 존재하는가?',
+  },
+}
+
 const churnResultFixture: RunResultEnvelope = {
   ...minsimResultFixture,
   run_id: 'fixture-minsim-churn',
@@ -196,9 +331,59 @@ export function runMinsimResultFixtureCheck(): MinsimResultFixtureCheck {
     failures.push('expected sub-10 region to be marked 참고')
   }
 
+  const segmentReport = buildMinsimReport(marketSegmentationFixture)
+  if (segmentReport.segment.mode !== 'segment') {
+    failures.push(`expected market segmentation mode=segment, got ${segmentReport.segment.mode}`)
+  }
+  if (segmentReport.segment.focusLabel === 'N/A' || segmentReport.segment.focusId !== '감성선물 찾는 직장인') {
+    failures.push(`expected recommended first target focus, got ${segmentReport.segment.focusLabel}`)
+  }
+  if (segmentReport.segment.overallPct <= 0) {
+    failures.push('expected positive segment focus share')
+  }
+  if (!segmentReport.segment.metricLabel.includes('점유율')) {
+    failures.push(`expected segment share metric label, got ${segmentReport.segment.metricLabel}`)
+  }
+  if (segmentReport.creatives.length < 2) {
+    failures.push('expected market segmentation creatives from segment_counts')
+  }
+  if (segmentReport.ageFull.length === 0 || segmentReport.ageFull.some((row) => row.pct === null)) {
+    failures.push('expected age rows with segment percentages')
+  }
+  const ageWithShare = segmentReport.ageFull.some((row) =>
+    Object.values(row.pct ?? {}).some((value) => value > 0),
+  )
+  if (!ageWithShare) failures.push('expected at least one non-zero age segment cell')
+  if (segmentReport.creatives.some((item) => item.label.endsWith('안'))) {
+    failures.push('expected segment labels without choice 안 suffix')
+  }
+  if (segmentReport.creatives.every((item) => !item.id.includes('감성선물'))) {
+    failures.push('expected top market segments in creatives')
+  }
+  const gyeonggi = segmentReport.regions.find((item) => item.name === '경기도')
+  if (!gyeonggi || gyeonggi.focusPct <= 0 || gyeonggi.focusLabel === 'N/A') {
+    failures.push('expected Gyeonggi segment focus share > 0')
+  }
+  if (segmentReport.report.findings.some((item) => item.body.includes('needs.count='))) {
+    failures.push('expected machine-key evidence to be sanitized from findings body')
+  }
+  if (segmentReport.core.positives.some((item) => item.body.includes('needs.count=') || item.body.includes('pains.count='))) {
+    failures.push('expected core positives without machine-key evidence')
+  }
+  const humanizedNeed = segmentReport.report.findings.some((item) => item.body.includes('「특별한 기념품 제작」'))
+  if (!humanizedNeed) {
+    failures.push('expected humanized needs evidence body')
+  }
+  if (segmentReport.crowd.some((item) => !item.choice)) {
+    failures.push('expected segment labels on crowd respondents')
+  }
+  if (segmentReport.sentiment !== null || segmentReport.intent !== null) {
+    failures.push('expected no synthetic sentiment/intent for market segmentation fixture')
+  }
+
   return {
     ok: failures.length === 0,
-    checked: 2,
+    checked: 3,
     failures,
   }
 }

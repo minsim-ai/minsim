@@ -337,6 +337,7 @@ function Verdict({ report, onExport }: { report: MinsimReport; onExport: () => v
 
 function CoreCase({ report }: { report: MinsimReport }) {
   const { core, sentiment, intent } = report
+  const showObservedRatios = Boolean(sentiment || intent)
   return (
     <section style={{ padding: '32px 0 8px' }}>
       <SectionHead kicker="핵심 한눈에" title="코어 케이스" sub="페르소나를 다 펼치기 전에, 의사결정에 필요한 6가지만 먼저 봅니다." />
@@ -344,24 +345,22 @@ function CoreCase({ report }: { report: MinsimReport }) {
         <div className="lbl-mono" style={{ marginBottom: 10, color: 'var(--lime)' }}>한 줄 결론</div>
         <div style={{ fontWeight: 600, fontSize: 17, lineHeight: 1.5 }}>{core.conclusion}</div>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+      {showObservedRatios ? (
+      <div style={{ display: 'grid', gridTemplateColumns: sentiment && intent ? '1fr 1fr' : '1fr', gap: 12, marginBottom: 12 }}>
+        {sentiment ? (
         <div className="card" style={{ padding: 20 }}>
           <div className="lbl-mono" style={{ marginBottom: 14 }}>긍정 · 중립 · 부정 비율 <span className="faint">· 직접 관측</span></div>
-          {sentiment ? (
-            <RatioBar parts={[['긍정', sentiment.pos], ['중립', sentiment.neu], ['부정', sentiment.neg]]} />
-          ) : (
-            <p className="faint">직접 수집된 감정 점수가 5건 미만이라 표시하지 않습니다.</p>
-          )}
+          <RatioBar parts={[['긍정', sentiment.pos], ['중립', sentiment.neu], ['부정', sentiment.neg]]} />
         </div>
+        ) : null}
+        {intent ? (
         <div className="card" style={{ padding: 20 }}>
           <div className="lbl-mono" style={{ marginBottom: 14 }}>구매 의향 <span className="faint">· 직접 관측</span></div>
-          {intent ? (
-            <RatioBar parts={[['구매', intent.buy], ['고려', intent.consider], ['거절', intent.no]]} />
-          ) : (
-            <p className="faint">직접 수집된 구매 의향 응답이 5건 미만이라 표시하지 않습니다.</p>
-          )}
+          <RatioBar parts={[['구매', intent.buy], ['고려', intent.consider], ['거절', intent.no]]} />
         </div>
+        ) : null}
       </div>
+      ) : null}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
         <ReasonCard mark="▲" title="긍정 이유" items={core.positives} empty="긍정 신호를 해석 중입니다." />
         <ReasonCard mark="▼" title="거절 이유" items={core.rejections} empty="거절 신호를 해석 중입니다." dim />
@@ -502,7 +501,9 @@ function AiReport({ report }: { report: MinsimReport }) {
 
 function MarketResponse({ report }: { report: MinsimReport }) {
   const { creatives, winner, runnerUp, keywords } = report
-  const isIntentReport = report.segment.mode === 'intent'
+  const mode = report.segment.mode
+  const distributionLabel = mode === 'intent' ? '행동 의향' : mode === 'segment' ? '세그먼트 점유' : '선호도'
+  if (creatives.length === 0 && keywords.length === 0 && !winner) return null
   return (
     <section style={{ padding: '40px 0' }}>
       <div style={{ display: 'grid', gridTemplateColumns: '1.15fr .85fr', gap: 40 }}>
@@ -520,7 +521,7 @@ function MarketResponse({ report }: { report: MinsimReport }) {
                       <span className="lbl-mono" style={{ fontSize: 11 }}>±{creative.band}</span>
                     </span>
                   </div>
-                  <div className="lbl-mono">{isIntentReport ? '행동 의향' : '선호도'} 분포 · {creative.label} · {creative.count}명 · 재현 변동 ±{creative.band}%p</div>
+                  <div className="lbl-mono">{distributionLabel} 분포 · {creative.label} · {creative.count}명 · 재현 변동 ±{creative.band}%p</div>
                   <Bar pct={creative.pct} cls={creative.id.toLowerCase()} color={creative.color} />
                 </div>
               </div>
@@ -531,9 +532,15 @@ function MarketResponse({ report }: { report: MinsimReport }) {
           <SectionHead kicker="인사이트" title="자동 추출" />
           {winner && (
             <div className="card" style={{ padding: 18, marginBottom: 12 }}>
-              <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>{winner.label}이 가장 많이 {isIntentReport ? '관측됐습니다' : '선택됐습니다'}</div>
+              <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>
+                {mode === 'segment'
+                  ? `${winner.label}이 가장 큰 세그먼트입니다`
+                  : `${winner.label}이 가장 많이 ${mode === 'intent' ? '관측됐습니다' : '선택됐습니다'}`}
+              </div>
               <p className="muted" style={{ fontSize: 13, lineHeight: 1.6 }}>
-                {winner.label}이 {winner.count}명({winner.pct}%)에게서 {isIntentReport ? '나타나 가장 큰 행동 의향 집단입니다.' : '선택돼 가장 강한 반응을 얻었습니다.'}
+                {mode === 'segment'
+                  ? `${winner.label}이 ${winner.count}명(${winner.pct}%)으로 1순위 타깃 후보입니다.`
+                  : `${winner.label}이 ${winner.count}명(${winner.pct}%)에게서 ${mode === 'intent' ? '나타나 가장 큰 행동 의향 집단입니다.' : '선택돼 가장 강한 반응을 얻었습니다.'}`}
                 {runnerUp ? ` 다음 ${runnerUp.label}(${runnerUp.count}명·${runnerUp.pct}%)보다 ${report.run.gap} 높습니다.` : ''}
               </p>
             </div>
@@ -558,30 +565,40 @@ function MarketResponse({ report }: { report: MinsimReport }) {
 
 function AgeFullTable({ report }: { report: MinsimReport }) {
   const { ageFull, creatives } = report
-  if (ageFull.length === 0) return null
+  if (ageFull.length === 0 || creatives.length === 0) return null
   const legend = [...creatives].sort((a, b) => a.id.localeCompare(b.id))
+  const mode = report.segment.mode
+  const titleNoun = mode === 'intent' ? '반응' : mode === 'segment' ? '세그먼트 점유' : '선호'
+  const cellNoun = mode === 'intent' ? '행동 의향' : mode === 'segment' ? '세그먼트 점유' : '후보의 선택'
   const gridTemplate = `minmax(72px, 1.2fr) repeat(${legend.length}, minmax(54px, .85fr)) minmax(52px, .75fr)`
   return (
     <section style={{ padding: '40px 0' }}>
       <SectionHead
         kicker="연령 분포"
-        title={`연령대별 ${report.segment.mode === 'intent' ? '반응' : '선호'} — 전체`}
-        sub={`색이 진할수록 해당 ${report.segment.mode === 'intent' ? '행동 의향' : '후보의 선택'} 비율이 높습니다. 굵은 숫자가 연령대별 1위이며, n이 작은 집단은 참고용으로만 해석합니다.`}
+        title={`연령대별 ${titleNoun} — 전체`}
+        sub={`색이 진할수록 해당 ${cellNoun} 비율이 높습니다. 굵은 숫자가 연령대별 1위이며, n이 작은 집단은 참고용으로만 해석합니다.`}
       />
       <div className="row" style={{ gap: 16, marginBottom: 14, flexWrap: 'wrap' }}>
         {legend.map((creative) => (
           <span key={creative.id} className="row lbl" style={{ gap: 6, fontSize: 12, whiteSpace: 'nowrap' }}>
             <span style={{ width: 10, height: 10, borderRadius: 3, background: creative.color, flex: 'none' }} />
-            {creative.label}
+            <span style={{ maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }}>{creative.label}</span>
           </span>
         ))}
       </div>
       <div className="card result-table-scroll" style={{ padding: 20 }}>
-        <div className="result-age-table" style={{ minWidth: 520 }}>
+        <div className="result-age-table" style={{ minWidth: Math.max(520, 120 + legend.length * 88) }}>
         <div style={{ display: 'grid', gridTemplateColumns: gridTemplate, gap: 12, alignItems: 'center', paddingBottom: 12, borderBottom: '1px solid var(--border)' }}>
           <span className="lbl-mono">연령</span>
           {legend.map((creative) => (
-            <span key={creative.id} className="lbl-mono" style={{ textAlign: 'right' }}>{creative.label}</span>
+            <span
+              key={creative.id}
+              className="lbl-mono"
+              style={{ textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+              title={creative.label}
+            >
+              {creative.label}
+            </span>
           ))}
           <span className="lbl-mono" style={{ textAlign: 'right' }}>표본</span>
         </div>

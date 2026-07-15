@@ -86,7 +86,7 @@ export type MinsimReport = {
   ageRows: MinsimAgeRow[]
   ageFull: MinsimAgeFull[]
   segment: {
-    mode: 'choice' | 'intent'
+    mode: 'choice' | 'intent' | 'segment'
     focusId: string
     focusLabel: string
     overallPct: number
@@ -114,6 +114,20 @@ const OUTCOME_COLORS: Record<string, string> = {
   관망: 'var(--segment-watch)',
   이탈: 'var(--segment-churn)',
 }
+
+const SEGMENT_PALETTE = [
+  'var(--opt-a)',
+  'var(--opt-b)',
+  'var(--opt-c)',
+  'var(--opt-d)',
+  'var(--segment-retain)',
+  'var(--segment-watch)',
+  'var(--segment-churn)',
+  'var(--fg-dim)',
+] as const
+
+const SEGMENT_TOP_N = 8
+const OTHER_SEGMENT_ID = '기타'
 
 const PROVINCE_SVG_ID: Record<string, string> = {
   서울: '서울특별시',
@@ -158,32 +172,42 @@ export function buildMinsimReport(result: RunResultEnvelope, options: { complete
   const choicePct = numberRecord(metrics.choice_pct)
   const intentCounts = numberRecord(metrics.intent_counts)
   const intentPct = numberRecord(metrics.intent_pct)
+  const segmentCounts = numberRecord(metrics.segment_counts)
+  const segmentPct = numberRecord(metrics.segment_pct)
   const creativeTexts = stringArray(metrics.creatives)
   const reasonsByChoice = recordOfStringArray(metrics.reasons_by_choice)
+
   const hasChoices = Object.keys(choiceCounts).length > 0
-  const outcomeCounts = hasChoices ? choiceCounts : intentCounts
-  const outcomePct = hasChoices ? choicePct : intentPct
+  const hasIntent = !hasChoices && Object.keys(intentCounts).length > 0
+  const hasSegments = !hasChoices && !hasIntent && Object.keys(segmentCounts).length > 0
+  const segmentMode: MinsimReport['segment']['mode'] = hasChoices ? 'choice' : hasIntent ? 'intent' : hasSegments ? 'segment' : 'choice'
+  const isChoiceMode = segmentMode === 'choice'
+
+  const rawOutcomeCounts = hasChoices ? choiceCounts : hasIntent ? intentCounts : segmentCounts
+  const rawOutcomePct = hasChoices ? choicePct : hasIntent ? intentPct : segmentPct
+  const { counts: outcomeCounts, pct: outcomePct, ids } = resolveOutcomeColumns(
+    rawOutcomeCounts,
+    rawOutcomePct,
+    segmentMode,
+  )
   const validChoiceTotal = Object.values(outcomeCounts).reduce((sum, count) => sum + count, 0)
 
-  const ids = Object.keys(outcomeCounts).length
-    ? Object.keys(outcomeCounts).sort()
-    : hasChoices ? ['A', 'B', 'C'].filter((id) => id in outcomePct) : Object.keys(outcomePct).sort()
   const creatives: MinsimCreative[] = ids.map((id, index) => {
     const count = outcomeCounts[id] ?? 0
     const pct = round(outcomePct[id] ?? 0)
     return {
       id,
-      label: hasChoices ? `${id}안` : id,
-      text: hasChoices ? (creativeTexts[index] ?? `${id}안`) : id,
+      label: isChoiceMode ? `${id}안` : id,
+      text: isChoiceMode ? (creativeTexts[index] ?? `${id}안`) : id,
       angle: '',
       pct,
       count,
       band: wilsonMarginPct(count, validChoiceTotal),
-      color: OPT[id] ?? OUTCOME_COLORS[id] ?? 'var(--opt-d)',
+      color: colorForOutcome(id, index),
       winner: false,
     }
   })
-  const ranked = [...creatives].sort((a, b) => b.pct - a.pct)
+  const ranked = [...creatives].sort((a, b) => b.pct - a.pct || a.id.localeCompare(b.id))
   if (ranked[0]) ranked[0].winner = true
   const winner = ranked[0] ?? null
   const runnerUp = ranked[1] ?? null
@@ -201,16 +225,21 @@ export function buildMinsimReport(result: RunResultEnvelope, options: { complete
   const actions = agent.actions.slice(0, 4)
   const watch = agent.watch.slice(0, 4)
 
-  const segmentMode = hasChoices ? 'choice' : 'intent'
-  const focusId = !hasChoices && outcomePct.이탈 !== undefined ? '이탈' : (winner?.id ?? ids[0] ?? '')
-  const focusLabel = outcomeLabel(focusId, hasChoices)
+  const recommendedTarget = asString(metrics.recommended_first_target)
+  const focusId = segmentMode === 'intent' && outcomePct.이탈 !== undefined
+    ? '이탈'
+    : (recommendedTarget && recommendedTarget in outcomeCounts
+      ? recommendedTarget
+      : (winner?.id ?? ids[0] ?? ''))
+  const focusLabel = outcomeLabel(focusId, isChoiceMode)
   const overallFocusPct = round(outcomePct[focusId] ?? 0)
-  const ageRows = buildAgeRows(result.segments)
-  const ageFull = buildAgeFull(result.segments)
-  const gender = buildGender(result.segments, hasChoices)
-  const regions = buildRegions(result.segments, hasChoices, focusId, overallFocusPct)
+  const displaySegments = foldSegmentBreakdowns(result.segments, ids, segmentMode === 'segment')
+  const ageRows = buildAgeRows(displaySegments)
+  const ageFull = buildAgeFull(displaySegments)
+  const gender = buildGender(displaySegments, isChoiceMode)
+  const regions = buildRegions(displaySegments, isChoiceMode, segmentMode, focusId, overallFocusPct)
 
-  const winnerLabel = winner?.label ?? '기준안'
+  const winnerLabel = winner?.label ?? (segmentMode === 'segment' ? '주요 세그먼트' : '기준안')
   const reco = {
     action: '다듬기 →',
     meta: `재실행 · 1위 ${winnerLabel} ${winner?.pct ?? 0}% · 격차 ${gapPoint === null ? '집계 중' : `+${gapPoint}pt`}`,
@@ -229,6 +258,12 @@ export function buildMinsimReport(result: RunResultEnvelope, options: { complete
     ...(runnerUp ? [{ t: `${winnerLabel} vs ${runnerUp.label} 분리 테스트`, d: '상위 두 후보를 세그먼트별로 나눠 비교합니다.' }] : []),
   ].slice(0, 2)
 
+  const metricLabel = focusId === '이탈'
+    ? '이탈률'
+    : segmentMode === 'segment'
+      ? `${focusLabel} 점유율`
+      : `${focusLabel} 반응률`
+
   return {
     run: {
       panel: total,
@@ -241,7 +276,11 @@ export function buildMinsimReport(result: RunResultEnvelope, options: { complete
       status,
       structured: parseSuccessRate === null ? 'N/A' : `${round(parseSuccessRate)}%`,
       excludeUnemployed: Boolean(isRecord(result.target_filter) && result.target_filter.exclude_unemployed),
-      verdictLine: agent.headline || (winner ? `‘${winner.text}’ 메시지(${winner.label})가 가장 강하게 반응합니다.` : '핵심 결론을 해석 중입니다.'),
+      verdictLine: agent.headline || (winner
+        ? (segmentMode === 'segment'
+          ? `‘${winner.text}’ 세그먼트(${winner.pct}%)를 1순위 타깃으로 권장합니다.`
+          : `‘${winner.text}’ 메시지(${winner.label})가 가장 강하게 반응합니다.`)
+        : '핵심 결론을 해석 중입니다.'),
       conclusion: agent.summary || '집계 결과를 해석 중입니다.',
     },
     winner,
@@ -261,17 +300,21 @@ export function buildMinsimReport(result: RunResultEnvelope, options: { complete
       nextExp,
     },
     decision: {
-      judgeBody: buildJudgeBody(winner, runnerUp, gapPoint, status),
+      judgeBody: buildJudgeBody(winner, runnerUp, gapPoint, status, segmentMode),
     },
     report: {
-      headline: agent.headline || (winner ? `${winner.label} 메시지를 기준안으로 권장합니다.` : '결과를 해석 중입니다.'),
+      headline: agent.headline || (winner
+        ? (segmentMode === 'segment'
+          ? `${winner.label} 세그먼트를 1순위 타깃으로 권장합니다.`
+          : `${winner.label} 메시지를 기준안으로 권장합니다.`)
+        : '결과를 해석 중입니다.'),
       summary: agent.summary || reasonsByChoice[winner?.id ?? '']?.[0] || '집계 결과를 해석 중입니다.',
       findings,
       actions,
       watch,
     },
     keywords: buildKeywords(result.raw_results, reasonsByChoice),
-    oppRisk: buildOppRisk(result.segments, result.raw_results, winner?.id ?? null),
+    oppRisk: buildOppRisk(displaySegments, result.raw_results, winner?.id ?? null),
     objections: buildObjections(result.raw_results, watch),
     ageRows,
     ageFull,
@@ -280,13 +323,13 @@ export function buildMinsimReport(result: RunResultEnvelope, options: { complete
       focusId,
       focusLabel,
       overallPct: overallFocusPct,
-      metricLabel: focusId === '이탈' ? '이탈률' : `${focusLabel} 반응률`,
+      metricLabel,
     },
     gender,
     regions,
     reco,
-    sampleAge: buildSampleAge(result.segments),
-    sampleRegion: buildSampleRegion(result.segments),
+    sampleAge: buildSampleAge(displaySegments),
+    sampleRegion: buildSampleRegion(displaySegments),
     crowd: buildCrowd(result.raw_results),
     quotes: buildQuotes(result.raw_results),
     disclaimer:
@@ -307,7 +350,7 @@ function buildAgentView(result: RunResultEnvelope): AgentView {
     if (isRecord(item)) {
       const title = asString(item.finding)
       if (!title) return []
-      return [{ title, body: asString(item.evidence) ?? '' }]
+      return [{ title, body: sanitizeEvidenceBody(asString(item.evidence) ?? '') }]
     }
     return asString(item) ? [{ title: String(item), body: '' }] : []
   })
@@ -353,17 +396,156 @@ function buildJudgeBody(
   runnerUp: MinsimCreative | null,
   gapPoint: number | null,
   status: string,
+  mode: MinsimReport['segment']['mode'] = 'choice',
 ): string[] {
   const lines: string[] = []
   if (winner && runnerUp && gapPoint !== null) {
     lines.push(
-      `이 synthetic panel에서는 ${runnerUp.label}(${runnerUp.pct}%)보다 ${gapPoint}%포인트 더 많이 선택됐습니다. 실제 시장 일반화 전 추가 검증이 필요합니다.`,
+      mode === 'segment'
+        ? `이 synthetic panel에서는 ${winner.label}(${winner.pct}%)가 ${runnerUp.label}(${runnerUp.pct}%)보다 ${gapPoint}%포인트 더 큽니다. 실제 시장 일반화 전 추가 검증이 필요합니다.`
+        : `이 synthetic panel에서는 ${runnerUp.label}(${runnerUp.pct}%)보다 ${gapPoint}%포인트 더 많이 선택됐습니다. 실제 시장 일반화 전 추가 검증이 필요합니다.`,
     )
   } else if (winner) {
-    lines.push(`${winner.label}가 ${winner.pct}%로 가장 강한 반응을 얻었습니다.`)
+    lines.push(
+      mode === 'segment'
+        ? `${winner.label}가 ${winner.pct}%로 가장 큰 세그먼트입니다.`
+        : `${winner.label}가 ${winner.pct}%로 가장 강한 반응을 얻었습니다.`,
+    )
   }
   lines.push(`단, 신뢰도는 ‘${status}’ 수준 — 큰 세그먼트 차이는 근거로 쓰되 소표본 세그먼트는 분리 해석이 필요합니다.`)
   return lines
+}
+
+/** Hide or humanize machine metric-key evidence so it never shows as report body copy. */
+export function sanitizeEvidenceBody(evidence: string): string {
+  const trimmed = evidence.trim()
+  if (!trimmed) return ''
+  if (!looksLikeMachineEvidence(trimmed)) return trimmed
+  return humanizeMachineEvidence(trimmed) ?? ''
+}
+
+function looksLikeMachineEvidence(text: string): boolean {
+  if (/needs\.count\s*=|pains\.count\s*=|segment_counts\.|segment_pct\.|breakdown_by_/i.test(text)) return true
+  if (/\b[a-z][a-z0-9_]*\.[A-Za-z0-9_.[\]가-힣]+\s*=/.test(text)) return true
+  if (/\b[a-z][a-z0-9_]+\[/.test(text)) return true
+  if (/^[A-Za-z0-9_.'"[\]=\s,:%+\-가-힣]+$/.test(text) && /[a-z][a-z0-9_]*\s*=/.test(text) && !/\s{2,}|다\.|요\.|니다/.test(text)) {
+    return true
+  }
+  return false
+}
+
+function humanizeMachineEvidence(text: string): string | null {
+  const needCountFirst = /needs\.count\s*=\s*(\d+)[^\n]*needs\.label\s*=\s*['"]([^'"]+)['"]/i.exec(text)
+  if (needCountFirst) return `「${needCountFirst[2]}」 니즈 ${needCountFirst[1]}건`
+  const needLabelFirst = /needs\.label\s*=\s*['"]([^'"]+)['"][^\n]*needs\.count\s*=\s*(\d+)/i.exec(text)
+  if (needLabelFirst) return `「${needLabelFirst[1]}」 니즈 ${needLabelFirst[2]}건`
+
+  const painCountFirst = /pains\.count\s*=\s*(\d+)[^\n]*pains\.label\s*=\s*['"]([^'"]+)['"]/i.exec(text)
+  if (painCountFirst) return `「${painCountFirst[2]}」 페인 ${painCountFirst[1]}건`
+  const painLabelFirst = /pains\.label\s*=\s*['"]([^'"]+)['"][^\n]*pains\.count\s*=\s*(\d+)/i.exec(text)
+  if (painLabelFirst) return `「${painLabelFirst[1]}」 페인 ${painLabelFirst[2]}건`
+
+  const segmentCount = /segment_counts\.([^=\s,]+)\s*=\s*([\d.]+)/i.exec(text)
+  if (segmentCount) {
+    const name = segmentCount[1]?.replace(/_/g, ' ') ?? ''
+    const value = segmentCount[2]
+    const pct = /segment_pct\.[^=\s,]+\s*=\s*([\d.]+)/i.exec(text)?.[1]
+    if (name && value) {
+      return pct ? `「${name}」 ${value}건 · ${pct}%` : `「${name}」 ${value}건`
+    }
+  }
+
+  const labelThenCount = /(?:label|name)\s*=\s*['"]([^'"]+)['"][^\n]*(?:count|n)\s*=\s*(\d+)/i.exec(text)
+  if (labelThenCount) return `「${labelThenCount[1]}」 ${labelThenCount[2]}건`
+  const countThenLabel = /(?:count|n)\s*=\s*(\d+)[^\n]*(?:label|name)\s*=\s*['"]([^'"]+)['"]/i.exec(text)
+  if (countThenLabel) return `「${countThenLabel[2]}」 ${countThenLabel[1]}건`
+
+  return null
+}
+
+function resolveOutcomeColumns(
+  rawCounts: Record<string, number>,
+  rawPct: Record<string, number>,
+  mode: MinsimReport['segment']['mode'],
+): { counts: Record<string, number>; pct: Record<string, number>; ids: string[] } {
+  if (Object.keys(rawCounts).length === 0 && Object.keys(rawPct).length === 0) {
+    return { counts: {}, pct: {}, ids: [] }
+  }
+
+  if (mode !== 'segment') {
+    const ids = Object.keys(rawCounts).length
+      ? Object.keys(rawCounts).sort()
+      : Object.keys(rawPct).sort()
+    return { counts: rawCounts, pct: rawPct, ids }
+  }
+
+  const ranked = Object.entries(rawCounts)
+    .filter(([, count]) => count > 0)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+  const top = ranked.slice(0, SEGMENT_TOP_N)
+  const rest = ranked.slice(SEGMENT_TOP_N)
+  const otherCount = rest.reduce((sum, [, count]) => sum + count, 0)
+  const total = ranked.reduce((sum, [, count]) => sum + count, 0) || 1
+
+  const counts: Record<string, number> = Object.fromEntries(top)
+  const pct: Record<string, number> = {}
+  for (const [id, count] of top) {
+    pct[id] = rawPct[id] !== undefined ? round(rawPct[id]) : round((count / total) * 100)
+  }
+  const ids = top.map(([id]) => id)
+  if (otherCount > 0) {
+    counts[OTHER_SEGMENT_ID] = otherCount
+    pct[OTHER_SEGMENT_ID] = round((otherCount / total) * 100)
+    ids.push(OTHER_SEGMENT_ID)
+  }
+  return { counts, pct, ids }
+}
+
+function foldSegmentBreakdowns(
+  segments: JsonObject,
+  primaryIds: string[],
+  enabled: boolean,
+): JsonObject {
+  if (!enabled || primaryIds.length === 0) return segments
+  const primary = new Set(primaryIds.filter((id) => id !== OTHER_SEGMENT_ID))
+  const foldRecord = (counts: Record<string, number>): Record<string, number> => {
+    const next: Record<string, number> = {}
+    let other = 0
+    for (const [key, value] of Object.entries(counts)) {
+      if (primary.has(key)) next[key] = (next[key] ?? 0) + value
+      else other += value
+    }
+    if (other > 0 && primaryIds.includes(OTHER_SEGMENT_ID)) next[OTHER_SEGMENT_ID] = other
+    for (const id of primaryIds) {
+      if (next[id] === undefined) next[id] = 0
+    }
+    return next
+  }
+
+  const foldMap = (value: unknown): JsonObject => {
+    if (!isRecord(value)) return {}
+    const out: JsonObject = {}
+    for (const [label, row] of Object.entries(value)) {
+      out[label] = foldRecord(numberRecord(row))
+    }
+    return out
+  }
+
+  return {
+    ...segments,
+    breakdown_by_age: foldMap(segments.breakdown_by_age),
+    breakdown_by_province: foldMap(segments.breakdown_by_province),
+    breakdown_by_sex: foldMap(segments.breakdown_by_sex),
+  }
+}
+
+function colorForOutcome(id: string, index: number): string {
+  if (OPT[id]) return OPT[id]
+  if (OUTCOME_COLORS[id]) return OUTCOME_COLORS[id]
+  if (id === OTHER_SEGMENT_ID) return 'var(--fg-faint)'
+  let hash = 0
+  for (let i = 0; i < id.length; i += 1) hash = (hash * 31 + id.charCodeAt(i)) >>> 0
+  return SEGMENT_PALETTE[(hash + index) % SEGMENT_PALETTE.length]
 }
 
 function deriveSentiment(rawResults: RawPersonaResult[]): { pos: number; neu: number; neg: number } | null {
@@ -463,6 +645,7 @@ function buildGender(segments: JsonObject, hasChoices: boolean): MinsimGender[] 
 function buildRegions(
   segments: JsonObject,
   hasChoices: boolean,
+  mode: MinsimReport['segment']['mode'],
   focusId: string,
   overallFocusPct: number,
 ): MinsimRegion[] {
@@ -471,9 +654,11 @@ function buildRegions(
     .map((name) => {
       const counts = numberRecord((byProvince as JsonObject)[name])
       const n = sumValues(counts)
-      const entries = Object.entries(counts).sort((a, b) => b[1] - a[1])
+      const entries = Object.entries(counts)
+        .filter(([, count]) => count > 0)
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
       const top = entries[0]
-      const lead = top ? top[0] : 'B'
+      const lead = top ? top[0] : ''
       const pctNum = top && n > 0 ? round((top[1] / n) * 100) : 0
       const leadLabel = outcomeLabel(lead, hasChoices)
       const focusPct = n > 0 ? round(((counts[focusId] ?? 0) / n) * 100) : 0
@@ -483,16 +668,19 @@ function buildRegions(
       const isReferenceOnly = n < 10
       const focusLabel = outcomeLabel(focusId, hasChoices)
       const deltaText = `${deltaPoint >= 0 ? '+' : ''}${deltaPoint}pt`
+      const metricWord = mode === 'segment' ? '점유율' : '반응률'
       const why = isReferenceOnly
         ? `표본이 ${n}명뿐이라 편차가 큽니다. ${focusLabel} ${focusPct}%는 방향성 참고치로만 해석하세요.`
         : hasChoices
           ? `${displayName}의 ${focusLabel} 반응률은 ${focusPct}%로 전체보다 ${deltaText}입니다. 이 합성 패널에서 관측된 차이이며 시장 전체를 뜻하지 않습니다.`
-          : `${displayName}의 ${focusLabel} 비율은 ${focusPct}%로 전체보다 ${deltaText}입니다. 표본 ${n}명의 합성 패널 반응으로 해석하세요.`
+          : `${displayName}의 ${focusLabel} ${metricWord}은 ${focusPct}%로 전체보다 ${deltaText}입니다. 표본 ${n}명의 합성 패널 반응으로 해석하세요.`
       const actions = isReferenceOnly
         ? ['지역 표본을 늘려 다시 확인', `${focusLabel} 이유를 소규모 후속 질문으로 확인`]
         : hasChoices
           ? [`${focusLabel} 메시지로 지역 타겟 테스트`, '전체 대비 차이가 난 이유를 후속 질문으로 확인']
-          : [`${focusLabel} 트리거를 지역 코호트에 다시 질문`, '유지·관망으로 전환할 조건을 별도 확인']
+          : mode === 'segment'
+            ? [`${focusLabel} 비중이 높은 지역 코호트에 후속 질문`, '세그먼트 선택 이유를 소규모로 확인']
+            : [`${focusLabel} 트리거를 지역 코호트에 다시 질문`, '유지·관망으로 전환할 조건을 별도 확인']
       const distribution = Object.fromEntries(
         Object.entries(counts).map(([id, count]) => [id, n > 0 ? round((count / n) * 100) : 0]),
       )
@@ -779,10 +967,14 @@ export function choiceOf(item: RawPersonaResult): string {
   const parsed = item.parsed
   if (parsed && typeof parsed.choice === 'string' && parsed.choice.trim()) return parsed.choice.trim().charAt(0)
   if (parsed && typeof parsed.intent === 'string' && parsed.intent.trim()) return parsed.intent.trim()
+  if (parsed && typeof parsed.segment === 'string' && parsed.segment.trim()) return parsed.segment.trim()
+  if (parsed && typeof parsed.primary === 'string' && parsed.primary.trim()) return parsed.primary.trim()
   const match = /선택[:：]\s*([A-D])/.exec(item.response ?? '')
   if (match) return match[1]
   const intentMatch = /(?:대표)?의향[:：]\s*(유지|관망|이탈)/.exec(item.response ?? '')
-  return intentMatch ? intentMatch[1] : ''
+  if (intentMatch) return intentMatch[1]
+  const segmentMatch = /세그먼트[:：]\s*([^\n]+)/.exec(item.response ?? '')
+  return segmentMatch ? segmentMatch[1].trim() : ''
 }
 
 function confidenceLabel(total: number, parseSuccessRate: number | null): string {

@@ -3,7 +3,7 @@ title: Segment Reaction Radar
 type: design-doc
 tags: [results, segments, map, churn, landing]
 created: 2026-07-13
-updated: 2026-07-13
+updated: 2026-07-15
 status: approved
 related: [[../execution/segment-reaction-radar-v1]], [[results-research-workspace]]
 ---
@@ -34,6 +34,16 @@ related: [[../execution/segment-reaction-radar-v1]], [[results-research-workspac
 - 금지 표현: `유지안`, `관망안`, `이탈안`, `유안`, `관안`, `이안`
 - 초점 지표: 지역별 이탈률
 - 의미 색상: 유지=청록, 관망=호박색, 이탈=코랄/적색
+
+### Market segmentation
+
+- 표시: free-text 세그먼트 라벨 그대로 (예: `감성선물 찾는 직장인`)
+- 금지 표현: 세그먼트 라벨에 `안` 접미사 붙이기, 초점 라벨 `N/A`
+- 결과 어댑터 모드: `segment` (`metrics.segment_counts` / `segment_pct`)
+- 초점 지표: `recommended_first_target` 또는 1위 세그먼트의 지역별 점유율
+- KPI 라벨: `{focusLabel} 점유율`
+- 표시 열: 상위 8개 세그먼트 + 나머지 `기타` 합산 (연령/지역/성별 breakdown 동일 폴딩)
+- 연령 분포 표와 시장 반응 막대는 위 열을 공유한다
 
 ### Reliability
 

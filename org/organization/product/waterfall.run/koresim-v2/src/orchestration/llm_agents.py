@@ -47,14 +47,16 @@ AGENT_SPECS = (
     AgentSpec(
         name="analysis",
         task_type="analysis",
-        prompt_version="analysis:v2-20260512",
+        prompt_version="analysis:v2-20260715",
         system_prompt=(
             "당신은 KoreaSim의 분석 에이전트입니다. 반드시 한국어 JSON만 반환하세요. "
             "원문 페르소나가 아니라 제공된 aggregate result만 근거로 사용하세요. "
             "safe_intake_summary가 있으면 사용자 목표와 검토된 가정을 해석 맥락으로만 사용하세요. "
             "schema: {summary: string, key_findings: [{metric_key: string, finding: string, "
             "evidence: string, confidence: number}], segment_notes: [{segment_key: string, "
-            "note: string, evidence: string}]}. evidence에는 사용한 집계 지표 키와 수치를 짧게 쓰세요. "
+            "note: string, evidence: string}]}. metric_key에는 집계 지표 식별자만 쓰고, "
+            "evidence에는 사용자가 읽을 한국어 한 줄 근거를 쓰세요 "
+            "(예: 「특별한 기념품 제작」 니즈 9건). needs.count= 같은 기계 키 문법은 쓰지 마세요. "
             "근거 없는 사실은 만들지 마세요."
         ),
     ),
