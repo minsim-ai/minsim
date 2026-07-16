@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react'
-import { ArrowRight, ClockCounterClockwise } from '@phosphor-icons/react'
+import { ArrowRight, History } from 'lucide-react'
+import { autofillProject } from '../api/intake'
 import { archiveProject, getProject, listProjectRuns, updateProject } from '../api/projects'
-import type { ProjectResponse, ProjectRunItem } from '../types/api'
+import type { ProjectAutofillMeta, ProjectResponse, ProjectRunItem } from '../types/api'
 import { getSimulationLabel } from '../simulations/registry'
+import { AutofillPanel } from './AutofillPanel'
 import { navigateTo } from './navigation'
+import { AUTOFILL_ALL_FIELDS, autofillMetaOf } from './projectAutofill'
 
 export function ProjectDetailPage({ projectId }: { projectId: string }) {
   const [project, setProject] = useState<ProjectResponse | null>(null)
@@ -15,6 +18,10 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
   const [prices, setPrices] = useState('')
   const [targetNotes, setTargetNotes] = useState('')
   const [alternatives, setAlternatives] = useState('')
+  const [autofillMeta, setAutofillMeta] = useState<ProjectAutofillMeta | null>(null)
+  const [aiFilled, setAiFilled] = useState<Set<string>>(new Set())
+  const [aiBusy, setAiBusy] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -33,12 +40,55 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
         setPrices(projectResponse.prices.join('\n'))
         setTargetNotes(projectResponse.target_notes)
         setAlternatives(projectResponse.alternatives.join('\n'))
+        const meta = autofillMetaOf(projectResponse)
+        setAutofillMeta(meta)
+        setAiFilled(new Set(meta?.filled_fields ?? []))
       })
       .catch((err) => setError(err instanceof Error ? err.message : String(err)))
     return () => {
       cancelled = true
     }
   }, [projectId])
+
+  const markEdited = (field: string) => {
+    setAiFilled((current) => {
+      if (!current.has(field)) return current
+      const next = new Set(current)
+      next.delete(field)
+      return next
+    })
+  }
+
+  const applyAutofill = async (prompt: string) => {
+    setAiBusy(true)
+    setAiError(null)
+    try {
+      const draft = await autofillProject({ prompt })
+      const fields = draft.project_fields
+      setName(fields.name || name)
+      setDescription(fields.description || description)
+      setProductContext(fields.product_context || productContext)
+      setFeatures(fields.features.join('\n'))
+      setPrices(fields.prices.join('\n'))
+      setTargetNotes(fields.target_notes)
+      setAlternatives(fields.alternatives.join('\n'))
+      setAutofillMeta({
+        source: 'generated',
+        prompt,
+        recommended_simulation_type: draft.recommended_simulation_type,
+        simulation_input: draft.simulation_input,
+        assumptions: draft.assumptions,
+        notes: draft.notes,
+        filled_fields: [...AUTOFILL_ALL_FIELDS],
+      })
+      setAiFilled(new Set(AUTOFILL_ALL_FIELDS))
+      setNotice('AI가 전체 항목을 채웠습니다. 확인 후 원하는 부분만 수정하고 저장하세요.')
+    } catch {
+      setAiError('AI 채움에 실패했습니다. 직접 입력하거나 잠시 후 다시 시도해주세요.')
+    } finally {
+      setAiBusy(false)
+    }
+  }
 
   const save = async () => {
     setSaving(true)
@@ -47,7 +97,12 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
       const updated = await updateProject(projectId, {
         name,
         description,
-        product_context: { product_description: productContext },
+        product_context: {
+          product_description: productContext,
+          ...(autofillMeta
+            ? { autofill: { ...autofillMeta, filled_fields: [...aiFilled] } }
+            : {}),
+        },
         features: splitLines(features),
         prices: splitLines(prices, { splitCommas: false }),
         target_notes: targetNotes,
@@ -83,7 +138,16 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
           <h1>{project.name}</h1>
         </div>
         <div className="v2-action-row">
-          <button type="button" onClick={() => navigateTo(`/projects/${encodeURIComponent(projectId)}/type`)}>
+          <button
+            type="button"
+            onClick={() => {
+              const recommended = autofillMeta?.recommended_simulation_type
+              const path = recommended
+                ? `/projects/${encodeURIComponent(projectId)}/type?recommended=${encodeURIComponent(recommended)}`
+                : `/projects/${encodeURIComponent(projectId)}/type`
+              navigateTo(path)
+            }}
+          >
             새 시뮬레이션
           </button>
           <button type="button" disabled={saving} onClick={save}>{saving ? '저장 중…' : '저장'}</button>
@@ -93,28 +157,40 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
 
       {notice && <p className="v2-muted">{notice}</p>}
 
+      <div className="minsim-autofill-layout">
       <div className="v2-editor-grid">
         <label>
           <span>이름</span>
           <input
             value={name}
-            onChange={(event) => setName(event.target.value)}
+            onChange={(event) => {
+              markEdited('name')
+              setName(event.target.value)
+            }}
             placeholder="예: 사주·점성술 AI 채팅 앱"
           />
         </label>
-        <label>
+        <label className="v2-wide-field">
           <span>설명</span>
-          <input
+          <textarea
+            className="minsim-description-field"
             value={description}
-            onChange={(event) => setDescription(event.target.value)}
+            onChange={(event) => {
+              markEdited('description')
+              setDescription(event.target.value)
+            }}
             placeholder="예: 사주와 별자리 해석을 대화형으로 제공하는 AI 앱"
+            rows={3}
           />
         </label>
         <label className="v2-wide-field">
           <span>제품 컨텍스트</span>
           <textarea
             value={productContext}
-            onChange={(event) => setProductContext(event.target.value)}
+            onChange={(event) => {
+              markEdited('product_context')
+              setProductContext(event.target.value)
+            }}
             placeholder="예: 생년월일과 고민을 바탕으로 사주·점성술 상담을 제공하는 AI 채팅 앱"
             rows={5}
           />
@@ -123,7 +199,10 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
           <span>기능</span>
           <textarea
             value={features}
-            onChange={(event) => setFeatures(event.target.value)}
+            onChange={(event) => {
+              markEdited('features')
+              setFeatures(event.target.value)
+            }}
             placeholder={'예: 사주 풀이\n별자리 운세\nAI 고민 상담'}
             rows={5}
           />
@@ -132,7 +211,10 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
           <span>가격</span>
           <textarea
             value={prices}
-            onChange={(event) => setPrices(event.target.value)}
+            onChange={(event) => {
+              markEdited('prices')
+              setPrices(event.target.value)
+            }}
             placeholder="예: 무료 3회 상담 · 프리미엄 월 9,900원"
             rows={5}
           />
@@ -141,7 +223,10 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
           <span>타겟 메모</span>
           <textarea
             value={targetNotes}
-            onChange={(event) => setTargetNotes(event.target.value)}
+            onChange={(event) => {
+              markEdited('target_notes')
+              setTargetNotes(event.target.value)
+            }}
             placeholder="예: 사주·별자리에 관심 있고 연애·진로 고민을 나누고 싶은 20~30대"
             rows={4}
           />
@@ -150,11 +235,41 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
           <span>대안/경쟁재</span>
           <textarea
             value={alternatives}
-            onChange={(event) => setAlternatives(event.target.value)}
+            onChange={(event) => {
+              markEdited('alternatives')
+              setAlternatives(event.target.value)
+            }}
             placeholder="예: 점신, 포스텔러, 운세의 신"
             rows={4}
           />
         </label>
+      </div>
+
+      <AutofillPanel
+        initialPrompt={autofillMeta?.prompt || description || ''}
+        busy={aiBusy}
+        error={aiError}
+        notes={autofillMeta?.notes ?? []}
+        onGenerate={(prompt) => void applyAutofill(prompt)}
+        generateLabel="AI 생성 (전체 다시 채우기)"
+        footer={
+          autofillMeta ? (
+            <button
+              className="btn"
+              type="button"
+              onClick={() =>
+                navigateTo(
+                  `/projects/${encodeURIComponent(projectId)}/type?recommended=${encodeURIComponent(
+                    autofillMeta.recommended_simulation_type,
+                  )}`,
+                )
+              }
+            >
+              추천 유형({getSimulationLabel(autofillMeta.recommended_simulation_type)})으로 시작 →
+            </button>
+          ) : undefined
+        }
+      />
       </div>
 
       <section className="v2-report-section">
@@ -169,7 +284,7 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
           {runs.map((item) => <RunHistoryRow item={item} projectId={projectId} key={item.run.run_id} />)}
           {runs.length === 0 && (
             <div className="v2-run-empty">
-              <ClockCounterClockwise size={24} aria-hidden="true" />
+              <History size={24} aria-hidden="true" />
               <strong>아직 실행한 시뮬레이션이 없습니다</strong>
               <span>새 시뮬레이션을 시작하면 상태와 결과가 시간순으로 쌓입니다.</span>
             </div>
@@ -242,6 +357,7 @@ function stringFromContext(value: ProjectResponse['product_context']): string {
   const description = value.product_description
   if (typeof description === 'string') return description
   return Object.entries(value)
+    .filter(([key]) => key !== 'autofill')
     .map(([key, item]) => `${key}: ${String(item)}`)
     .join('\n')
 }

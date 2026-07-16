@@ -1,13 +1,29 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { generateIntakeCandidates, linkIntakeSessionRun, saveIntakeSession } from '../api/intake'
 import { createProjectRun, getProject } from '../api/projects'
+import { SAMPLE_SIZE_PRESETS, estimatedRunSeconds } from '../config/limits'
 import { advanceIntakeSession, createInitialIntakeSession } from '../intake/planner'
 import { buildGenericSimulationPayload, validateCreativeTestingPayload } from '../intake/payloadBuilder'
+import { createSlot, upsertSlot } from '../intake/slotUtils'
 import type { CreativeCandidate, DynamicFormField, IntakeSession, IntakeSlotValue } from '../intake/types'
-import type { JsonObject, ProjectResponse, SimulationType } from '../types/api'
+import type { JsonObject, PersonaCountryOption, ProjectResponse, SimulationType } from '../types/api'
 import { getSimulationLabel } from '../simulations/registry'
 import { navigateTo } from './navigation'
 import { createProjectIntakeSession } from './projectIntake'
+
+const FALLBACK_COUNTRIES: PersonaCountryOption[] = [
+  {
+    country_id: 'kr',
+    country_name: 'South Korea',
+    country_name_ko: '대한민국',
+    hf_id: 'nvidia/Nemotron-Personas-Korea',
+    language: 'Korean',
+    supports_region_filter: true,
+    supports_korea_map: true,
+    available: true,
+    path: '',
+  },
+]
 
 export function MinsimIntakeFlow({
   projectId,
@@ -27,8 +43,28 @@ export function MinsimIntakeFlow({
   const [error, setError] = useState<string | null>(null)
   const [candidateLoading, setCandidateLoading] = useState(false)
   const [candidateMeta, setCandidateMeta] = useState<string | null>(null)
+  const [countries, setCountries] = useState<PersonaCountryOption[]>(FALLBACK_COUNTRIES)
+  const [countryId, setCountryId] = useState('kr')
   const composingRef = useRef(false)
   const type = simulationType ?? 'creative_testing'
+
+  useEffect(() => {
+    fetch('/api/config')
+      .then((response) => (response.ok ? response.json() : null))
+      .then((config: { available_countries?: PersonaCountryOption[]; default_country_id?: string } | null) => {
+        if (!config?.available_countries?.length) return
+        setCountries(config.available_countries)
+        const preferred = config.default_country_id || 'kr'
+        const firstAvailable =
+          config.available_countries.find((item) => item.country_id === preferred && item.available) ||
+          config.available_countries.find((item) => item.available) ||
+          config.available_countries[0]
+        if (firstAvailable) setCountryId(firstAvailable.country_id)
+      })
+      .catch(() => {
+        // Keep Korea fallback when config is unavailable.
+      })
+  }, [])
 
   useEffect(() => {
     getProject(projectId)
@@ -168,6 +204,7 @@ export function MinsimIntakeFlow({
       const response = await createProjectRun(projectId, {
         ...payload,
         simulation_type: type,
+        country_id: countryId,
         run_label: `${project?.name ?? 'Project'} ${new Date().toLocaleDateString('ko-KR')}`,
       })
       try {
@@ -236,7 +273,7 @@ export function MinsimIntakeFlow({
         <i style={{ width: `${progress}%` }} />
       </div>
 
-      <div className="minsim-chat-grid">
+      <div className="minsim-chat-grid minsim-chat-grid--single">
         <div className="v2-chat-panel minsim-chat-thread">
           {session.messages.map((item, index) => (
             <ChatBubble item={item} key={`${item.role}-${index}-${item.content}`} />
@@ -246,6 +283,35 @@ export function MinsimIntakeFlow({
             candidateLoading={candidateLoading}
             productDescription={slotString(session, 'product_description') || stringFromProject(project)}
             formValues={formValues}
+            countries={countries}
+            countryId={countryId}
+            onCountryChange={setCountryId}
+            sampleSize={payload.sample_size ?? 200}
+            onSampleSizeChange={(size) =>
+              setSession((current) => ({
+                ...current,
+                slots: upsertSlot(
+                  current.slots,
+                  createSlot('sample_size', size, 'user', 1, 'panel-size-picker', false),
+                ),
+              }))
+            }
+            personaPool={payload.persona_pool ?? 'nationwide'}
+            onPersonaPoolChange={(pool) =>
+              setSession((current) => ({
+                ...current,
+                slots: upsertSlot(
+                  current.slots,
+                  createSlot('persona_pool', pool, 'user', 1, 'persona-pool-picker', false),
+                ),
+              }))
+            }
+            summary={{
+              product: slotString(session, 'product_description') || stringFromProject(project) || '—',
+              customers: slotStringArray(session, 'target_customers').join(', ') || '—',
+              benefit: slotString(session, 'main_benefit') || '—',
+              candidates: candidateSummary(session),
+            }}
             onAcceptCandidates={acceptCandidates}
             onConfirmAssumptions={confirmAssumptions}
             onFormValues={setFormValues}
@@ -266,26 +332,144 @@ export function MinsimIntakeFlow({
                 onKeyDown={handleComposerKeyDown}
                 aria-label="질문에 답변"
                 rows={2}
-                placeholder="위 질문에 아는 만큼 답해주세요. 예: 최근 3개월간 재구매율이 줄었습니다."
+                placeholder="위 질문에 아는 만큼 답해주세요. 예: 최근 3개월간 재구매율이 줄었어요."
               />
               <button type="button" onClick={send} disabled={!message.trim()}>답변 전송 →</button>
             </div>
           )}
         </div>
-
-        <aside className="minsim-input-summary card">
-          <div className="lbl-mono">입력 요약</div>
-          <SummaryRow label="제품" value={slotString(session, 'product_description') || stringFromProject(project) || '—'} />
-          <SummaryRow label="고객" value={slotStringArray(session, 'target_customers').join(', ') || '—'} />
-          <SummaryRow label="장점" value={slotString(session, 'main_benefit') || '—'} />
-          <SummaryRow label="후보" value={candidateSummary(session)} />
-          <SummaryRow label="패널" value={`${payload.sample_size ?? 200}명`} />
-          <SummaryRow label="상태" value={statusLabel(action?.type ?? null)} />
-        </aside>
       </div>
 
       {error && <p className="v2-error">{error}</p>}
     </section>
+  )
+}
+
+function PanelSizePicker({ value, onSelect }: { value: number; onSelect: (size: number) => void }) {
+  const estimatedMinutes = Math.ceil(estimatedRunSeconds(value) / 60)
+  return (
+    <div className="minsim-run-control">
+      <div className="minsim-run-control-head">
+        <span className="minsim-run-control-label">패널 크기</span>
+        <span className="minsim-run-control-hint">선택하세요</span>
+      </div>
+      <div className="minsim-run-option-row" role="group" aria-label="패널 크기 선택">
+        {SAMPLE_SIZE_PRESETS.map((preset) => (
+          <button
+            key={preset}
+            type="button"
+            className={`minsim-run-option${value === preset ? ' is-on' : ''}`}
+            aria-pressed={value === preset}
+            onClick={() => onSelect(preset)}
+          >
+            {preset.toLocaleString()}명
+          </button>
+        ))}
+      </div>
+      {value >= 1000 && (
+        <p className="minsim-run-control-note">
+          대규모 패널은 약 {estimatedMinutes}분이 걸리고 토큰 비용이 비례해 늘어납니다.
+        </p>
+      )}
+    </div>
+  )
+}
+
+type PersonaPoolOption = { id: string; label: string; available: boolean }
+
+const DEFAULT_POOL_OPTIONS: PersonaPoolOption[] = [
+  { id: 'nationwide', label: '전 국민', available: true },
+  { id: 'dgist', label: 'DGIST 구성원', available: false },
+]
+
+function PersonaPoolPicker({ value, onSelect }: { value: string; onSelect: (pool: string) => void }) {
+  const [pools, setPools] = useState<PersonaPoolOption[]>(DEFAULT_POOL_OPTIONS)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/config')
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (cancelled || !data || !Array.isArray(data.persona_pools)) return
+        const parsed = data.persona_pools
+          .filter((item: unknown): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
+          .map((item: Record<string, unknown>) => ({
+            id: String(item.id ?? ''),
+            label: String(item.label ?? item.id ?? ''),
+            available: item.available === true,
+          }))
+          .filter((item: PersonaPoolOption) => item.id)
+        if (parsed.length > 0) setPools(parsed)
+      })
+      .catch(() => {
+        // Static defaults keep the picker functional when config is unreachable.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  return (
+    <div className="minsim-run-control">
+      <div className="minsim-run-control-head">
+        <span className="minsim-run-control-label">페르소나 풀</span>
+        <span className="minsim-run-control-hint">선택하세요</span>
+      </div>
+      <div className="minsim-run-option-row" role="group" aria-label="페르소나 풀 선택">
+        {pools.map((pool) => (
+          <button
+            key={pool.id}
+            type="button"
+            className={`minsim-run-option${value === pool.id ? ' is-on' : ''}`}
+            aria-pressed={value === pool.id}
+            disabled={!pool.available}
+            title={pool.available ? undefined : '데이터셋 준비 중'}
+            onClick={() => pool.available && onSelect(pool.id)}
+          >
+            {pool.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function CountryPicker({
+  countries,
+  value,
+  onChange,
+}: {
+  countries: PersonaCountryOption[]
+  value: string
+  onChange: (countryId: string) => void
+}) {
+  const selected = countries.find((item) => item.country_id === value)
+  return (
+    <div className="minsim-run-control">
+      <div className="minsim-run-control-head">
+        <label className="minsim-run-control-label" htmlFor="minsim-country-select">
+          페르소나 국가
+        </label>
+        <span className="minsim-run-control-hint">선택하세요</span>
+      </div>
+      <select
+        id="minsim-country-select"
+        className="minsim-run-select"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        aria-label="페르소나 국가 선택"
+      >
+        {countries.map((country) => (
+          <option key={country.country_id} value={country.country_id} disabled={!country.available}>
+            {country.country_name_ko} ({country.country_name})
+            {country.available ? '' : ' · 미설치'}
+          </option>
+        ))}
+      </select>
+      <p className="minsim-run-control-note">
+        {selected?.language ?? '—'} · 시뮬레이션 시작 전에 선택
+      </p>
+    </div>
   )
 }
 
@@ -310,6 +494,14 @@ function ActionPanel({
   candidateLoading,
   productDescription,
   formValues,
+  countries,
+  countryId,
+  onCountryChange,
+  sampleSize,
+  onSampleSizeChange,
+  personaPool,
+  onPersonaPoolChange,
+  summary,
   onAcceptCandidates,
   onConfirmAssumptions,
   onFormValues,
@@ -320,6 +512,14 @@ function ActionPanel({
   candidateLoading: boolean
   productDescription: string
   formValues: Record<string, string>
+  countries: PersonaCountryOption[]
+  countryId: string
+  onCountryChange: (countryId: string) => void
+  sampleSize: number
+  onSampleSizeChange: (size: number) => void
+  personaPool: string
+  onPersonaPoolChange: (pool: string) => void
+  summary: { product: string; customers: string; benefit: string; candidates: string }
   onAcceptCandidates: (candidates: CreativeCandidate[], assumptions: IntakeSlotValue[]) => void
   onConfirmAssumptions: () => void
   onFormValues: (updater: (current: Record<string, string>) => Record<string, string>) => void
@@ -416,7 +616,28 @@ function ActionPanel({
             ))}
           </div>
         )}
-        <button type="button" onClick={onRun}>조건 확인하고 시뮬레이션 시작 →</button>
+
+        <div className="minsim-run-setup" aria-label="실행 조건 선택">
+          <div className="minsim-run-setup-head">
+            <strong>실행 조건</strong>
+            <span>시작 전에 아래 항목을 확인·선택하세요</span>
+          </div>
+          <div className="minsim-run-summary-grid" aria-label="입력 요약">
+            <SummaryRow label="제품" value={summary.product} />
+            <SummaryRow label="고객" value={summary.customers} />
+            <SummaryRow label="장점" value={summary.benefit} />
+            <SummaryRow label="후보" value={summary.candidates} />
+          </div>
+          <CountryPicker countries={countries} value={countryId} onChange={onCountryChange} />
+          <PanelSizePicker value={sampleSize} onSelect={onSampleSizeChange} />
+          {countryId === 'kr' && (
+            <PersonaPoolPicker value={personaPool} onSelect={onPersonaPoolChange} />
+          )}
+        </div>
+
+        <button className="minsim-run-start-btn" type="button" onClick={onRun}>
+          조건 확인하고 시뮬레이션 시작 →
+        </button>
       </div>
     )
   }
@@ -608,18 +829,6 @@ function candidateSummary(session: IntakeSession): string {
   if (candidates.length > 0) return `${candidates.length}개 후보 확정`
   if (session.action?.type === 'candidate_review') return `${session.action.candidates.length}개 후보 검토 중`
   return '—'
-}
-
-function statusLabel(actionType: string | null): string {
-  const labels: Record<string, string> = {
-    ask_question: '질문 중',
-    show_form: '정보 입력',
-    candidate_review: '후보 검토',
-    confirm_assumptions: '가정 확인',
-    run_ready: '실행 가능',
-    repair_input: '수정 필요',
-  }
-  return actionType ? labels[String(actionType)] ?? String(actionType) : '대기'
 }
 
 function progressForAction(actionType: string | null): number {
