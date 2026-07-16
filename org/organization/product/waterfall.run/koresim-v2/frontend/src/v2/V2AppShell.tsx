@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { AuthStatus } from '../components/AuthStatus'
 import type { V2Stage } from './types'
-import type { V2Route } from './navigation'
+import { navigateTo, stageHref, type V2Route } from './navigation'
 
 type Props = {
   route: V2Route
@@ -16,7 +16,7 @@ const stages: { id: V2Stage; label: string }[] = [
 ]
 
 function activeStage(route: V2Route): V2Stage {
-  if (route.page === 'project') return 'projects'
+  if (route.page === 'project' || route.page === 'connect') return 'projects'
   if (route.page === 'loading') return 'results'
   if (route.page === 'type' || route.page === 'intake' || route.page === 'results' || route.page === 'projects') {
     return route.page
@@ -27,6 +27,7 @@ function activeStage(route: V2Route): V2Stage {
 export function V2AppShell({ route, children }: Props) {
   const active = activeStage(route)
   const activeIndex = stages.findIndex((stage) => stage.id === active)
+
   return (
     <div className="minsim-shell">
       <a className="minsim-skip-link" href="#main-content">본문으로 건너뛰기</a>
@@ -43,22 +44,54 @@ export function V2AppShell({ route, children }: Props) {
             <a className="navlink" href="/projects" aria-current={route.page === 'projects' ? 'page' : undefined}>
               프로젝트
             </a>
+            <a className="navlink" href="/connect" aria-current={route.page === 'connect' ? 'page' : undefined}>
+              MCP
+            </a>
           </nav>
           <AuthStatus compact />
         </div>
       </header>
       <div className="minsim-flow-rail">
         <ol className="wrap row" aria-label="시뮬레이션 진행 단계">
-          {stages.map((stage, index) => (
-            <li
-              className={index < activeIndex ? 'complete' : index === activeIndex ? 'active' : ''}
-              aria-current={index === activeIndex ? 'step' : undefined}
-              key={stage.id}
-            >
-              <b>{index + 1}</b>
-              {stage.label}
-            </li>
-          ))}
+          {stages.map((stage, index) => {
+            const href = stageHref(stage.id, route)
+            const isActive = index === activeIndex
+            const isComplete = index < activeIndex
+            const canNavigate = Boolean(href) && !isActive
+            const className = [
+              isComplete ? 'complete' : '',
+              isActive ? 'active' : '',
+              canNavigate ? 'is-clickable' : '',
+              !href ? 'is-locked' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')
+
+            return (
+              <li
+                className={className}
+                aria-current={isActive ? 'step' : undefined}
+                key={stage.id}
+              >
+                {canNavigate && href ? (
+                  <button
+                    type="button"
+                    className="minsim-flow-step-button"
+                    onClick={() => navigateTo(href)}
+                    aria-label={`${index + 1}. ${stage.label} 단계로 이동`}
+                  >
+                    <b>{index + 1}</b>
+                    <span>{stage.label}</span>
+                  </button>
+                ) : (
+                  <span className="minsim-flow-step-static" aria-disabled={!href || isActive ? true : undefined}>
+                    <b>{index + 1}</b>
+                    <span>{stage.label}</span>
+                  </span>
+                )}
+              </li>
+            )
+          })}
         </ol>
       </div>
       <main className="v2-main screen" id="main-content">{children}</main>

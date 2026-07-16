@@ -6,6 +6,7 @@ export type V2Route =
   | { page: 'intake'; projectId: string; simulationType?: string | null }
   | { page: 'loading'; projectId: string | null; runId: string | null }
   | { page: 'results'; runId: string | null; projectId: string | null }
+  | { page: 'connect' }
   | { page: 'classic-app' }
   | { page: 'classic-results' }
   | { page: 'admin' }
@@ -30,6 +31,7 @@ export function parseV2Route(
   const path = pathname.replace(/\/+$/, '') || '/'
   const params = new URLSearchParams(search)
   if (path === '/app' || path === '/projects') return { page: 'projects' }
+  if (path === '/connect') return { page: 'connect' }
   if (path === '/admin') return { page: 'admin' }
   if (path === '/validation') return { page: 'validation' }
   if (path === '/classic/app') return { page: 'classic-app' }
@@ -61,4 +63,66 @@ export function parseV2Route(
 export function navigateTo(path: string): void {
   window.history.pushState(null, '', path)
   window.dispatchEvent(new PopStateEvent('popstate'))
+}
+
+/** Extract project/run context used by the flow-rail step navigator. */
+export function routeFlowContext(route: V2Route): {
+  projectId: string | null
+  runId: string | null
+  simulationType: string | null
+} {
+  if (route.page === 'project' || route.page === 'type') {
+    return { projectId: route.projectId, runId: null, simulationType: null }
+  }
+  if (route.page === 'intake') {
+    return {
+      projectId: route.projectId,
+      runId: null,
+      simulationType: route.simulationType ?? null,
+    }
+  }
+  if (route.page === 'loading' || route.page === 'results') {
+    return {
+      projectId: route.projectId,
+      runId: route.runId,
+      simulationType: null,
+    }
+  }
+  return { projectId: null, runId: null, simulationType: null }
+}
+
+/**
+ * Build a path for a flow stage when enough route context exists.
+ * Returns null when the step is not navigable yet (e.g. type without projectId).
+ */
+export function stageHref(
+  stage: 'projects' | 'type' | 'intake' | 'results',
+  route: V2Route,
+): string | null {
+  const { projectId, runId, simulationType } = routeFlowContext(route)
+
+  switch (stage) {
+    case 'projects':
+      if (projectId) return `/projects/${encodeURIComponent(projectId)}`
+      return '/projects'
+    case 'type':
+      if (!projectId) return null
+      return `/projects/${encodeURIComponent(projectId)}/type`
+    case 'intake': {
+      if (!projectId) return null
+      if (simulationType) {
+        return `/projects/${encodeURIComponent(projectId)}/intake?type=${encodeURIComponent(simulationType)}`
+      }
+      return `/projects/${encodeURIComponent(projectId)}/intake`
+    }
+    case 'results': {
+      if (!runId) return null
+      const params = new URLSearchParams()
+      params.set('run_id', runId)
+      if (projectId) params.set('project_id', projectId)
+      return `/results?${params.toString()}`
+    }
+    default:
+      return null
+  }
 }
