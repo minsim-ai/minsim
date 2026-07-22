@@ -17,6 +17,9 @@ import type {
 
 const initialAssistant = "어떤 결정을 돕고 싶으신가요? 제품, 캠페인, 가격, 메시지 고민을 편하게 적어주세요.";
 
+/** Marks that the user already submitted/skipped the optional (secondaryAction) form. */
+const OPTIONAL_FORM_DISMISSED_SLOT = "optional_form_dismissed";
+
 export function createInitialIntakeSession(): IntakeSession {
   return {
     id: `intake-${Date.now()}`,
@@ -47,10 +50,27 @@ export function advanceIntakeSession(session: IntakeSession, event: IntakeEvent)
   }
 
   if (event.type === "form_submit") {
-    const formFields = session.action?.type === "show_form" ? session.action.form.fields : undefined;
+    const currentForm = session.action?.type === "show_form" ? session.action.form : undefined;
+    const formFields = currentForm?.fields;
+    // Optional form (has 「넘어가기」) must stay dismissed after submit/skip.
+    // Replanning used to re-open it because the guard only checked action===show_form.
+    let slots = mergeFormValues(event.values, session.slots);
+    if (currentForm?.secondaryAction) {
+      slots = upsertSlot(
+        slots,
+        createSlot(
+          OPTIONAL_FORM_DISMISSED_SLOT,
+          currentForm.id,
+          "user",
+          1,
+          "optional-form-dismissed",
+          false,
+        ),
+      );
+    }
     const next = {
       ...session,
-      slots: mergeFormValues(event.values, session.slots),
+      slots,
       messages: [
         ...session.messages,
         {
@@ -181,19 +201,27 @@ function planGenericSimulationAction(session: IntakeSession): IntakeAction {
   }
 
   if (missingFields.length > 0) {
-    if (missingCritical.length === 0 && session.action?.type === "show_form" && session.action.form.id === formId) {
+    const optionalOnly = missingCritical.length === 0;
+    const dismissedOptionalForm = asString(session.slots[OPTIONAL_FORM_DISMISSED_SLOT]).trim() === formId;
+    const dismissingCurrentOptionalForm =
+      optionalOnly
+      && session.action?.type === "show_form"
+      && session.action.form.id === formId;
+    // After skip/submit of the optional form, never re-open it on replan.
+    // (Bug: price_optimization asked the same optional form twice after 「넘어가기」.)
+    if (optionalOnly && (dismissedOptionalForm || dismissingCurrentOptionalForm)) {
       return buildGenericRunReadyAction(session);
     }
     return {
       type: "show_form",
-      message: missingCritical.length === 0
+      message: optionalOnly
         ? `${pack.label}에 도움이 되는 선택 정보입니다. 모르면 「넘어가기」로 바로 진행할 수 있습니다.`
         : `${pack.label} 시뮬레이션에 필요한 정보를 입력해주세요. 모르는 선택 항목은 비워두고 넘어갈 수 있습니다.`,
       form: {
         id: formId,
         fields: compactFormFields(missingFields).map((requirement) => toFormField(requirement, session.slots[requirement.id])),
         primaryAction: "다음",
-        secondaryAction: missingCritical.length === 0 ? "넘어가기" : undefined,
+        secondaryAction: optionalOnly ? "넘어가기" : undefined,
       },
     };
   }
