@@ -73,6 +73,37 @@ def pool_from_input(input_data: dict[str, Any] | None) -> str:
     return normalize_pool(input_data.get("_persona_pool"))
 
 
+def campus_pool_mismatch_warning(requested_pool: str | None) -> str:
+    """전국민 풀 + 학내 계층 축 조합이 왜 위험한지 한 줄로 설명한다."""
+    pool = normalize_pool(requested_pool)
+    return (
+        f"학내 계층 축은 DGIST 구성원 풀에서만 의미가 있습니다. "
+        f"요청 풀 '{pool}'의 education_level(예: 고등학교/4년제 대학교)은 "
+        f"학부생·석박사 라벨과 맞지 않아 전원이 '교직원'으로 뭉개집니다. "
+        f"DGIST 구성원 풀로 전환해 층화 표본을 뽑습니다."
+    )
+
+
+def ensure_campus_sampler(sampler: Any) -> tuple[Any, list[str]]:
+    """campus_* 시뮬은 반드시 DGIST 풀로 샘플링한다.
+
+    nationwide 페르소나에 classify_tier를 쓰면 100% 교직원이 된다
+    (실측 run 6e56ccfb, sample_size=100, seed=42).
+    """
+    from src.data.sampler import PersonaSampler
+
+    if not isinstance(sampler, PersonaSampler):
+        sampler = PersonaSampler(pool="dgist")
+    if is_campus_pool(getattr(sampler, "pool", None)):
+        return sampler, []
+    requested = getattr(sampler, "pool", DEFAULT_PERSONA_POOL)
+    upgraded = PersonaSampler(
+        country_id=getattr(sampler, "country_id", None),
+        pool="dgist",
+    )
+    return upgraded, [campus_pool_mismatch_warning(requested)]
+
+
 def respondent_role_line(pool: str | None, *, for_survey: bool = False) -> str:
     """프롬프트 첫 줄. 풀이 전국민이면 DGIST 역할 강제를 하지 않는다."""
     if is_campus_pool(pool):

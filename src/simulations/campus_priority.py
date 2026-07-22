@@ -18,6 +18,7 @@ from src.agent.simulator import BatchSimulator
 from src.data.pools import DEFAULT_PERSONA_POOL
 from src.data.respondent_axes import (
     classify_primary,
+    ensure_campus_sampler,
     normalize_pool,
     primary_axis_label,
     primary_axis_order,
@@ -363,21 +364,18 @@ class CampusPrioritySimulation(GenericPersonaSimulation):
         )
 
         sampler = sampler or PersonaSampler()
-        runtime_input = {**input_data, "_persona_pool": getattr(sampler, "pool", DEFAULT_PERSONA_POOL)}
-        sampling_meta: dict[str, Any] = {
-            "sampling": "random",
-            "tier_counts": {},
-            "tier_weights": {},
-            "warnings": [],
+        # nationwide + campus tier axis → 전원 교직원 (education_level 불일치).
+        # 학내 우선순위 시뮬은 DGIST 풀·층화를 강제한다.
+        sampler, pool_warnings = ensure_campus_sampler(sampler)
+        runtime_input = {**input_data, "_persona_pool": "dgist"}
+        stratified = sample_stratified(
+            sampler, n=sample_size, seed=seed, target_filter=target_filter
+        )
+        personas = stratified.personas
+        sampling_meta = {
+            **stratified.meta,
+            "warnings": list(stratified.meta.get("warnings") or []) + pool_warnings,
         }
-        if sampler.pool != DEFAULT_PERSONA_POOL:
-            stratified = sample_stratified(
-                sampler, n=sample_size, seed=seed, target_filter=target_filter
-            )
-            personas = stratified.personas
-            sampling_meta = stratified.meta
-        else:
-            personas = sampler.sample(n=sample_size, filter_=target_filter, seed=seed)
 
         # 항목 제시 순서가 1위를 바꾼다 (2026-07-20 실측: 순서를 뒤집자 1위가
         # 학부실험실 → 기숙사로 이동). 설문 방법론의 counterbalancing을 적용해

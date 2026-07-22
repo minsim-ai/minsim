@@ -63,14 +63,24 @@ async def test_run_uses_stratified_sampling_and_records_meta():
 
 
 @pytest.mark.asyncio
-async def test_run_on_nationwide_pool_stays_random():
-    """전국 풀은 계층 개념이 없으므로 층화하지 않는다."""
+async def test_run_on_nationwide_pool_upgrades_to_dgist_stratified():
+    """전국민 풀 + 학내 축은 전원 교직원으로 뭉개지므로 DGIST 층화로 전환한다."""
     sim = SIMULATION_SPECS["campus_policy"].runner_factory()
     result = await sim.run(
         AGENDA_INPUT,
-        sample_size=10,
+        sample_size=100,
         seed=42,
         llm_client=StubLLMClient(),
-        sampler=PersonaSampler(),
+        sampler=PersonaSampler(pool="nationwide"),
     )
-    assert result.metrics["sampling"]["sampling"] == "random"
+    assert result.metrics["sampling"]["sampling"] == "stratified"
+    assert result.metrics["persona_pool"] == "dgist"
+    rankings = result.metrics.get("tier_housing_matrix") or result.metrics.get("tier_rankings") or {}
+    # 학부생 등 실제 캠퍼스 계층이 비어 있지 않아야 한다.
+    staff_only = False
+    if "tier_rankings" in result.metrics:
+        counts = {k: v.get("n", 0) for k, v in result.metrics["tier_rankings"].items()}
+        staff_only = counts.get("교직원", 0) == result.total_responses
+    assert not staff_only
+    warnings = " ".join(result.metrics["sampling"].get("warnings") or [])
+    assert "DGIST" in warnings or "교직원" in warnings
