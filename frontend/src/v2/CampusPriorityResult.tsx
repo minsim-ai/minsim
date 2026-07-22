@@ -1,6 +1,7 @@
 import type { CampusPriorityMetrics } from '../types/api'
 
-const FALLBACK_TIER_ORDER = ['학부생', '석·박사 재학', '박사후연구원', '교직원']
+const CAMPUS_TIER_ORDER = ['학부생', '석·박사 재학', '박사후연구원', '교직원']
+const AGE_TIER_ORDER = ['10대', '20대', '30대', '40대', '50대', '60대', '70대+']
 
 /** Borda 점수를 최고점 대비 비율 막대로. 절대값은 항목 수에 따라 달라지므로 상대 비교만 의미가 있다. */
 function barWidth(score: number, max: number): string {
@@ -8,14 +9,33 @@ function barWidth(score: number, max: number): string {
   return `${Math.max(2, Math.round((score / max) * 100))}%`
 }
 
+function resolveTierAxis(metrics: CampusPriorityMetrics): { order: string[]; label: string } {
+  if (metrics.tier_axis?.length) {
+    return {
+      order: metrics.tier_axis,
+      label: metrics.tier_axis_label || (metrics.persona_pool === 'nationwide' ? '연령대' : '소속'),
+    }
+  }
+  // Legacy/mis-tagged results: prefer keys that actually have counts.
+  const rankingKeys = Object.keys(metrics.tier_rankings || {})
+  const ageKeys = AGE_TIER_ORDER.filter((key) => rankingKeys.includes(key))
+  if (ageKeys.length > 0 || metrics.persona_pool === 'nationwide') {
+    return { order: ageKeys.length ? ageKeys : AGE_TIER_ORDER, label: '연령대' }
+  }
+  return {
+    order: CAMPUS_TIER_ORDER,
+    label: metrics.tier_axis_label || '소속',
+  }
+}
+
 export function CampusPriorityResult({ metrics }: { metrics: CampusPriorityMetrics }) {
   const threshold = metrics.low_confidence_min_sample
   const rankingAvailable = metrics.ranking_available !== false && metrics.item_rows.length > 0
   const maxScore = metrics.item_rows[0]?.borda_score ?? 0
-  const tierOrder = metrics.tier_axis?.length ? metrics.tier_axis : FALLBACK_TIER_ORDER
-  const tierAxisLabel = metrics.tier_axis_label || '계층'
+  const { order: tierOrder, label: tierAxisLabel } = resolveTierAxis(metrics)
   const tiersWithData = tierOrder.filter((tier) => (metrics.tier_rankings[tier]?.n ?? 0) > 0)
   const validAnswers = metrics.valid_answer_count ?? 0
+  const sampleWarnings = metrics.sampling?.warnings ?? []
 
   if (!rankingAvailable) {
     const reason = metrics.ranking_suppressed_reason
@@ -55,8 +75,8 @@ export function CampusPriorityResult({ metrics }: { metrics: CampusPriorityMetri
 
   return (
     <div className="minsim-campus-priority">
-      {metrics.sampling.warnings.map((warning) => (
-        <div className="card" key={warning}>
+      {sampleWarnings.map((warning) => (
+        <div className="card" key={warning} role="status">
           <p className="muted" style={{ margin: 0 }}>
             표본 경고: {warning}
           </p>
