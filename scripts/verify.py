@@ -39,6 +39,9 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
+        # Block reintroduction of verification dumps, deploy plists, agent
+        # sessions, and absolute local path leaks into the public tree.
+        run(["uv", "run", "python", "scripts/check_public_tree_hygiene.py"])
         run(["uv", "run", "ruff", "check", "."])
         run(["uv", "run", "python", "evals/run_creative_fixture_eval.py"])
         run(["uv", "run", "python", "evals/run_result_envelope_fixture_eval.py"])
