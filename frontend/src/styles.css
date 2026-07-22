@@ -6257,15 +6257,258 @@ html[data-theme="minsim-dark"] {
   border-radius: var(--r);
 }
 
-/* Free-survey results: cards need explicit padding (base .card has none). */
-.minsim-open-survey {
+/* Free-survey / campus-priority results: cards need explicit padding (base .card has none). */
+.minsim-open-survey,
+.minsim-campus-priority {
   display: grid;
   gap: 14px;
 }
 
 .minsim-shell .minsim-open-survey > .card,
-.minsim-open-survey > .card {
+.minsim-open-survey > .card,
+.minsim-shell .minsim-campus-priority > .card,
+.minsim-campus-priority > .card {
   padding: 20px 22px;
+}
+
+/* Methodology sample age stacked bar — never rely on empty .row spans. */
+.minsim-sample-age-track {
+  display: flex;
+  align-items: stretch;
+  height: 16px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: var(--surface-3);
+  border: 1px solid var(--border-soft);
+  margin-bottom: 14px;
+}
+
+.minsim-sample-age-seg {
+  display: block;
+  height: 100%;
+  flex: none;
+  min-height: 100%;
+}
+
+.minsim-sample-age-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.minsim-sample-age-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--fg-dim);
+}
+
+.minsim-sample-age-legend-item i {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  flex: none;
+}
+
+.minsim-sample-age-legend-item b {
+  color: var(--fg);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Campus priority result blocks (parity with open-survey cards). */
+.minsim-campus-priority-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.minsim-campus-priority-card-head h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--fg);
+}
+
+.minsim-campus-priority-lead {
+  margin: 0 0 14px;
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+.minsim-campus-priority-options-label {
+  display: block;
+  color: var(--fg-faint);
+  font-size: 12px;
+  font-weight: 650;
+  margin-bottom: 8px;
+}
+
+.minsim-campus-priority-options ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.minsim-campus-priority-options li {
+  max-width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2, var(--bg-2));
+  color: var(--fg-dim);
+  padding: 8px 12px;
+  font-size: 13px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.minsim-campus-priority-bars {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.minsim-campus-priority-bar-meta {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--fg);
+}
+
+.minsim-campus-priority-bar-meta > span:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.minsim-campus-priority-bar-meta .lbl-mono {
+  flex: none;
+  white-space: nowrap;
+  color: var(--fg-dim);
+}
+
+.minsim-campus-priority-bar-track {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--surface-3, var(--surface-2));
+  border: 1px solid var(--border-soft);
+  overflow: hidden;
+}
+
+.minsim-campus-priority-bar-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--lime);
+}
+
+.minsim-campus-priority-callout {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm);
+  background: var(--surface-2, var(--bg-2));
+}
+
+.minsim-campus-priority-callout-badge {
+  flex: none;
+  margin-top: 2px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--lime-line);
+  background: var(--lime-soft);
+  color: var(--lime);
+  font-size: 11px;
+}
+
+.minsim-campus-priority-callout-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--fg);
+  line-height: 1.45;
+}
+
+.minsim-campus-priority-inversion-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.minsim-campus-priority-inversion-item {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm);
+  background: var(--surface-2, var(--bg-2));
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--fg);
+}
+
+.minsim-campus-priority-reasons {
+  display: grid;
+  gap: 14px;
+}
+
+.minsim-campus-priority-reason-group {
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm);
+  background: var(--surface-2, var(--bg-2));
+  padding: 14px 16px;
+}
+
+.minsim-campus-priority-reason-group h4 {
+  margin: 0 0 10px;
+  color: var(--fg);
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.minsim-campus-priority-reason-group ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 10px;
+}
+
+.minsim-campus-priority-reason-group li {
+  display: grid;
+  gap: 4px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border-soft);
+  color: var(--fg-dim);
+  font-size: 13.5px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.minsim-campus-priority-reason-group li:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.minsim-campus-priority-reason-group li .muted {
+  font-size: 12px;
 }
 
 .minsim-open-survey-card-head {
@@ -6583,7 +6826,9 @@ html[data-theme="minsim-dark"] {
 
 @media (max-width: 640px) {
   .minsim-shell .minsim-open-survey > .card,
-  .minsim-open-survey > .card {
+  .minsim-open-survey > .card,
+  .minsim-shell .minsim-campus-priority > .card,
+  .minsim-campus-priority > .card {
     padding: 16px;
   }
 
