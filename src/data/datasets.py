@@ -53,6 +53,7 @@ class PersonaDataset:
     def public_dict(self, data_dir: Path | None = None) -> dict[str, Any]:
         path = self.resolved_path(data_dir)
         available = path.exists() and path.is_file()
+        # No filesystem path or size_bytes — public /api/config must not leak host layout.
         return {
             "country_id": self.country_id,
             "country_name": self.country_name,
@@ -62,8 +63,6 @@ class PersonaDataset:
             "supports_region_filter": self.supports_region_filter,
             "supports_korea_map": self.supports_korea_map,
             "available": available,
-            "path": str(path),
-            "size_bytes": path.stat().st_size if available else None,
             "notes": self.notes,
         }
 

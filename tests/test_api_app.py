@@ -84,6 +84,43 @@ def test_api_config_exposes_only_public_contract_metadata() -> None:
     assert "model_aliases" not in data
     assert "langgraph_enabled" not in data
     assert "llm_agents_enabled" not in data
+    assert "test_login_url" not in data.get("auth", {})
+    assert "worker_count" not in data.get("event_mode", {})
+    assert "max_queued_runs" not in data.get("event_mode", {})
+    assert "free_run_limit" not in data.get("event_mode", {})
+    assert "/Users/" not in response.text
+    assert "koresim-runtime" not in response.text
+    for country in data.get("available_countries", []):
+        assert "path" not in country
+        assert "size_bytes" not in country
+
+
+def test_security_headers_present_on_public_health() -> None:
+    client = TestClient(create_app())
+    response = client.get("/api/health")
+    assert response.status_code == 200
+    assert response.headers.get("x-content-type-options") == "nosniff"
+    assert response.headers.get("x-frame-options") == "DENY"
+    assert "content-security-policy" in response.headers
+    assert "strict-transport-security" in response.headers
+
+
+def test_internal_health_redacts_filesystem_paths(monkeypatch) -> None:
+    monkeypatch.setenv("KORESIM_AUTH_SECRET", "test-secret")
+    monkeypatch.setenv("KORESIM_AUTH_COOKIE_SECURE", "false")
+    monkeypatch.setenv("KORESIM_AUTH_TEST_LOGIN_ENABLED", "true")
+    monkeypatch.setenv("KORESIM_AUTH_REQUIRED", "false")
+    client = TestClient(create_app())
+    client.get("/api/auth/test-login", follow_redirects=False)
+    response = client.get("/api/internal/health")
+    assert response.status_code == 200
+    assert "/Users/" not in response.text
+    assert "koresim-runtime" not in response.text
+    body = response.json()
+    assert body["scope"] == "authenticated-redacted"
+    for key in ("sqlite", "persona_data", "react_build"):
+        section = body.get(key) or {}
+        assert "path" not in section
 
 
 def test_static_seo_files_directory_index_head_and_cache(tmp_path) -> None:

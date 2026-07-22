@@ -51,6 +51,47 @@ def test_test_login_sets_signed_session_cookie(monkeypatch) -> None:
     assert session["user"]["email"] == "qa@example.com"
 
 
+def test_test_login_blocked_on_public_demo_host(monkeypatch) -> None:
+    monkeypatch.setenv("KORESIM_AUTH_SECRET", "test-secret")
+    monkeypatch.setenv("KORESIM_AUTH_COOKIE_SECURE", "false")
+    monkeypatch.setenv("KORESIM_AUTH_TEST_LOGIN_ENABLED", "true")
+    client = TestClient(create_app())
+
+    response = client.get(
+        "/api/auth/test-login?next=/app",
+        headers={"host": "arabesque.cc"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 404
+
+
+def test_csrf_enforced_when_enabled(monkeypatch) -> None:
+    monkeypatch.setenv("KORESIM_AUTH_SECRET", "test-secret")
+    monkeypatch.setenv("KORESIM_AUTH_COOKIE_SECURE", "false")
+    monkeypatch.setenv("KORESIM_AUTH_TEST_LOGIN_ENABLED", "true")
+    monkeypatch.setenv("KORESIM_AUTH_REQUIRED", "false")
+    monkeypatch.setenv("KORESIM_CSRF_ENFORCE", "true")
+    client = TestClient(create_app())
+    client.get("/api/auth/test-login", follow_redirects=False)
+    # Bootstrap CSRF cookie via any GET.
+    bootstrap = client.get("/api/auth/session")
+    assert bootstrap.status_code == 200
+    csrf = client.cookies.get("koresim_csrf")
+    assert csrf
+
+    denied = client.post("/api/projects", json={"name": "x", "kind": "venture"})
+    assert denied.status_code == 403
+    assert denied.json()["detail"]["code"] == "CSRF_FAILED"
+
+    allowed = client.post(
+        "/api/projects",
+        json={"name": "demo", "kind": "venture"},
+        headers={"X-CSRF-Token": csrf},
+    )
+    # May be 200/201 or validation 422 depending on schema — but not CSRF 403.
+    assert allowed.status_code != 403
+
+
 def test_logout_clears_session_cookie(monkeypatch) -> None:
     monkeypatch.setenv("KORESIM_AUTH_SECRET", "test-secret")
     monkeypatch.setenv("KORESIM_AUTH_COOKIE_SECURE", "false")
@@ -159,8 +200,11 @@ def test_authenticated_user_cannot_read_another_users_run_partials(monkeypatch) 
         "private-persona",
         {"uuid": "private-persona", "response": "private model output"},
     )
-    attacker = TestClient(app, base_url="https://arabesque.cc")
-    attacker.get("/api/auth/test-login", follow_redirects=False)
+    # Use default TestClient host (testserver) so test-login remains available
+    # for unit tests; production arabesque.cc blocks test-login separately.
+    attacker = TestClient(app)
+    login = attacker.get("/api/auth/test-login", follow_redirects=False)
+    assert login.status_code == 303
 
     response = attacker.get(f"/api/runs/{run.run_id}/partials")
 

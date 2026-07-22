@@ -19,13 +19,30 @@ export class APIError extends Error {
   }
 }
 
+function readCsrfCookie(): string | null {
+  if (typeof document === 'undefined') return null
+  const match = document.cookie.match(/(?:^|;\s*)koresim_csrf=([^;]+)/)
+  return match ? decodeURIComponent(match[1]) : null
+}
+
+function withCsrfHeaders(init?: RequestInit): Headers {
+  const headers = new Headers(init?.headers ?? {})
+  if (!headers.has('Content-Type') && init?.body != null) {
+    headers.set('Content-Type', 'application/json')
+  }
+  const method = (init?.method ?? 'GET').toUpperCase()
+  if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
+    const csrf = readCsrfCookie()
+    if (csrf) headers.set('X-CSRF-Token', csrf)
+  }
+  return headers
+}
+
 export async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
+    credentials: 'same-origin',
     ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(init?.headers ?? {}),
-    },
+    headers: withCsrfHeaders(init),
   })
 
   if (!isJsonResponse(response)) {
