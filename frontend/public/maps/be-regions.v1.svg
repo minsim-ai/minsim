@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<svg xmlns="http://www.w3.org/2000/svg" version="1.2" baseProfile="tiny" width="800" height="770" viewBox="0 0 800 770" stroke-linecap="round" stroke-linejoin="round">
+<g id="BEL-ADM1">
+<path d="M 375.77 278.71 414.69 244.07 427.52 287.02 375.77 278.71 Z" fill="#18213c" stroke="#52607a" stroke-width="1" id="BRU" data-shapename="Brussels Hoofdstedelijk"/>
+<path d="M 735.62 279.39 92.38 301.99 51.82 294.95 12 321.35 140.75 51.81 569.9 12 735.62 279.39 Z M 375.77 278.71 427.52 287.02 414.69 244.07 375.77 278.71 Z" fill-rule="evenodd" fill="#18213c" stroke="#52607a" stroke-width="1" id="VLG" data-shapename="Vlaams Gewest"/>
+<path d="M 734.18 301.47 788 302.36 660.26 757.8 92.38 301.99 735.62 279.39 734.18 301.47 Z" fill="#18213c" stroke="#52607a" stroke-width="1" id="WAL" data-shapename="Wallonne Gewest"/>
+</g>
+</svg>

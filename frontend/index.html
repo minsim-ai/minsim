@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=20260721" />
+    <link rel="icon" type="image/png" sizes="64x64" href="/favicon-64.png?v=20260721" />
+    <link rel="apple-touch-icon" href="/logo-mark-512.png?v=20260721" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="제품 한 줄로 합성 페르소나 패널의 반응과 결과 리포트를 만드는 minsim 시장 반응 시뮬레이션입니다." />
+    <meta name="robots" content="index,follow,max-image-preview:large" />
+    <link rel="canonical" href="https://arabesque.cc/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="minsim" />
+    <meta property="og:title" content="minsim — 출시 전 시장 반응 시뮬레이션" />
+    <meta property="og:description" content="제품 한 줄로 합성 페르소나 패널의 반응과 결과 리포트를 만드는 minsim 시장 반응 시뮬레이션입니다." />
+    <meta property="og:url" content="https://arabesque.cc/" />
+    <meta property="og:image" content="https://arabesque.cc/OG_image.png?v=20260721" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="minsim AI persona simulation preview" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="minsim — 출시 전 시장 반응 시뮬레이션" />
+    <meta name="twitter:description" content="제품 한 줄로 합성 페르소나 패널의 반응과 결과 리포트를 만드는 minsim 시장 반응 시뮬레이션입니다." />
+    <meta name="twitter:image" content="https://arabesque.cc/OG_image.png?v=20260721" />
+    <title>minsim — 출시 전 시장 반응 시뮬레이션</title>
+    <script>
+      (() => {
+        try {
+          const stored = window.localStorage.getItem('minsim.theme')
+          // OS 설정은 따르지 않는다. 라이트가 기본이고 다크는 사용자가 고를 때만 적용한다.
+          const dark = stored === 'dark'
+          document.documentElement.dataset.theme = dark ? 'minsim-dark' : 'minsim'
+          document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
+        } catch {
+          document.documentElement.dataset.theme = 'minsim'
+          document.documentElement.style.colorScheme = 'light'
+        }
+      })()
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": "https://arabesque.cc/#organization",
+            "name": "minsim",
+            "url": "https://arabesque.cc/",
+            "logo": "https://arabesque.cc/organization/logo-a.png",
+            "sameAs": ["https://waterfall.run/"]
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://arabesque.cc/#website",
+            "name": "minsim",
+            "url": "https://arabesque.cc/",
+            "inLanguage": "ko-KR",
+            "publisher": { "@id": "https://arabesque.cc/#organization" }
+          },
+          {
+            "@type": "SoftwareApplication",
+            "@id": "https://arabesque.cc/#software",
+            "name": "minsim",
+            "applicationCategory": "BusinessApplication",
+            "operatingSystem": "Web",
+            "url": "https://arabesque.cc/",
+            "description": "합성 페르소나 패널로 가격, 캠페인, 메시지, 신제품 반응을 빠르게 검증하는 시장 반응 시뮬레이션입니다.",
+            "offers": { "@type": "Offer", "price": "0", "priceCurrency": "KRW" },
+            "publisher": { "@id": "https://arabesque.cc/#organization" }
+          },
+          {
+            "@type": "FAQPage",
+            "@id": "https://arabesque.cc/#faq",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "minsim은 어떤 문제를 해결하나요?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "가격, 광고 카피, 신제품 반응, 시장 세분화 같은 제품·마케팅 의사결정을 합성 페르소나 시뮬레이션으로 빠르게 사전 검증합니다."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "실제 시장조사를 대체하나요?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "중요 의사결정에서는 실제 인터뷰와 설문을 보완하는 도구로 사용하는 것이 적합합니다. 어떤 가설을 더 깊게 검증할지 좁히는 데 초점을 둡니다."
+                }
+              }
+            ]
+          }
+        ]
+      }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,100 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+.Python
+
+# 가상환경
+.venv/
+venv/
+env/
+
+# 환경변수 (시크릿 포함 가능)
+.env
+.env.local
+.env.*.local
+client_secret*.json
+*_client_secret*.json
+oauth_client*.json
+google-oauth*.json
+
+# 데이터셋 (GitHub 100MB 제한 + multi-GB Nemotron personas)
+data/*.parquet
+data/personas/
+data/*.log
+data/runtime/
+*.sqlite3
+*.sqlite3-*
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Frontend build / deps
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+node_modules/
+dist/
+
+# IDE / local tooling
+.vscode/
+.idea/
+*.swp
+*.swo
+.ruff_cache/
+.gstack/
+.superpowers/
+.gjc/
+.mypy_cache/
+
+# Feature worktrees (local only)
+.worktrees/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 로그·임시
+*.log
+*.tmp
+.cache/
+
+# 노트북 체크포인트
+.ipynb_checkpoints/
+
+# 테스트 / 커버리지 / 브라우저 산출물
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+test-results/
+frontend/test-results/
+frontend/playwright-report/
+playwright-report/
+coverage/
+
+# Claude·Wrangler·로컬 에이전트
+.claude/
+.wrangler/
+
+# 내부 운영·검증 산출물 (공개 리포에 올리지 않음)
+docs/verification/
+docs/execution/
+docs/runbooks/
+docs/phases/
+docs/reports/
+docs/superpowers/
+docs/diff-explanations/
+docs/research/
+docs/templates/
+deploy/
+.gjc/
+
+# Accidental local tool caches
+.vite/
+app/
+data/personas/
+.tmp-payloads.json
+.tmp-intake-payloads.json

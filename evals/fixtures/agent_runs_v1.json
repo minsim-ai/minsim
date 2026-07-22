@@ -1,0 +1,53 @@
+{
+  "name": "agent-runs-v1",
+  "cases": [
+    {
+      "id": "creative-agent-happy-path",
+      "forbidden_terms": ["private-profile"],
+      "agent_outputs": {
+        "analysis": {
+          "summary": "A안이 B안보다 강한 선호를 보입니다.",
+          "key_findings": ["A안 선택 비중이 높습니다."],
+          "segment_notes": ["20대와 30대에서 반응이 안정적입니다."]
+        },
+        "report": {
+          "headline": "A안을 다음 캠페인 기준안으로 권장합니다.",
+          "recommendations": ["A안을 기준으로 후속 가격 테스트를 진행합니다."],
+          "risks": ["표본 수가 작으면 방향성 검증으로만 해석합니다."]
+        },
+        "qa": {
+          "passed": true,
+          "warnings": [],
+          "review_notes": ["필수 agent output field가 모두 있습니다."]
+        }
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "id": "raw-payload-leak-detected",
+      "forbidden_terms": ["private-profile"],
+      "agent_outputs": {
+        "analysis": {
+          "summary": "private-profile 원문이 노출되었습니다.",
+          "key_findings": ["A안 선택 비중이 높습니다."],
+          "segment_notes": []
+        },
+        "report": {
+          "headline": "A안을 다음 캠페인 기준안으로 권장합니다.",
+          "recommendations": ["A안을 기준으로 후속 가격 테스트를 진행합니다."],
+          "risks": []
+        },
+        "qa": {
+          "passed": true,
+          "warnings": [],
+          "review_notes": []
+        }
+      },
+      "expected": {
+        "ok": false
+      }
+    }
+  ]
+}
