@@ -18,6 +18,11 @@ from src.api.auth import (
     set_local_dev_session_cookie,
 )
 from src.api.routes import router
+from src.api.security import (
+    apply_security_headers,
+    ensure_csrf_cookie,
+    mutating_request_blocked,
+)
 from src.api.static import install_static_routes
 from src.jobs.queue import enqueue_run
 from src.jobs.store import SQLiteRunStore
@@ -38,6 +43,19 @@ def create_app(
     app.state.run_store = store or SQLiteRunStore()
     app.state.enqueue_run = enqueue_run_func or enqueue_run
     app.state.llm_client = llm_client
+
+    @app.middleware("http")
+    async def security_headers_and_csrf(request: Request, call_next):
+        blocked = mutating_request_blocked(request)
+        if blocked is not None:
+            apply_security_headers(blocked)
+            ensure_csrf_cookie(blocked, request)
+            return blocked
+        response = await call_next(request)
+        apply_security_headers(response)
+        # Keep a CSRF cookie available for same-origin SPA mutations.
+        ensure_csrf_cookie(response, request)
+        return response
 
     @app.middleware("http")
     async def require_app_session(request: Request, call_next):

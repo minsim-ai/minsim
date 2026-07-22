@@ -48,13 +48,14 @@ BLOCKED_BASENAMES = {
 
 # Built in pieces so this file does not contain a literal local path string
 # that would trip the staged-content scanner.
+_RUNTIME_MARK = "koresim" + "-" + "runtime" + "/"
 LOCAL_PATH_RE = re.compile(
     "(?:"
     + "/".join(["", "Users", r"[A-Za-z0-9._-]+"])
     + "|"
     + "/".join(["", "home", r"[A-Za-z0-9._-]+"])
     + "|"
-    + "koresim-runtime/"
+    + re.escape(_RUNTIME_MARK)
     + ")"
 )
 

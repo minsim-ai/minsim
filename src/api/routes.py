@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -11,6 +12,8 @@ from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, Request
 from starlette.responses import RedirectResponse, StreamingResponse
+
+logger = logging.getLogger("koresim.api")
 
 from src.api.schemas import (
     DemoPreset,
@@ -164,12 +167,14 @@ def _is_llm_connection_error(exc: BaseException) -> bool:
 
 
 def _llm_unavailable(exc: BaseException) -> HTTPException:
+    # Log server-side detail; never echo raw provider/path text to the client.
+    logger.warning("LLM unavailable: %s", str(exc)[:300])
     return _error(
         502,
         ErrorResponse(
             code=ErrorCode.LLM_UNAVAILABLE,
             message="AI 연결에 실패했습니다. 잠시 후 다시 시도해주세요.",
-            details={"error": str(exc)[:300]},
+            details={"error": "llm_unavailable"},
         ),
     )
 
@@ -493,17 +498,20 @@ async def api_health(request: Request) -> dict[str, object]:
 
 @router.get("/api/internal/health")
 async def api_internal_health(request: Request) -> dict[str, object]:
-    runtime = collect_runtime_health(_store(request))
+    from src.api.security import redact_runtime_health
+
+    _require_user(request)
+    runtime = redact_runtime_health(collect_runtime_health(_store(request)))
     return {
         "ok": runtime["ok"],
         "service": "koresim-api",
-        "scope": "authenticated-detail",
-        "sqlite": runtime["sqlite"],
-        "redis": runtime["redis"],
-        "queue": runtime["queue"],
-        "persona_data": runtime["persona_data"],
-        "react_build": runtime["react_build"],
-        "model_provider": runtime["model_provider"],
+        "scope": "authenticated-redacted",
+        "sqlite": runtime.get("sqlite"),
+        "redis": runtime.get("redis"),
+        "queue": runtime.get("queue"),
+        "persona_data": runtime.get("persona_data"),
+        "react_build": runtime.get("react_build"),
+        "model_provider": runtime.get("model_provider"),
         "llm_backend": LLM_BACKEND,
         "langgraph_enabled": ENABLE_LANGGRAPH,
         "llm_agents_enabled": ENABLE_LLM_AGENTS,
@@ -512,11 +520,14 @@ async def api_internal_health(request: Request) -> dict[str, object]:
 
 @router.get("/api/config")
 async def api_config() -> dict[str, object]:
-    from src.config import DEFAULT_COUNTRY_ID, WORKER_COUNT
+    from src.api.security import public_config_auth_block
+    from src.config import DEFAULT_COUNTRY_ID
     from src.data.datasets import available_countries
     from src.runtime.event_mode import event_config_snapshot, event_mode_enabled
 
     event = event_config_snapshot()
+    # Public config is intentionally UI-oriented only: no filesystem paths,
+    # no test-login URL, no worker/LLM provider inventory.
     return {
         "service": "koresim-api",
         "max_sample_size": event.max_sample_size if event.enabled else MAX_SAMPLE_SIZE,
@@ -533,21 +544,13 @@ async def api_config() -> dict[str, object]:
             "enabled": event_mode_enabled(),
             "default_sample_size": event.default_sample_size,
             "max_sample_size": event.max_sample_size,
-            "max_queued_runs": event.max_queued_runs,
-            "worker_count": WORKER_COUNT,
-            "free_run_limit": event.free_run_limit,
             "banner": (
                 "행사장 체험 모드 · 권장 표본 100명 · 대기 시 1–2분"
                 if event_mode_enabled()
                 else None
             ),
         },
-        "auth": {
-            "session_url": "/api/auth/session",
-            "login_url": "/api/auth/google/login",
-            "logout_url": "/api/auth/logout",
-            "test_login_url": "/api/auth/test-login",
-        },
+        "auth": public_config_auth_block(),
     }
 
 
@@ -709,8 +712,8 @@ async def auth_google_callback(request: Request) -> RedirectResponse:
 
 
 @router.get("/api/auth/test-login")
-async def auth_test_login(next: str = "/app") -> RedirectResponse:
-    return build_test_login_response(next_url=next)
+async def auth_test_login(request: Request, next: str = "/app") -> RedirectResponse:
+    return build_test_login_response(next_url=next, request=request)
 
 
 @router.post("/api/auth/logout")

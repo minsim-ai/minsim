@@ -200,9 +200,28 @@ def test_project_run_actions_reject_other_users(tmp_path, monkeypatch) -> None:
         assert response.status_code == 404
 
 
+class _InterviewFakeLLM:
+    async def generate(self, request):  # noqa: ANN001
+        from src.llm.base import LLMResponse
+
+        return LLMResponse(
+            content='{"answer": "가격이 부담되지 않아서요.", "confidence": 0.8}',
+            provider="fake",
+            provider_model="fake-model",
+            trace_id="trace-interview",
+            metadata={"task_type": getattr(request, "task_type", None)},
+        )
+
+
 def test_project_interview_thread_persists_messages_and_rejects_unknown_subject(tmp_path, monkeypatch) -> None:
     store = SQLiteRunStore(tmp_path / "runs.sqlite3")
-    client = TestClient(create_app(store=store, enqueue_run_func=lambda run_id: f"job-{run_id}"))
+    client = TestClient(
+        create_app(
+            store=store,
+            enqueue_run_func=lambda run_id: f"job-{run_id}",
+            llm_client=_InterviewFakeLLM(),
+        )
+    )
     _login(client, monkeypatch, "owner@example.com")
     project = client.post("/api/projects", json={"name": "Interview project"}).json()
     created_run = client.post(

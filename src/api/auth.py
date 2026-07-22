@@ -32,7 +32,31 @@ def auth_required() -> bool:
 
 
 def test_login_enabled() -> bool:
+    """Env flag only. Host gating is applied in test_login_allowed_for_request()."""
     return os.getenv("KORESIM_AUTH_TEST_LOGIN_ENABLED", "").lower() in {"1", "true", "yes"}
+
+
+def test_login_allowed_for_request(request: Request) -> bool:
+    """Test login is off by default and always blocked on the public demo apex.
+
+    Even if KORESIM_AUTH_TEST_LOGIN_ENABLED=true is mis-set on arabesque.cc,
+    the route stays disabled there so the E2E bypass cannot be used live.
+    Staging/test hosts may enable the flag; production apex never can.
+    """
+    if not test_login_enabled():
+        return False
+    host = (request.url.hostname or "").lower()
+    blocked = {
+        item.strip().lower()
+        for item in os.getenv(
+            "KORESIM_AUTH_TEST_LOGIN_BLOCKED_HOSTS",
+            "arabesque.cc,www.arabesque.cc",
+        ).split(",")
+        if item.strip()
+    }
+    if host in blocked:
+        return False
+    return True
 
 
 def local_dev_auto_login_enabled(request: Request) -> bool:
@@ -55,13 +79,15 @@ def session_summary(request: Request) -> dict[str, Any]:
     user = read_session_user(request)
     if user is None and auth_required() and local_dev_auto_login_enabled(request):
         user = local_dev_user()
+    # Never advertise test-login availability on the public demo host.
+    test_enabled = test_login_allowed_for_request(request)
     return {
         "authenticated": user is not None,
         "user": user,
         "provider": user.get("provider") if user else None,
         "auth_enabled": auth_enabled(),
         "auth_required": auth_required(),
-        "test_login_enabled": test_login_enabled(),
+        "test_login_enabled": test_enabled,
         "login_url": "/api/auth/google/login",
         "logout_url": "/api/auth/logout",
     }
@@ -74,8 +100,16 @@ def read_session_user(request: Request) -> dict[str, Any] | None:
     return _loads_signed(token, purpose="session", max_age_seconds=SESSION_MAX_AGE_SECONDS)
 
 
-def build_test_login_response(next_url: str = "/app") -> RedirectResponse:
-    if not test_login_enabled():
+def build_test_login_response(
+    next_url: str = "/app",
+    *,
+    request: Request | None = None,
+) -> RedirectResponse:
+    if request is not None:
+        allowed = test_login_allowed_for_request(request)
+    else:
+        allowed = test_login_enabled()
+    if not allowed:
         raise HTTPException(status_code=404, detail="Test login is disabled.")
     user = {
         "id": "test-user",
