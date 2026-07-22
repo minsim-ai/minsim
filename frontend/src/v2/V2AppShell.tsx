@@ -67,45 +67,55 @@ export function V2AppShell({ route, children }: Props) {
       </header>
       <div className="minsim-flow-rail">
         <ol className="wrap row" aria-label="시뮬레이션 진행 단계">
-          {stages.map((stage, index) => {
-            const href = stageHref(stage.id, route)
-            const isActive = index === activeIndex
-            const isComplete = index < activeIndex
-            const canNavigate = Boolean(href) && !isActive
-            const className = [
-              isComplete ? 'complete' : '',
-              isActive ? 'active' : '',
-              canNavigate ? 'is-clickable' : '',
-              !href ? 'is-locked' : '',
-            ]
-              .filter(Boolean)
-              .join(' ')
+          {(() => {
+            // Resolve once so session memory is written and results stay linked
+            // after navigating back to type/intake (those routes omit run_id).
+            const resultsHref = stageHref('results', route)
+            const resultsAvailable = Boolean(resultsHref) && route.page !== 'loading'
+            const resultsIndex = stages.findIndex((stage) => stage.id === 'results')
 
-            return (
-              <li
-                className={className}
-                aria-current={isActive ? 'step' : undefined}
-                key={stage.id}
-              >
-                {canNavigate && href ? (
-                  <button
-                    type="button"
-                    className="minsim-flow-step-button"
-                    onClick={() => navigateTo(href)}
-                    aria-label={`${index + 1}. ${stage.label} 단계로 이동`}
-                  >
-                    <b>{index + 1}</b>
-                    <span>{stage.label}</span>
-                  </button>
-                ) : (
-                  <span className="minsim-flow-step-static" aria-disabled={!href || isActive ? true : undefined}>
-                    <b>{index + 1}</b>
-                    <span>{stage.label}</span>
-                  </span>
-                )}
-              </li>
-            )
-          })}
+            return stages.map((stage, index) => {
+              const href = stage.id === 'results' ? resultsHref : stageHref(stage.id, route)
+              const isActive = index === activeIndex
+              const isComplete =
+                !isActive &&
+                (index < activeIndex || (resultsAvailable && index <= resultsIndex))
+              const canNavigate = Boolean(href) && !isActive
+              const className = [
+                isComplete ? 'complete' : '',
+                isActive ? 'active' : '',
+                canNavigate ? 'is-clickable' : '',
+                !href ? 'is-locked' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')
+
+              return (
+                <li
+                  className={className}
+                  aria-current={isActive ? 'step' : undefined}
+                  key={stage.id}
+                >
+                  {canNavigate && href ? (
+                    <button
+                      type="button"
+                      className="minsim-flow-step-button"
+                      onClick={() => navigateTo(href)}
+                      aria-label={`${index + 1}. ${stage.label} 단계로 이동`}
+                    >
+                      <b>{index + 1}</b>
+                      <span>{stage.label}</span>
+                    </button>
+                  ) : (
+                    <span className="minsim-flow-step-static" aria-disabled={!href || isActive ? true : undefined}>
+                      <b>{index + 1}</b>
+                      <span>{stage.label}</span>
+                    </span>
+                  )}
+                </li>
+              )
+            })
+          })()}
         </ol>
       </div>
       <main className="v2-main screen" id="main-content" aria-hidden={needsOnboarding || undefined}>

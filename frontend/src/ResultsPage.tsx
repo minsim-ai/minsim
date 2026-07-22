@@ -13,6 +13,7 @@ import {
 } from './simulations/registry'
 import type { JsonObject, RawPersonaResult, RunResultEnvelope, RunSnapshot } from './types/api'
 import { personaDisplayName } from './v2/personaDisplay'
+import { isMethodologyDisclaimer } from './v2/minsimReport'
 
 const CHOICE_COLORS = ['#0066FF', '#00A878', '#7C3AED', '#D97706', '#64748B']
 const KOREA_PROVINCE_MAP_PATH = '/maps/korea-provinces.svg'
@@ -1150,17 +1151,16 @@ function TrustLayer({
           <TargetFilterSummary targetFilter={result.target_filter} />
         </div>
       </div>
-      {result.warnings.length > 0 && (
+      {result.warnings.filter((warning) => !isMethodologyDisclaimer(warning)).length > 0 && (
         <div className="ks-report-warning">
           <p>해석 유의사항</p>
           <ul>
-            {result.warnings.map((warning) => <li key={warning}>{warning}</li>)}
+            {result.warnings
+              .filter((warning) => !isMethodologyDisclaimer(warning))
+              .map((warning) => <li key={warning}>{warning}</li>)}
           </ul>
         </div>
       )}
-      <p className="ks-report-disclaimer">
-        본 결과는 NVIDIA {result.dataset_name?.trim() || (result.country_id && result.country_id !== 'kr' ? `Nemotron-Personas-${result.country_id.toUpperCase()}` : 'Nemotron-Personas-Korea')}(CC BY 4.0) 기반 synthetic persona 시뮬레이션입니다. 실제 설문, 시장 점유율, 수요 보장을 의미하지 않으며 의사결정 전 보조 검증 자료로 사용해야 합니다.
-      </p>
     </Section>
   )
 }

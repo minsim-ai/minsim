@@ -120,9 +120,6 @@ def build_generic_result_envelope(
         warnings=quality_warnings(
             result.total_responses,
             result.parse_failed,
-            extra=[
-                "시뮬레이션 결과는 합성 페르소나 기반 추산값이며 실제 시장조사를 대체하지 않습니다."
-            ],
         ),
         metrics=result.metrics,
         segments=result.segments,

@@ -122,7 +122,10 @@ export function OpenSurveyResult({ metrics }: { metrics: OpenSurveyMetrics }) {
                   {reasons.map((item) => (
                     <li key={item.reason}>
                       <span>{item.reason}</span>
-                      <span className="muted">({item.count}명)</span>
+                      {/* Free-text reasons almost never cluster, so count=1 after every quote is noise. */}
+                      {item.count > 1 ? (
+                        <span className="muted">({item.count}명)</span>
+                      ) : null}
                     </li>
                   ))}
                 </ul>
