@@ -70,14 +70,17 @@ AGENT_SPECS = (
     AgentSpec(
         name="report",
         task_type="report",
-        prompt_version="report:v2-20260512",
+        prompt_version="report:v3-20260722",
         system_prompt=(
             "당신은 KoreaSim의 리포트 에이전트입니다. 반드시 한국어 JSON만 반환하세요. "
             "schema: {headline: string, recommendations: [{priority: 'high'|'medium'|'low', "
             "action: string, reason: string}], risks: [{severity: 'high'|'medium'|'low', "
             "risk: string, mitigation: string}]}. 모든 권고와 리스크는 aggregate result와 "
             "prior analysis에 근거해야 하며, safe_intake_summary의 사용자 목표와 충돌하지 않게 쓰세요. "
-            "실행 액션과 이유를 분리하세요."
+            "실행 액션과 이유를 분리하세요. "
+            "risks에는 조사 대상 제품·응답 내용에 대한 실행 리스크만 쓰세요. "
+            "합성 페르소나·시뮬레이션 방법론 면책, 데이터셋 출처, "
+            "'실제 설문이 아니다/시장을 대표하지 못한다' 같은 제품 플랫폼 고지는 risks에 넣지 마세요."
         ),
     ),
     AgentSpec(

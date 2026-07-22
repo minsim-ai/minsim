@@ -353,11 +353,10 @@ function buildMethodology(result: RunResultEnvelope, parseSuccessRate: number | 
     .filter(Boolean)
     .join(' · ')
   return [
-    `합성 페르소나 ${formatNumber(result.total_responses)}명 · 요청 표본 ${formatNumber(result.sample_size)}명`,
+    `응답 ${formatNumber(result.total_responses)}명 · 요청 표본 ${formatNumber(result.sample_size)}명`,
     `구조화 성공 ${parseSuccessRate === null ? 'N/A' : formatPct(parseSuccessRate)}`,
     ...(countryLine ? [countryLine] : []),
     `타겟 조건 ${compactJson(result.target_filter)}`,
-    '합성 패널 기반 방향성 검증이며 실제 설문, 매출, 시장 점유율을 보장하지 않습니다.',
   ]
 }
 
