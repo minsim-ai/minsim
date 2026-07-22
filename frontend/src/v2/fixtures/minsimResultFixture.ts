@@ -539,8 +539,8 @@ export function runMinsimResultFixtureCheck(): MinsimResultFixtureCheck {
   if (!usFemale || !usMale) {
     failures.push('expected US Female/Male gender rows')
   }
-  if (!usReport.disclaimer.includes('Nemotron-Personas-USA')) {
-    failures.push(`expected USA dataset disclaimer, got ${usReport.disclaimer}`)
+  if (usReport.disclaimer) {
+    failures.push(`expected empty result disclaimer (landing-only), got ${usReport.disclaimer}`)
   }
 
   return {

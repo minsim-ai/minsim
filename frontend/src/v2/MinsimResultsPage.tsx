@@ -451,9 +451,11 @@ function MinimalReportView({
       </p>
       <div className="card" style={{ padding: 20, marginTop: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
         <span className="lbl-mono">상태 {envelope.status} · 유효 응답 {envelope.total_responses}명 · 파싱 실패 {envelope.parse_failed}건</span>
-        {(envelope.warnings ?? []).map((warning) => (
-          <p key={warning} className="muted" style={{ fontSize: 12.5, margin: 0 }}>· {warning}</p>
-        ))}
+        {(envelope.warnings ?? [])
+          .filter((warning) => !/합성\s*페르소나|실제\s*시장조사를\s*대체|Nemotron-Personas/i.test(warning))
+          .map((warning) => (
+            <p key={warning} className="muted" style={{ fontSize: 12.5, margin: 0 }}>· {warning}</p>
+          ))}
         <details>
           <summary className="lbl">집계 지표 원본 ({Object.keys(metrics).length}개)</summary>
           <pre style={{ fontSize: 11, overflowX: 'auto', maxHeight: 320 }}>{JSON.stringify(metrics, null, 2)}</pre>
@@ -1393,7 +1395,7 @@ function RegionDetailPanel({
 }
 
 function Methodology({ report }: { report: MinsimReport }) {
-  const { sampleAge, sampleRegion, run, disclaimer } = report
+  const { sampleAge, sampleRegion, run } = report
   const maxReg = Math.max(1, ...sampleRegion.map(([, n]) => n))
   const totalAge = sampleAge.reduce((sum, [, n]) => sum + n, 0)
   return (
@@ -1457,7 +1459,6 @@ function Methodology({ report }: { report: MinsimReport }) {
           <div className="lbl" style={{ marginTop: run.ts ? 8 : 0 }}>타깃 조건 · 무직 제외 <span style={{ color: 'var(--fg)' }}>{run.excludeUnemployed ? '예' : '아니오'}</span></div>
         </div>
       </div>
-      <div className="card card-2" style={{ padding: '14px 18px', marginTop: 12, fontSize: 12.5, lineHeight: 1.6, color: 'var(--fg-faint)' }}>{disclaimer}</div>
     </section>
   )
 }

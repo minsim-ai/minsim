@@ -626,7 +626,7 @@ function ChatBubble({ item }: { item: IntakeSession['messages'][number] }) {
 function composerPlaceholder(slotIds: string[], simulationType: SimulationType): string {
   if (slotIds.includes('options')) {
     return simulationType === 'open_survey'
-      ? '위 설문 질문에 맞는 선택지를 적어주세요. 예: OO당 / OO의힘 / 무당층'
+      ? '위 설문 질문에 맞는 선택지를 적어주세요. 예: 매우 관심 있음 / 관심 있음 / 보통 / 관심 없음 / 잘 모름'
       : '선택지 2~6개를 줄바꿈·쉼표·/ 로 적어주세요.'
   }
   if (slotIds.includes('items')) {

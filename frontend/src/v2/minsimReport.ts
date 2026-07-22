@@ -365,7 +365,8 @@ export function buildMinsimReport(result: RunResultEnvelope, options: { complete
     sampleRegion: buildSampleRegion(displaySegments, isRecord(result.sample_summary) ? result.sample_summary : null),
     crowd: buildCrowd(result.raw_results),
     quotes: buildQuotes(result.raw_results),
-    disclaimer: buildDisclaimer(result),
+    // Method disclaimers stay on the landing page only — not in result reports.
+    disclaimer: '',
   }
   return { ...report, finalSummary: buildFinalSummary(report) }
 }
@@ -413,7 +414,7 @@ function buildAgentView(result: RunResultEnvelope): AgentView {
         ? [{ title: `${name} 단계가 fallback으로 처리됨`, body: asString(output.fallback_reason) ?? '원본 AI 단계 실패' }]
         : []
     )),
-  ]
+  ].filter((item) => !isMethodologyDisclaimer(`${item.title} ${item.body}`))
 
   return {
     headline: asString(report.headline) ?? '',
@@ -422,6 +423,25 @@ function buildAgentView(result: RunResultEnvelope): AgentView {
     actions,
     watch,
   }
+}
+
+/**
+ * Product-method disclaimers belong on the landing page, not inside a survey
+ * report. Filtering here also covers already-generated agent risks that restate
+ * "synthetic persona / not a real survey" instead of the researched product.
+ */
+export function isMethodologyDisclaimer(text: string): boolean {
+  const t = text.trim()
+  if (!t) return false
+  if (/합성\s*페르소나/.test(t)) return true
+  if (/합성\s*패널\s*기반/.test(t)) return true
+  if (/Nemotron-Personas/i.test(t)) return true
+  if (/실제\s*시장조사를\s*대체/.test(t)) return true
+  if (/실제\s*설문[·\s,]*시장\s*점유율/.test(t)) return true
+  if (/수요\s*보장을\s*의미하지/.test(t)) return true
+  if (/의사결정\s*전\s*보조\s*검증/.test(t)) return true
+  if (/CC\s*BY\s*4\.0/.test(t) && /시뮬레이션/.test(t)) return true
+  return false
 }
 
 function buildJudgeBody(
@@ -1213,15 +1233,6 @@ function buildQuotes(rawResults: RawPersonaResult[]): MinsimReport['quotes'] {
 function extractReason(response: string): string {
   const match = /이유[:：]\s*([^\n]+)/.exec(response)
   return match ? match[1].trim() : ''
-}
-
-function buildDisclaimer(result: RunResultEnvelope): string {
-  const dataset = typeof result.dataset_name === 'string' && result.dataset_name.trim()
-    ? result.dataset_name.trim()
-    : result.country_id && result.country_id !== 'kr'
-      ? `Nemotron-Personas-${result.country_id.toUpperCase()}`
-      : 'Nemotron-Personas-Korea'
-  return `본 결과는 NVIDIA ${dataset}(CC BY 4.0) 기반 합성 페르소나 시뮬레이션입니다. 실제 설문·시장 점유율·수요 보장을 의미하지 않으며, 의사결정 전 보조 검증 자료로 사용해야 합니다.`
 }
 
 /** Re-export legacy helper for any external callers. Prefer personaDisplayName. */
