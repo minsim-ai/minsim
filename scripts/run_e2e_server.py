@@ -22,9 +22,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 os.environ.setdefault("LLM_BACKEND", "fake")
 os.environ.setdefault("OBSERVABILITY_PROVIDER", "none")
 os.environ.setdefault("ENABLE_LLM_AGENTS", "true")
+# HTTP loopback only — Secure cookies would never be stored by Playwright.
+os.environ["KORESIM_AUTH_COOKIE_SECURE"] = "false"
 os.environ["KORESIM_AUTH_REQUIRED"] = "true"
 os.environ["KORESIM_AUTH_LOCAL_DEV_AUTO_LOGIN"] = "true"
 os.environ["KORESIM_AUTH_SECRET"] = secrets.token_urlsafe(32)
+# CSRF remains on; e2e helpers send X-CSRF-Token after session bootstrap.
+os.environ.setdefault("KORESIM_CSRF_ENFORCE", "true")
 
 
 def main() -> int:

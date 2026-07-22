@@ -2,6 +2,7 @@ import { mkdir } from 'node:fs/promises'
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import { minsimResultFixture } from '../src/v2/fixtures/minsimResultFixture'
 import { countryMapRegionManifest } from './fixtures/country-map-region-manifest'
+import { apiPost } from './helpers/api'
 
 const EVIDENCE_DIR = '../docs/verification/deploy/mobile-ui-20260718'
 const evidencePhase = process.env.MOBILE_UX_EVIDENCE_PHASE ?? 'final'
@@ -137,19 +138,19 @@ test('mobile intake shows collapsible prior project context', async ({ page }) =
   await page.goto(`/projects/${projectId}/intake?type=open_survey`)
   const context = page.locator('details.minsim-intake-context')
   await expect(context).toBeVisible()
-  await expect(context).not.toHaveAttribute('open', '')
+  // Product default: prior context starts expanded so booth users see history first.
+  await expect(context).toHaveAttribute('open', '')
   await expect(context.getByText('이전 입력')).toBeVisible()
   await expect(context.getByText('자유 설문').first()).toBeVisible()
-
-  await context.locator('summary').click()
-  await expect(context).toHaveAttribute('open', '')
-  await expect(context.getByText('늦을 때 2~3명 동승이 혼자 택시보다 합리적일지 확인')).toBeVisible()
-  await expect(context.getByText('학내 택시 카풀 배경 메모')).toBeVisible()
+  await expect(context.getByText('늦을 때 2~3명 동승이 혼자 택시보다 합리적일지 확인').first()).toBeVisible()
+  await expect(context.getByText('학내 택시 카풀 배경 메모').first()).toBeVisible()
   // Type change stays outside the collapsible for one-tap access.
   await expect(page.getByRole('button', { name: '변경', exact: true })).toBeVisible()
 
   await context.locator('summary').click()
   await expect(context).not.toHaveAttribute('open', '')
+  await context.locator('summary').click()
+  await expect(context).toHaveAttribute('open', '')
 })
 
 test('mobile simulation type grid stays two columns', async ({ page }) => {
@@ -512,11 +513,9 @@ test('mobile shell preserves the working viewport', async ({ page }) => {
 })
 
 test('mobile intake exposes touch-safe actions', async ({ page, request }) => {
-  const response = await request.post('/api/projects', {
-    data: {
-      name: `모바일 UX ${Date.now()}`,
-      description: '모바일 입력 흐름 검증용 프로젝트',
-    },
+  const response = await apiPost(request, '/api/projects', {
+    name: `모바일 UX ${Date.now()}`,
+    description: '모바일 입력 흐름 검증용 프로젝트',
   })
   expect(response.ok()).toBeTruthy()
   const payload = await response.json()

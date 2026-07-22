@@ -1,16 +1,15 @@
 import { expect, test, type APIRequestContext } from '@playwright/test'
+import { apiPost } from './helpers/api'
 
 /**
  * 여론조사 프로젝트에 창업 아이템 검증 폼이 새는 것을 막는다.
  * 코드 게이트는 통과해도 화면은 틀릴 수 있어 실제 렌더로 확인한다.
  */
 async function createProject(request: APIRequestContext, kind: 'poll' | 'venture') {
-  const response = await request.post('/api/projects', {
-    data: {
-      name: `${kind} 갈래 확인 ${Date.now()}`,
-      kind,
-      description: '프로젝트 갈래 렌더 검증용',
-    },
+  const response = await apiPost(request, '/api/projects', {
+    name: `${kind} 갈래 확인 ${Date.now()}`,
+    kind,
+    description: '프로젝트 갈래 렌더 검증용',
   })
   expect(response.ok()).toBeTruthy()
   const payload = await response.json()
