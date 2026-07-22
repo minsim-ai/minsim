@@ -67,12 +67,16 @@ export function navigateTo(path: string): void {
   window.dispatchEvent(new PopStateEvent('popstate'))
 }
 
-/** Extract project/run context used by the flow-rail step navigator. */
-export function routeFlowContext(route: V2Route): {
+export type FlowContext = {
   projectId: string | null
   runId: string | null
   simulationType: string | null
-} {
+}
+
+const FLOW_CONTEXT_STORAGE_KEY = 'minsim.flowContext.v1'
+
+/** Context fields present on the current route only (no session memory). */
+export function routeOwnFlowContext(route: V2Route): FlowContext {
   if (route.page === 'project' || route.page === 'type') {
     return { projectId: route.projectId, runId: null, simulationType: null }
   }
@@ -91,6 +95,59 @@ export function routeFlowContext(route: V2Route): {
     }
   }
   return { projectId: null, runId: null, simulationType: null }
+}
+
+function readStoredFlowContext(): FlowContext | null {
+  try {
+    const raw = sessionStorage.getItem(FLOW_CONTEXT_STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Partial<FlowContext>
+    return {
+      projectId: typeof parsed.projectId === 'string' ? parsed.projectId : null,
+      runId: typeof parsed.runId === 'string' ? parsed.runId : null,
+      simulationType: typeof parsed.simulationType === 'string' ? parsed.simulationType : null,
+    }
+  } catch {
+    return null
+  }
+}
+
+function writeStoredFlowContext(ctx: FlowContext): void {
+  try {
+    sessionStorage.setItem(FLOW_CONTEXT_STORAGE_KEY, JSON.stringify(ctx))
+  } catch {
+    // Private mode / quota — navigation still works for the current URL.
+  }
+}
+
+/**
+ * Merge route-owned fields into stored flow context for the same project.
+ * Keeps the last known run_id so the results step stays reachable after
+ * stepping back to type/intake (those URLs do not carry run_id).
+ */
+export function rememberFlowContext(own: FlowContext): FlowContext {
+  const stored = readStoredFlowContext()
+  if (!own.projectId) {
+    return own
+  }
+
+  const sameProject = stored?.projectId === own.projectId
+  const next: FlowContext = {
+    projectId: own.projectId,
+    runId: own.runId ?? (sameProject ? stored?.runId ?? null : null),
+    simulationType:
+      own.simulationType ?? (sameProject ? stored?.simulationType ?? null : null),
+  }
+  writeStoredFlowContext(next)
+  return next
+}
+
+/**
+ * Extract project/run context used by the flow-rail step navigator.
+ * Remembers run_id across type/intake so step 4 stays open after going back.
+ */
+export function routeFlowContext(route: V2Route): FlowContext {
+  return rememberFlowContext(routeOwnFlowContext(route))
 }
 
 /**

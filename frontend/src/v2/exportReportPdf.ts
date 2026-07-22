@@ -202,7 +202,6 @@ function buildReportHtml(report: MinsimReport, meta: MinsimPdfMeta, title: strin
   </section>` : ''}
 
   <footer class="footer">
-    <p>${escapeHtml(report.disclaimer)}</p>
     <p>minsim · 응답 ${run.valid}명${run.ts ? ` · ${escapeHtml(run.ts)}` : ''}</p>
   </footer>
 </body>
