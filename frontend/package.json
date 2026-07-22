@@ -1,0 +1,51 @@
+{
+  "name": "frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:grab": "vite --host 127.0.0.1 --port 5173 --strictPort",
+    "build": "node scripts/generate-seo-pages.mjs && tsc && vite build",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "check:intake": "node scripts/check-intake-fixtures.mjs",
+    "check:loading": "node scripts/check-loading-failure.mjs",
+    "check:minsim": "node scripts/check-minsim-result.mjs",
+    "check:landing": "node scripts/check-landing-demo-pdf-cta.mjs",
+    "preview": "vite preview",
+    "verify": "npm run lint && npm run typecheck && npm run check:intake && npm run check:loading && npm run check:minsim && npm run check:landing && npm run build",
+    "e2e:booth": "playwright test",
+    "check:contract": "node scripts/export-intake-payloads.mjs .tmp-intake-payloads.json"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.61.1",
+    "@tailwindcss/vite": "^4.2.4",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "eslint": "^10.3.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "globals": "^17.6.0",
+    "react-grab": "^0.1.48",
+    "tailwindcss": "^4.2.4",
+    "typescript": "~6.0.2",
+    "typescript-eslint": "^8.59.1",
+    "vite": "^8.0.10",
+    "vite-plugin-wasm": "^3.6.0"
+  },
+  "dependencies": {
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.6.1",
+    "@zane-chen/agents-are-thinking": "^0.1.6",
+    "gsap": "^3.15.0",
+    "lord-icon-element": "^4.1.2",
+    "lottie-web": "^5.13.0",
+    "lucide-react": "^1.14.0",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "three": "^0.184.0"
+  }
+}
