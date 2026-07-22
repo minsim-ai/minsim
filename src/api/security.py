@@ -10,7 +10,6 @@ from __future__ import annotations
 import os
 import secrets
 from typing import Any
-from urllib.parse import urlparse
 
 from fastapi import Request
 from starlette.responses import JSONResponse, Response

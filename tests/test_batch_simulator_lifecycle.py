@@ -33,8 +33,12 @@ async def test_second_run_on_owned_client_raises_instead_of_failing_every_call()
         async def close(self):
             OwnedStub.closed = True
 
-    sim = BatchSimulator(purpose="t", task_type="policy_response")
-    sim.client = OwnedStub()
+    # Inject owned stub so tests do not require a live provider key.
+    sim = BatchSimulator(
+        purpose="t",
+        task_type="policy_response",
+        llm_client=OwnedStub(),
+    )
     sim._owns_client = True
 
     await sim.run(PERSONAS, "prompt")
@@ -67,7 +71,10 @@ async def test_fresh_instance_per_batch_works():
             async def close(self):
                 return None
 
-        sim = BatchSimulator(purpose="t", task_type="policy_response")
-        sim.client = OwnedStub()
+        sim = BatchSimulator(
+            purpose="t",
+            task_type="policy_response",
+            llm_client=OwnedStub(),
+        )
         sim._owns_client = True
         assert len(await sim.run(PERSONAS, "prompt")) == 1

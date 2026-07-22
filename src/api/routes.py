@@ -13,8 +13,6 @@ from uuid import uuid4
 from fastapi import APIRouter, HTTPException, Request
 from starlette.responses import RedirectResponse, StreamingResponse
 
-logger = logging.getLogger("koresim.api")
-
 from src.api.schemas import (
     DemoPreset,
     ErrorCode,
@@ -116,6 +114,8 @@ from src.services.llm_usage_service import consume_interactive_llm_action
 from src.services.project_service import ProjectService
 from src.services.run_service import create_run_for_user
 from src.simulations.registry import enabled_simulation_types, simulation_metadata
+
+logger = logging.getLogger("koresim.api")
 
 router = APIRouter()
 

@@ -1,4 +1,5 @@
 import { expect, test, type APIRequestContext } from '@playwright/test'
+import { apiPost } from './helpers/api'
 
 /**
  * 저장하지 않은 편집을 남긴 채 시뮬레이션으로 넘어가면 인테이크가 서버의 옛 값을 읽는다.
@@ -6,8 +7,9 @@ import { expect, test, type APIRequestContext } from '@playwright/test'
  * 200명 중 170명이 가격 후보 밖 금액을 답했다.
  */
 async function createProject(request: APIRequestContext) {
-  const response = await request.post('/api/projects', {
-    data: { name: `자동저장 확인 ${Date.now()}`, description: '옛 설명 · 3천원' },
+  const response = await apiPost(request, '/api/projects', {
+    name: `자동저장 확인 ${Date.now()}`,
+    description: '옛 설명 · 3천원',
   })
   expect(response.ok()).toBeTruthy()
   const payload = await response.json()
