@@ -379,7 +379,7 @@ function FinalSummaryCard({ report }: { report: MinsimReport }) {
       />
       <div className="card minsim-final-summary-grid" style={{ padding: 24, display: 'grid', gridTemplateColumns: 'minmax(180px, .8fr) 1.2fr', gap: 24 }}>
         <div className="col minsim-final-summary-lead" style={{ gap: 10, borderRight: '1px solid var(--border-soft)', paddingRight: 20 }}>
-          <span className="lbl-mono">1위 {report.segment.mode === 'segment' ? '세그먼트' : '반응'}</span>
+          <span className="lbl-mono">1위 {report.segment.mode === 'segment' ? '세그먼트' : report.segment.mode === 'price' ? '선호 가격' : '반응'}</span>
           {summary.winner ? (
             <>
               <span style={{ fontSize: 30, fontWeight: 700, color: 'var(--lime)', lineHeight: 1.1 }}>
@@ -664,22 +664,30 @@ function Verdict({ report, onExport }: { report: MinsimReport; onExport: () => v
   const { run, winner, runnerUp, segment } = report
   if (!winner) return null
   const isIntentReport = segment.mode === 'intent'
+  const isPriceReport = segment.mode === 'price'
   const metrics = [
     { l: '응답 표본', v: `${run.panel.toLocaleString('ko-KR')}명`, s: `유효 응답 ${run.valid.toLocaleString('ko-KR')}명` },
-    isIntentReport
+    isIntentReport || isPriceReport
       ? { l: segment.metricLabel, v: `${segment.overallPct}%`, s: `전체 합성 패널 중 ${segment.focusLabel}` }
       : { l: '선호 격차', v: run.gap, s: runnerUp ? `1위−2위 (${winner.id}−${runnerUp.id})` : '1위 기준' },
     { l: '해석 상태', v: run.status, s: `구조화 성공 ${run.structured}` },
   ]
+  const reportKicker = isPriceReport
+    ? '가격 수용도 보고서'
+    : isIntentReport
+      ? '행동 의향 예측 보고서'
+      : run.gap === '집계 중'
+        ? '분석 보고서'
+        : '크리에이티브 비교 분석 보고서'
   return (
     <section style={{ paddingTop: 30, paddingBottom: 34 }}>
       <div className="spread" style={{ marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
-        <Kicker>{isIntentReport ? '행동 의향 예측 보고서' : run.gap === '집계 중' ? '분석 보고서' : '크리에이티브 비교 분석 보고서'}</Kicker>
+        <Kicker>{reportKicker}</Kicker>
       </div>
       <div className="result-verdict-grid">
         <div className="col" style={{ gap: 22 }}>
           <div>
-            <span className="badge lime" style={{ marginBottom: 16 }}>{isIntentReport ? '핵심 관측' : '먼저 선택'} · {winner.label}</span>
+            <span className="badge lime" style={{ marginBottom: 16 }}>{isIntentReport || isPriceReport ? '핵심 관측' : '먼저 선택'} · {winner.label}</span>
             <h1 style={{ fontSize: 'clamp(24px, 6.2vw, 38px)', lineHeight: 1.18, marginTop: 14, letterSpacing: '-.025em', fontWeight: 600 }}>{winner.text}</h1>
             <p className="muted" style={{ fontSize: 15, lineHeight: 1.65, marginTop: 16, maxWidth: 640 }}>
               {run.verdictLine} {run.conclusion}
@@ -891,7 +899,13 @@ function AiReport({ report }: { report: MinsimReport }) {
 function MarketResponse({ report }: { report: MinsimReport }) {
   const { creatives, winner, runnerUp, keywords } = report
   const mode = report.segment.mode
-  const distributionLabel = mode === 'intent' ? '행동 의향' : mode === 'segment' ? '세그먼트 점유' : '선호도'
+  const distributionLabel = mode === 'intent'
+    ? '행동 의향'
+    : mode === 'segment'
+      ? '세그먼트 점유'
+      : mode === 'price'
+        ? '선호 가격'
+        : '선호도'
   // A/B preference board — not applicable when there are no creatives/choices.
   if (creatives.length === 0) return null
   return (
@@ -925,12 +939,16 @@ function MarketResponse({ report }: { report: MinsimReport }) {
               <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>
                 {mode === 'segment'
                   ? `이름 있는 세그먼트 1위: ${winner.label}`
-                  : `${winner.label}이 가장 많이 ${mode === 'intent' ? '관측됐습니다' : '선택됐습니다'}`}
+                  : mode === 'price'
+                    ? `선호 가격 1위: ${winner.label}`
+                    : `${winner.label}이 가장 많이 ${mode === 'intent' ? '관측됐습니다' : '선택됐습니다'}`}
               </div>
               <p className="muted" style={{ fontSize: 13, lineHeight: 1.6 }}>
                 {mode === 'segment'
                   ? `${winner.label} 세그먼트가 ${winner.count}명(${winner.pct}%)으로 1순위 타깃 후보입니다.`
-                  : `${winner.label}이 ${winner.count}명(${winner.pct}%)에게서 ${mode === 'intent' ? '나타나 가장 큰 행동 의향 집단입니다.' : '선택돼 가장 강한 반응을 얻었습니다.'}`}
+                  : mode === 'price'
+                    ? `${winner.label}을 ${winner.count}명(${winner.pct}%)이 가장 선호했습니다. 가격대별 누적 수요 곡선과 함께 해석하세요.`
+                    : `${winner.label}이 ${winner.count}명(${winner.pct}%)에게서 ${mode === 'intent' ? '나타나 가장 큰 행동 의향 집단입니다.' : '선택돼 가장 강한 반응을 얻었습니다.'}`}
                 {runnerUp ? ` 다음 ${runnerUp.label}(${runnerUp.count}명·${runnerUp.pct}%)보다 ${report.run.gap} 높습니다.` : ''}
                 {mode === 'segment' && report.creatives.some((item) => item.id === '기타')
                   ? ' ‘기타 롱테일(잔여)’은 상위 세그먼트 밖 라벨 합이며 타깃으로 해석하지 않습니다.'
@@ -963,8 +981,8 @@ function AgeFullTable({ report }: { report: MinsimReport }) {
   const legend = sortedLegend.slice(0, 9)
   const hiddenColumns = sortedLegend.length - legend.length
   const mode = report.segment.mode
-  const titleNoun = mode === 'intent' ? '반응' : mode === 'segment' ? '세그먼트 점유' : '선호'
-  const cellNoun = mode === 'intent' ? '행동 의향' : mode === 'segment' ? '세그먼트 점유' : '후보의 선택'
+  const titleNoun = mode === 'intent' ? '반응' : mode === 'segment' ? '세그먼트 점유' : mode === 'price' ? '선호 가격' : '선호'
+  const cellNoun = mode === 'intent' ? '행동 의향' : mode === 'segment' ? '세그먼트 점유' : mode === 'price' ? '선호 가격' : '후보의 선택'
   const gridTemplate = `minmax(72px, 1.2fr) repeat(${legend.length}, minmax(54px, .85fr)) minmax(52px, .75fr)`
   return (
     <section style={{ padding: '40px 0' }}>

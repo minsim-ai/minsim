@@ -108,7 +108,7 @@ export type MinsimReport = {
   interest: MinsimInterestRow[] | null
   finalSummary: MinsimFinalSummary | null
   segment: {
-    mode: 'choice' | 'intent' | 'segment'
+    mode: 'choice' | 'intent' | 'segment' | 'price'
     focusId: string
     focusLabel: string
     overallPct: number
@@ -194,19 +194,50 @@ export function buildMinsimReport(result: RunResultEnvelope, options: { complete
   const choicePct = numberRecord(metrics.choice_pct)
   const intentCounts = numberRecord(metrics.intent_counts)
   const intentPct = numberRecord(metrics.intent_pct)
+  const preferredCounts = numberRecord(metrics.preferred_price_counts)
+  const preferredPct = numberRecord(metrics.preferred_price_pct)
   const segmentCounts = numberRecord(metrics.segment_counts)
   const segmentPct = numberRecord(metrics.segment_pct)
   const creativeTexts = stringArray(metrics.creatives)
   const reasonsByChoice = recordOfStringArray(metrics.reasons_by_choice)
+  const protocolId = asString(metrics.protocol_id)
+
+  // price_optimization v1: intent is near-always "구매" once a preferred price is
+  // chosen, so the headline KPI must use preferred_price_* (not intent_counts).
+  const hasPricePreferred =
+    result.simulation_type === 'price_optimization'
+    && protocolId !== 'price_research_v2'
+    && Object.keys(preferredCounts).length > 0
 
   const hasChoices = Object.keys(choiceCounts).length > 0
-  const hasIntent = !hasChoices && Object.keys(intentCounts).length > 0
-  const hasSegments = !hasChoices && !hasIntent && Object.keys(segmentCounts).length > 0
-  const segmentMode: MinsimReport['segment']['mode'] = hasChoices ? 'choice' : hasIntent ? 'intent' : hasSegments ? 'segment' : 'choice'
+  const hasPrice = !hasChoices && hasPricePreferred
+  const hasIntent = !hasChoices && !hasPrice && Object.keys(intentCounts).length > 0
+  const hasSegments = !hasChoices && !hasPrice && !hasIntent && Object.keys(segmentCounts).length > 0
+  const segmentMode: MinsimReport['segment']['mode'] = hasChoices
+    ? 'choice'
+    : hasPrice
+      ? 'price'
+      : hasIntent
+        ? 'intent'
+        : hasSegments
+          ? 'segment'
+          : 'choice'
   const isChoiceMode = segmentMode === 'choice'
 
-  const rawOutcomeCounts = hasChoices ? choiceCounts : hasIntent ? intentCounts : segmentCounts
-  const rawOutcomePct = hasChoices ? choicePct : hasIntent ? intentPct : segmentPct
+  const rawOutcomeCounts = hasChoices
+    ? choiceCounts
+    : hasPrice
+      ? preferredCounts
+      : hasIntent
+        ? intentCounts
+        : segmentCounts
+  const rawOutcomePct = hasChoices
+    ? choicePct
+    : hasPrice
+      ? preferredPct
+      : hasIntent
+        ? intentPct
+        : segmentPct
   const { counts: outcomeCounts, pct: outcomePct, ids } = resolveOutcomeColumns(
     rawOutcomeCounts,
     rawOutcomePct,
@@ -217,10 +248,12 @@ export function buildMinsimReport(result: RunResultEnvelope, options: { complete
   const creatives: MinsimCreative[] = ids.map((id, index) => {
     const count = outcomeCounts[id] ?? 0
     const pct = round(outcomePct[id] ?? 0)
+    const label = isChoiceMode ? `${id}안` : outcomeLabel(id, false)
+    const text = isChoiceMode ? (creativeTexts[index] ?? `${id}안`) : label
     return {
       id,
-      label: isChoiceMode ? `${id}안` : segmentResidualLabel(id),
-      text: isChoiceMode ? (creativeTexts[index] ?? `${id}안`) : segmentResidualLabel(id),
+      label,
+      text,
       angle: '',
       pct,
       count,
@@ -232,7 +265,12 @@ export function buildMinsimReport(result: RunResultEnvelope, options: { complete
   // "기타" is a residual long-tail bucket, never a competitive winner/target.
   const namedCreatives = creatives.filter((item) => item.id !== OTHER_SEGMENT_ID)
   const residualCreatives = creatives.filter((item) => item.id === OTHER_SEGMENT_ID)
-  const rankedNamed = [...namedCreatives].sort((a, b) => b.pct - a.pct || a.id.localeCompare(b.id))
+  // Prefer higher share; for price ties pick the higher price last via numeric id.
+  const rankedNamed = [...namedCreatives].sort((a, b) => {
+    if (b.pct !== a.pct) return b.pct - a.pct
+    if (segmentMode === 'price') return Number(a.id) - Number(b.id) || a.id.localeCompare(b.id)
+    return a.id.localeCompare(b.id)
+  })
   if (rankedNamed[0]) rankedNamed[0].winner = true
   const ranked = [...rankedNamed, ...residualCreatives]
   const winner = rankedNamed[0] ?? null
@@ -245,7 +283,8 @@ export function buildMinsimReport(result: RunResultEnvelope, options: { complete
   const status = confidenceLabel(total, parseSuccessRate)
 
   const sentiment = deriveSentiment(result.raw_results)
-  const intent = deriveIntent(result.raw_results, result.simulation_type)
+  // Suppress the near-always-100% intent bar when preferred prices are the KPI.
+  const intent = hasPrice ? null : deriveIntent(result.raw_results, result.simulation_type)
 
   const findings = agent.findings.slice(0, 4)
   const actions = agent.actions.slice(0, 4)
@@ -260,19 +299,29 @@ export function buildMinsimReport(result: RunResultEnvelope, options: { complete
       : (winner?.id ?? namedIds[0] ?? ''))
   const focusLabel = outcomeLabel(focusId, isChoiceMode)
   const overallFocusPct = round(outcomePct[focusId] ?? 0)
-  const displaySegments = foldSegmentBreakdowns(result.segments, ids, segmentMode === 'segment')
+  const priceAlignedSegments = hasPrice
+    ? alignPriceSegments(result.segments, result.raw_results, ids)
+    : result.segments
+  const displaySegments = foldSegmentBreakdowns(
+    priceAlignedSegments,
+    ids,
+    segmentMode === 'segment' || segmentMode === 'price',
+  )
   const ageFull = buildAgeFull(displaySegments)
   const gender = buildGender(displaySegments, isChoiceMode)
   const regions = buildRegions(displaySegments, isChoiceMode, segmentMode, focusId, overallFocusPct)
 
-  const winnerLabel = winner?.label ?? (segmentMode === 'segment' ? '주요 세그먼트' : '기준안')
+  const winnerLabel = winner?.label
+    ?? (segmentMode === 'segment' ? '주요 세그먼트' : segmentMode === 'price' ? '선호 가격' : '기준안')
   const reco = {
     action: '다듬기 →',
     meta: `재실행 · 1위 ${winnerLabel} ${winner?.pct ?? 0}% · 격차 ${gapPoint === null ? '집계 중' : `+${gapPoint}pt`}`,
     bullets: firstNonEmpty(
       actions.map((item) => item.title),
       [
-        `${winnerLabel}을 기준안으로 두고 후속 질문에서 거절 이유를 확인합니다.`,
+        segmentMode === 'price'
+          ? `${winnerLabel}을 기준 가격으로 두고 수요 곡선과 상위 가격 옵션을 함께 검증합니다.`
+          : `${winnerLabel}을 기준안으로 두고 후속 질문에서 거절 이유를 확인합니다.`,
         '상위 반응 세그먼트에 같은 메시지를 우선 적용하고, 약한 세그먼트는 별도 가설로 분리합니다.',
         '외부 공유 전에는 표본을 키워 세그먼트 흔들림을 한 번 더 확인합니다.',
       ],
@@ -288,7 +337,9 @@ export function buildMinsimReport(result: RunResultEnvelope, options: { complete
     ? '이탈률'
     : segmentMode === 'segment'
       ? `${focusLabel} 점유율`
-      : `${focusLabel} 반응률`
+      : segmentMode === 'price'
+        ? `${focusLabel} 선호 점유율`
+        : `${focusLabel} 반응률`
 
   const report: MinsimReport = {
     run: {
@@ -305,7 +356,9 @@ export function buildMinsimReport(result: RunResultEnvelope, options: { complete
       verdictLine: agent.headline || (winner
         ? (segmentMode === 'segment'
           ? `‘${winner.text}’ 세그먼트(${winner.pct}%)를 1순위 타깃으로 권장합니다.`
-          : `‘${winner.text}’ 메시지(${winner.label})가 가장 강하게 반응합니다.`)
+          : segmentMode === 'price'
+            ? `선호 가격 1위는 ‘${winner.text}’(${winner.pct}%)입니다. 가격대별 수요 곡선과 함께 해석하세요.`
+            : `‘${winner.text}’ 메시지(${winner.label})가 가장 강하게 반응합니다.`)
         : '핵심 결론을 해석 중입니다.'),
       conclusion: agent.summary || '집계 결과를 해석 중입니다.',
     },
@@ -332,7 +385,9 @@ export function buildMinsimReport(result: RunResultEnvelope, options: { complete
       headline: agent.headline || (winner
         ? (segmentMode === 'segment'
           ? `${winner.label} 세그먼트를 1순위 타깃으로 권장합니다.`
-          : `${winner.label} 메시지를 기준안으로 권장합니다.`)
+          : segmentMode === 'price'
+            ? `선호 가격 ${winner.label}(${winner.pct}%)을 기준으로 가격 전략을 검토하세요.`
+            : `${winner.label} 메시지를 기준안으로 권장합니다.`)
         : '결과를 해석 중입니다.'),
       summary: agent.summary || reasonsByChoice[winner?.id ?? '']?.[0] || '집계 결과를 해석 중입니다.',
       findings,
@@ -456,13 +511,17 @@ function buildJudgeBody(
     lines.push(
       mode === 'segment'
         ? `이 패널에서는 ${winner.label}(${winner.pct}%)가 ${runnerUp.label}(${runnerUp.pct}%)보다 ${gapPoint}%포인트 더 큽니다. 실제 시장 일반화 전 추가 검증이 필요합니다.`
-        : `이 패널에서는 ${runnerUp.label}(${runnerUp.pct}%)보다 ${gapPoint}%포인트 더 많이 선택됐습니다. 실제 시장 일반화 전 추가 검증이 필요합니다.`,
+        : mode === 'price'
+          ? `선호 가격 1위는 ${winner.label}(${winner.pct}%)이며, 다음 ${runnerUp.label}(${runnerUp.pct}%)보다 ${gapPoint}%포인트 높습니다. 가격대별 수요 곡선과 함께 해석하세요.`
+          : `이 패널에서는 ${runnerUp.label}(${runnerUp.pct}%)보다 ${gapPoint}%포인트 더 많이 선택됐습니다. 실제 시장 일반화 전 추가 검증이 필요합니다.`,
     )
   } else if (winner) {
     lines.push(
       mode === 'segment'
         ? `${winner.label}가 ${winner.pct}%로 가장 큰 세그먼트입니다.`
-        : `${winner.label}가 ${winner.pct}%로 가장 강한 반응을 얻었습니다.`,
+        : mode === 'price'
+          ? `선호 가격 1위는 ${winner.label}(${winner.pct}%)입니다. 누적 수요 곡선과 함께 해석하세요.`
+          : `${winner.label}가 ${winner.pct}%로 가장 강한 반응을 얻었습니다.`,
     )
   }
   lines.push(`단, 신뢰도는 ‘${status}’ 수준 — 큰 세그먼트 차이는 근거로 쓰되 소표본 세그먼트는 분리 해석이 필요합니다.`)
@@ -527,8 +586,8 @@ function resolveOutcomeColumns(
 
   if (mode !== 'segment') {
     const ids = Object.keys(rawCounts).length
-      ? Object.keys(rawCounts).sort()
-      : Object.keys(rawPct).sort()
+      ? Object.keys(rawCounts).sort(mode === 'price' ? comparePriceIds : undefined)
+      : Object.keys(rawPct).sort(mode === 'price' ? comparePriceIds : undefined)
     return { counts: rawCounts, pct: rawPct, ids }
   }
 
@@ -590,6 +649,107 @@ function foldSegmentBreakdowns(
     breakdown_by_province: foldMap(segments.breakdown_by_province),
     breakdown_by_sex: foldMap(segments.breakdown_by_sex),
   }
+}
+
+/**
+ * price_optimization stored demographic segments keyed by intent for a long time.
+ * Prefer preferred_price keys when available so region/age maps match the new KPI.
+ * Old completed runs still have raw preferred_price, so rebuild client-side.
+ */
+function alignPriceSegments(
+  segments: JsonObject,
+  rawResults: RawPersonaResult[],
+  priceIds: string[],
+): JsonObject {
+  const priceSet = new Set(priceIds.filter((id) => id !== OTHER_SEGMENT_ID))
+  if (priceSet.size === 0) return segments
+
+  const breakdownHasPriceKeys = (value: unknown): boolean => {
+    if (!isRecord(value)) return false
+    for (const row of Object.values(value)) {
+      const keys = Object.keys(numberRecord(row))
+      if (keys.some((key) => priceSet.has(key))) return true
+    }
+    return false
+  }
+
+  if (
+    breakdownHasPriceKeys(segments.breakdown_by_age)
+    || breakdownHasPriceKeys(segments.breakdown_by_province)
+    || breakdownHasPriceKeys(segments.breakdown_by_sex)
+  ) {
+    return segments
+  }
+
+  const byAge: Record<string, Record<string, number>> = {}
+  const bySex: Record<string, Record<string, number>> = {}
+  const byProvince: Record<string, Record<string, number>> = {}
+
+  for (const item of rawResults) {
+    if (item.error) continue
+    const priceId = preferredPriceIdOf(item)
+    if (!priceId || !priceSet.has(priceId)) continue
+    const persona = item.persona ?? {}
+    const age = ageBucketLabel(persona.age)
+    const sex = typeof persona.sex === 'string' ? persona.sex : null
+    const province = typeof persona.province === 'string' ? persona.province : null
+    if (age) {
+      byAge[age] ??= {}
+      byAge[age][priceId] = (byAge[age][priceId] ?? 0) + 1
+    }
+    if (sex) {
+      bySex[sex] ??= {}
+      bySex[sex][priceId] = (bySex[sex][priceId] ?? 0) + 1
+    }
+    if (province) {
+      byProvince[province] ??= {}
+      byProvince[province][priceId] = (byProvince[province][priceId] ?? 0) + 1
+    }
+  }
+
+  if (Object.keys(byAge).length === 0 && Object.keys(bySex).length === 0 && Object.keys(byProvince).length === 0) {
+    return segments
+  }
+
+  return {
+    ...segments,
+    breakdown_by_age: byAge,
+    breakdown_by_sex: bySex,
+    breakdown_by_province: byProvince,
+  }
+}
+
+function preferredPriceIdOf(item: RawPersonaResult): string | null {
+  const parsed = item.parsed
+  if (!parsed || typeof parsed !== 'object') return null
+  const value = (parsed as Record<string, unknown>).preferred_price
+    ?? (parsed as Record<string, unknown>).primary
+  if (typeof value === 'number' && Number.isFinite(value)) return String(Math.round(value))
+  if (typeof value === 'string' && value.trim() && /^-?\d+(\.\d+)?$/.test(value.trim())) {
+    return String(Math.round(Number(value.trim())))
+  }
+  return null
+}
+
+function ageBucketLabel(age: unknown): string | null {
+  if (typeof age !== 'number' || !Number.isFinite(age) || age < 0) return null
+  if (age >= 70) return '70대+'
+  const decade = Math.floor(age / 10) * 10
+  if (decade < 10) return '10대'
+  return `${decade}대`
+}
+
+function comparePriceIds(a: string, b: string): number {
+  const na = Number(a)
+  const nb = Number(b)
+  if (Number.isFinite(na) && Number.isFinite(nb) && na !== nb) return na - nb
+  return a.localeCompare(b)
+}
+
+function formatPriceLabel(id: string): string {
+  const n = Number(id)
+  if (Number.isFinite(n)) return `${Math.round(n).toLocaleString('ko-KR')}원`
+  return id
 }
 
 function colorForOutcome(id: string, index: number): string {
@@ -780,7 +940,7 @@ function buildRegions(
       const isReferenceOnly = n < 10
       const focusLabel = outcomeLabel(focusId, hasChoices)
       const deltaText = `${deltaPoint >= 0 ? '+' : ''}${deltaPoint}pt`
-      const metricWord = mode === 'segment' ? '점유율' : '반응률'
+      const metricWord = mode === 'segment' || mode === 'price' ? '점유율' : '반응률'
       const why = isReferenceOnly
         ? `표본이 ${n}명뿐이라 편차가 큽니다. ${focusLabel} ${focusPct}%는 방향성 참고치로만 해석하세요.`
         : hasChoices
@@ -792,7 +952,9 @@ function buildRegions(
           ? [`${focusLabel} 메시지로 지역 타겟 테스트`, '전체 대비 차이가 난 이유를 후속 질문으로 확인']
           : mode === 'segment'
             ? [`${focusLabel} 비중이 높은 지역 코호트에 후속 질문`, '세그먼트 선택 이유를 소규모로 확인']
-            : [`${focusLabel} 트리거를 지역 코호트에 다시 질문`, '유지·관망으로 전환할 조건을 별도 확인']
+            : mode === 'price'
+              ? [`${focusLabel} 선호 이유를 지역 코호트에 후속 질문`, '인접 가격대 수용 조건을 별도 확인']
+              : [`${focusLabel} 트리거를 지역 코호트에 다시 질문`, '유지·관망으로 전환할 조건을 별도 확인']
       const distribution = Object.fromEntries(
         Object.entries(counts).map(([id, count]) => [id, n > 0 ? round((count / n) * 100) : 0]),
       )
@@ -826,6 +988,7 @@ function outcomeLabel(id: string, hasChoices: boolean): string {
 
 function segmentResidualLabel(id: string): string {
   if (id === OTHER_SEGMENT_ID) return '기타 롱테일(잔여)'
+  if (/^-?\d+(\.\d+)?$/.test(id)) return formatPriceLabel(id)
   return id
 }
 
@@ -1242,6 +1405,9 @@ export function displayName(seed: string, sex: string): string {
 
 export function choiceOf(item: RawPersonaResult): string {
   const parsed = item.parsed
+  // price_optimization: preferred price is the decision axis (not intent).
+  const preferredId = preferredPriceIdOf(item)
+  if (preferredId) return preferredId
   if (parsed && typeof parsed.choice === 'string' && parsed.choice.trim()) return parsed.choice.trim().charAt(0)
   if (parsed && typeof parsed.intent === 'string' && parsed.intent.trim()) return parsed.intent.trim()
   if (parsed && typeof parsed.segment === 'string' && parsed.segment.trim()) return parsed.segment.trim()

@@ -101,6 +101,15 @@ export function getMetricSections(result: RunResultEnvelope): MetricSection[] {
       }
       return [
         {
+          title: '선호 가격',
+          rows: countPctRows(metrics, 'preferred_price_counts', 'preferred_price_pct').map((row) => ({
+            ...row,
+            label: Number.isFinite(Number(row.label))
+              ? `${Number(row.label).toLocaleString('ko-KR')}원`
+              : row.label,
+          })),
+        },
+        {
           title: '가격 후보별 수요',
           rows: objectRows(metrics.demand_by_price, (label, value) => ({
             label: `${Number(label).toLocaleString('ko-KR')}원`,
