@@ -1398,6 +1398,18 @@ function Methodology({ report }: { report: MinsimReport }) {
   const { sampleAge, sampleRegion, run } = report
   const maxReg = Math.max(1, ...sampleRegion.map(([, n]) => n))
   const totalAge = sampleAge.reduce((sum, [, n]) => sum + n, 0)
+  // Stack segments need explicit height — `.row` uses align-items:center so
+  // empty width-only spans collapse to 0px and leave a blank white track.
+  const ageParts: [string, number][] = sampleAge.map(([label, n]) => [
+    label,
+    totalAge > 0 ? (n / totalAge) * 100 : 0,
+  ])
+  const ageAria = sampleAge
+    .map(([label, n]) => {
+      const pct = totalAge > 0 ? Math.round((n / totalAge) * 100) : 0
+      return `${label} ${pct}% (${n}명)`
+    })
+    .join(', ')
   return (
     <section style={{ padding: '40px 0' }}>
       <SectionHead kicker="검증 정보" title="방법론과 신뢰 정보" />
@@ -1405,37 +1417,40 @@ function Methodology({ report }: { report: MinsimReport }) {
         <div className="card" style={{ padding: 20 }}>
           <div className="lbl-mono" style={{ marginBottom: 16 }}>표본 구성 · 연령대</div>
           <div
-            className="row"
+            className="minsim-sample-age-track"
             role="img"
-            aria-label={`연령대별 표본 구성: ${sampleAge.map(([label, n]) => `${label} ${n}명`).join(', ')}`}
-            style={{
-              height: 16,
-              borderRadius: 5,
-              overflow: 'hidden',
-              background: 'var(--surface-3)',
-              border: '1px solid var(--border-soft)',
-              marginBottom: 14,
-            }}
+            aria-label={`연령대별 표본 구성: ${ageAria}`}
           >
-            {sampleAge.map(([label, n], index) => (
-              <span
+            {ageParts.map(([label, pct], index) => (
+              <div
                 key={label}
-                title={`${label} ${n}명`}
+                className="minsim-sample-age-seg"
+                title={`${label} ${Math.round(pct)}%`}
                 style={{
-                  width: `${totalAge ? (n / totalAge) * 100 : 0}%`,
-                  minWidth: n > 0 ? 3 : 0,
-                  // Solid blues — faint/dim + opacity made the gauge disappear on light cards.
+                  width: `${Math.max(pct, 0)}%`,
+                  minWidth: pct > 0 ? 3 : 0,
                   background: STACK_FALLBACK[index % STACK_FALLBACK.length],
                 }}
               />
             ))}
           </div>
-          <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-            {sampleAge.map(([label, n]) => (
-              <span key={label} className="lbl" style={{ fontSize: 11 }}>
-                {label} <b style={{ color: 'var(--fg)', fontWeight: 600 }}>{n}명</b>{n < 10 ? ' · 참고' : ''}
-              </span>
-            ))}
+          <div className="minsim-sample-age-legend" role="list">
+            {sampleAge.map(([label, n], index) => {
+              const pct = totalAge > 0 ? Math.round((n / totalAge) * 100) : 0
+              return (
+                <span key={label} className="minsim-sample-age-legend-item" role="listitem">
+                  <i
+                    aria-hidden="true"
+                    style={{ background: STACK_FALLBACK[index % STACK_FALLBACK.length] }}
+                  />
+                  <span>
+                    {label}{' '}
+                    <b>{pct}%</b>
+                    <span className="faint"> · {n}명{n < 10 ? ' · 참고' : ''}</span>
+                  </span>
+                </span>
+              )
+            })}
           </div>
         </div>
         <div className="card" style={{ padding: 20 }}>
