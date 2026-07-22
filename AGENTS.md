@@ -12,10 +12,11 @@ Public product repository for **minsim** (AI persona behavior simulation).
 
 1. Never commit `.env`, API keys, OAuth client secrets, Cloudflare tunnel credentials, certs, or Langfuse keys.
 2. Prefer placeholders in `.env.example` only.
-3. Do not add `docs/verification/`, `test-results/`, Playwright reports, or agent session dirs (`.gjc/`, `.claude/`).
+3. Do not add `docs/verification/`, `test-results/`, Playwright reports, agent sessions (`.gjc/`, `.claude/`), `deploy/`, or internal runbooks/execution dumps.
 4. Simulation modules must not import provider SDKs directly — use the internal `LLMClient` boundary.
 5. Product storage may keep protected `raw_results`; external providers and observability default to metadata-only.
 6. Export and MCP surfaces must not return `raw_results`.
+7. Run `bash scripts/install_git_hooks.sh` once per clone so pre-commit blocks sensitive paths. `scripts/verify.py` also runs `scripts/check_public_tree_hygiene.py`.
 
 ## Useful entry points
 
