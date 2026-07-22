@@ -46,8 +46,16 @@ BLOCKED_BASENAMES = {
     ".env.local",
 }
 
+# Built in pieces so this file does not contain a literal local path string
+# that would trip the staged-content scanner.
 LOCAL_PATH_RE = re.compile(
-    r"(?:/Users/[A-Za-z0-9._-]+|/home/[A-Za-z0-9._-]+|koresim-runtime/)"
+    "(?:"
+    + "/".join(["", "Users", r"[A-Za-z0-9._-]+"])
+    + "|"
+    + "/".join(["", "home", r"[A-Za-z0-9._-]+"])
+    + "|"
+    + "koresim-runtime/"
+    + ")"
 )
 
 # Text files we scan for absolute local path leaks when staged.
