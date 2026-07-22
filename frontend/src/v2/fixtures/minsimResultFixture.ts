@@ -228,6 +228,94 @@ const marketSegmentationFixture: RunResultEnvelope = {
   },
 }
 
+/** price_optimization v1: intent can be 100% 구매 while preferred prices differ. */
+const priceOptimizationFixture: RunResultEnvelope = {
+  ...minsimResultFixture,
+  run_id: 'fixture-minsim-price',
+  simulation_type: 'price_optimization',
+  sample_size: 200,
+  total_responses: 200,
+  parse_failed: 0,
+  metrics: {
+    price_points: [12900, 15900, 18900, 21900, 24900],
+    intent_counts: { 구매: 200 },
+    intent_pct: { 구매: 100 },
+    preferred_price_counts: { '12900': 10, '15900': 70, '18900': 80, '21900': 40 },
+    preferred_price_pct: { '12900': 5, '15900': 35, '18900': 40, '21900': 20 },
+    demand_by_price: {
+      '12900': { count: 200, pct: 100 },
+      '15900': { count: 190, pct: 95 },
+      '18900': { count: 120, pct: 60 },
+      '21900': { count: 40, pct: 20 },
+      '24900': { count: 0, pct: 0 },
+    },
+    recommended_price: 12900,
+    avg_willingness_to_pay: 18150,
+  },
+  segments: {
+    // Old production shape: intent-keyed segments. Report must rebuild from raw.
+    breakdown_by_age: {
+      '20대': { 구매: 32 },
+      '30대': { 구매: 35 },
+    },
+    breakdown_by_sex: {
+      남자: { 구매: 101 },
+      여자: { 구매: 99 },
+    },
+    breakdown_by_province: {
+      경기: { 구매: 37 },
+      서울: { 구매: 35 },
+    },
+  },
+  raw_results: [
+    {
+      uuid: 'price-persona-18900',
+      persona: { name: '김선호', age: 29, sex: '남', province: '서울', occupation: '직장인' },
+      response: '선호가격: 18900\n의향: 구매\n지불의향가격: 18900\n이유: 새벽 편의 값이 이 정도면 납득돼요.',
+      parsed: {
+        intent: '구매',
+        preferred_price: 18900,
+        primary: '18900',
+        willingness_to_pay: 18900,
+        reason: '새벽 편의 값이 이 정도면 납득돼요.',
+      },
+    },
+    {
+      uuid: 'price-persona-15900',
+      persona: { name: '이관망', age: 34, sex: '여', province: '경기', occupation: '직장인' },
+      response: '선호가격: 15900\n의향: 구매\n지불의향가격: 15900\n이유: 2만원은 부담되고 1만5천대가 편해요.',
+      parsed: {
+        intent: '구매',
+        preferred_price: 15900,
+        primary: '15900',
+        willingness_to_pay: 15900,
+        reason: '2만원은 부담되고 1만5천대가 편해요.',
+      },
+    },
+  ],
+  orchestration: {
+    agents: {
+      analysis: {
+        summary: '18,900원 선호가 가장 많지만 15,900원까지 수요가 유지됩니다.',
+        key_findings: [
+          { finding: '선호 가격 1위는 18,900원', evidence: 'preferred_price_counts.18900=80' },
+          { finding: '18,900원 이상에서 수요가 급감', evidence: 'demand_by_price.18900.pct=60' },
+        ],
+      },
+      report: {
+        headline: '선호 가격과 수요 곡선을 함께 보고 가격 전략을 정하세요.',
+        recommendations: [
+          { action: '기본가 15,900원 검토', reason: '누적 수요와 선호 분포의 균형' },
+        ],
+        risks: [
+          { risk: 'intent 100% 구매만 보면 가격 차별이 안 보임', mitigation: '선호 가격·수요 곡선을 1위로 표시' },
+        ],
+      },
+      qa: { warnings: [] },
+    },
+  },
+}
+
 const churnResultFixture: RunResultEnvelope = {
   ...minsimResultFixture,
   run_id: 'fixture-minsim-churn',
@@ -307,6 +395,45 @@ export function runMinsimResultFixtureCheck(): MinsimResultFixtureCheck {
   }
   if (!report.objections.some((item) => item.reason.includes('가격') && item.pct > 0)) {
     failures.push('expected price objection derived from persona reasons')
+  }
+
+  const priceReport = buildMinsimReport(priceOptimizationFixture)
+  if (priceReport.segment.mode !== 'price') {
+    failures.push(`expected price mode, got ${priceReport.segment.mode}`)
+  }
+  if (priceReport.winner?.id !== '18900' || priceReport.winner?.pct !== 40) {
+    failures.push(
+      `expected preferred-price winner 18900 at 40%, got ${priceReport.winner?.id ?? 'none'} ${priceReport.winner?.pct ?? 'n/a'}%`,
+    )
+  }
+  if (priceReport.winner?.label !== '18,900원') {
+    failures.push(`expected winner label 18,900원, got ${priceReport.winner?.label ?? 'none'}`)
+  }
+  if (priceReport.runnerUp?.id !== '15900') {
+    failures.push(`expected runner-up 15900, got ${priceReport.runnerUp?.id ?? 'none'}`)
+  }
+  if (priceReport.creatives.some((item) => item.id === '구매' || item.label === '구매')) {
+    failures.push('price report must not use intent "구매" as primary outcome')
+  }
+  if (priceReport.intent !== null) {
+    failures.push('expected intent bar suppressed when preferred prices drive the KPI')
+  }
+  if (!priceReport.segment.metricLabel.includes('선호')) {
+    failures.push(`expected price metric label to mention 선호, got ${priceReport.segment.metricLabel}`)
+  }
+  if (priceReport.crowd.some((item) => item.choice === '구매')) {
+    failures.push('expected crowd labels to use preferred prices, not intent')
+  }
+  if (!priceReport.crowd.some((item) => item.choice === '18900' || item.choice === '15900')) {
+    failures.push('expected crowd choice labels from preferred_price')
+  }
+  // Old intent-keyed segments must be rebuilt so age cells follow prices.
+  const priceAge = priceReport.ageFull.find((row) => row.label === '20대' || row.label === '30대')
+  if (priceAge?.pct && Object.keys(priceAge.pct).includes('구매')) {
+    failures.push('expected age breakdown keys to be prices after client-side rebuild')
+  }
+  if (priceAge?.pct && !Object.keys(priceAge.pct).some((key) => key === '18900' || key === '15900')) {
+    failures.push(`expected age breakdown to include preferred prices, got ${Object.keys(priceAge.pct ?? {}).join(',')}`)
   }
 
   const churnReport = buildMinsimReport(churnResultFixture)
@@ -545,7 +672,7 @@ export function runMinsimResultFixtureCheck(): MinsimResultFixtureCheck {
 
   return {
     ok: failures.length === 0,
-    checked: 4 + adversarialCases.length,
+    checked: 5 + adversarialCases.length,
     failures,
   }
 }

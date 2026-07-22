@@ -232,7 +232,11 @@ def _aggregate_price(
             "avg_willingness_to_pay": _avg([item["willingness_to_pay"] for item in parsed]),
             "top_reasons": top_counts([item["reason"] for item in parsed], limit=8),
         },
-        "segments": demographic_segments(raw_results, parsed_results, key="intent"),
+        # Prefer preferred_price (not intent): intent is near-always 구매 once a
+        # price is chosen, so demographic maps must follow the price axis.
+        "segments": demographic_segments(
+            raw_results, parsed_results, key="preferred_price"
+        ),
         "insights": _single_insight(
             "recommended_price",
             "Recommended price",
