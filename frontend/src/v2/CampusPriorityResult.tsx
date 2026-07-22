@@ -46,8 +46,8 @@ export function CampusPriorityResult({ metrics }: { metrics: CampusPriorityMetri
           ? `유효 응답이 ${validAnswers}명뿐이라 승자를 단정할 수 없습니다.`
           : '순위 집계에 쓸 응답이 없습니다.'
     return (
-      <div className="minsim-campus-priority">
-        <section className="card" role="alert">
+      <div className="minsim-campus-priority minsim-result-stack">
+        <section className="card minsim-result-card" role="alert">
           <header className="minsim-campus-priority-card-head">
             <h3>순위를 표시하지 않습니다</h3>
           </header>
@@ -74,16 +74,16 @@ export function CampusPriorityResult({ metrics }: { metrics: CampusPriorityMetri
   }
 
   return (
-    <div className="minsim-campus-priority">
+    <div className="minsim-campus-priority minsim-result-stack">
       {sampleWarnings.map((warning) => (
-        <div className="card" key={warning} role="status">
+        <div className="card minsim-result-card" key={warning} role="status">
           <p className="muted" style={{ margin: 0 }}>
             표본 경고: {warning}
           </p>
         </div>
       ))}
 
-      <section className="card">
+      <section className="card minsim-result-card">
         <header className="minsim-campus-priority-card-head">
           <h3>전체 순위</h3>
           <span className="lbl-mono" style={{ color: 'var(--segment-retain)' }}>
@@ -117,7 +117,7 @@ export function CampusPriorityResult({ metrics }: { metrics: CampusPriorityMetri
         </ol>
       </section>
 
-      <section className="card">
+      <section className="card minsim-result-card">
         <header className="minsim-campus-priority-card-head">
           <h3>{tierAxisLabel}별 순위</h3>
         </header>
@@ -159,32 +159,37 @@ export function CampusPriorityResult({ metrics }: { metrics: CampusPriorityMetri
         </div>
       </section>
 
-      <section className="card">
+      <section className="card minsim-result-card">
         <header className="minsim-campus-priority-card-head">
-          <h3>계층 간 순위 역전</h3>
+          <h3>{tierAxisLabel} 간 순위 역전</h3>
         </header>
         {metrics.rank_inversions.length === 0 ? (
-          <div className="minsim-campus-priority-callout" role="status">
-            <span className="minsim-campus-priority-callout-badge lbl-mono">합의</span>
+          <div className="minsim-campus-priority-callout minsim-result-callout" role="status">
+            <span className="minsim-campus-priority-callout-badge minsim-result-callout-badge lbl-mono">
+              합의
+            </span>
             <div>
-              <p className="minsim-campus-priority-callout-title">
+              <p className="minsim-campus-priority-callout-title minsim-result-callout-title">
                 순위가 {metrics.inversion_threshold}단계 이상 갈리는 항목이 없습니다.
               </p>
               <p className="muted" style={{ margin: '6px 0 0' }}>
-                계층 간 합의된 안건으로 해석할 수 있습니다. 다만 표본이 한 계층에 몰려 있으면
-                이 합의는 재검증이 필요합니다.
+                {tierAxisLabel} 간 합의된 안건으로 해석할 수 있습니다. 다만 표본이 한 구간에
+                몰려 있으면 이 합의는 재검증이 필요합니다.
               </p>
             </div>
           </div>
         ) : (
           <>
             <p className="muted minsim-campus-priority-lead">
-              평균 순위 하나만 보면 묻히는 집행 갈등입니다. 아래 항목은 계층에 따라 우선순위가
-              {metrics.inversion_threshold}단계 이상 갈립니다.
+              평균 순위 하나만 보면 묻히는 집행 갈등입니다. 아래 항목은 {tierAxisLabel}에 따라
+              우선순위가 {metrics.inversion_threshold}단계 이상 갈립니다.
             </p>
-            <ul className="minsim-campus-priority-inversion-list">
+            <ul className="minsim-campus-priority-inversion-list minsim-result-inversion-list">
               {metrics.rank_inversions.map((inversion) => (
-                <li key={inversion.item} className="minsim-campus-priority-inversion-item">
+                <li
+                  key={inversion.item}
+                  className="minsim-campus-priority-inversion-item minsim-result-inversion-item"
+                >
                   <b>{inversion.item}</b>
                   <span className="muted">
                     {inversion.highest_tier} {inversion.highest_rank}위 ↔ {inversion.lowest_tier}{' '}
@@ -198,36 +203,32 @@ export function CampusPriorityResult({ metrics }: { metrics: CampusPriorityMetri
       </section>
 
       {(metrics.top_reasons.length > 0 || metrics.bottom_reasons.length > 0) && (
-        <section className="card">
+        <section className="card minsim-result-card">
           <header className="minsim-campus-priority-card-head">
             <h3>1순위·최하위 이유</h3>
           </header>
-          <div className="minsim-campus-priority-reasons">
+          <div className="minsim-campus-priority-reasons minsim-result-reasons">
             {metrics.top_reasons.length > 0 && (
-              <article className="minsim-campus-priority-reason-group">
+              <article className="minsim-campus-priority-reason-group minsim-result-reason-group">
                 <h4>1순위를 고른 이유</h4>
                 <ul>
                   {metrics.top_reasons.map((row) => (
                     <li key={row.reason}>
                       <span>{row.reason}</span>
-                      {row.count > 1 ? (
-                        <span className="muted">{row.count}명</span>
-                      ) : null}
+                      <span className="muted minsim-result-reason-count">{row.count}명</span>
                     </li>
                   ))}
                 </ul>
               </article>
             )}
             {metrics.bottom_reasons.length > 0 && (
-              <article className="minsim-campus-priority-reason-group">
+              <article className="minsim-campus-priority-reason-group minsim-result-reason-group">
                 <h4>최하위를 고른 이유</h4>
                 <ul>
                   {metrics.bottom_reasons.map((row) => (
                     <li key={row.reason}>
                       <span>{row.reason}</span>
-                      {row.count > 1 ? (
-                        <span className="muted">{row.count}명</span>
-                      ) : null}
+                      <span className="muted minsim-result-reason-count">{row.count}명</span>
                     </li>
                   ))}
                 </ul>

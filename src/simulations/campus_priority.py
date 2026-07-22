@@ -18,7 +18,7 @@ from src.agent.simulator import BatchSimulator
 from src.data.pools import DEFAULT_PERSONA_POOL
 from src.data.respondent_axes import (
     classify_primary,
-    ensure_campus_sampler,
+    is_campus_pool,
     normalize_pool,
     primary_axis_label,
     primary_axis_order,
@@ -342,8 +342,9 @@ def aggregate_campus_priority(
 class CampusPrioritySimulation(GenericPersonaSimulation):
     """파서가 항목 집합에 의존하므로 실행 시점에 파서를 만든다.
 
-    DGIST 등 전용 풀에서는 계층 최소 표본을 보장한다. 순위 역전 탐지는
-    계층별 표본이 있어야 성립하므로 층화가 특히 중요하다.
+    페르소나 풀을 존중한다:
+    - DGIST: 소속 층화 + 학내 계층 축
+    - 전 국민: 무작위 표본 + 연령 축 (학내 계층 분류를 쓰면 전원 교직원으로 뭉개짐)
     """
 
     async def run(
@@ -364,18 +365,22 @@ class CampusPrioritySimulation(GenericPersonaSimulation):
         )
 
         sampler = sampler or PersonaSampler()
-        # nationwide + campus tier axis → 전원 교직원 (education_level 불일치).
-        # 학내 우선순위 시뮬은 DGIST 풀·층화를 강제한다.
-        sampler, pool_warnings = ensure_campus_sampler(sampler)
-        runtime_input = {**input_data, "_persona_pool": "dgist"}
-        stratified = sample_stratified(
-            sampler, n=sample_size, seed=seed, target_filter=target_filter
-        )
-        personas = stratified.personas
-        sampling_meta = {
-            **stratified.meta,
-            "warnings": list(stratified.meta.get("warnings") or []) + pool_warnings,
-        }
+        pool = normalize_pool(getattr(sampler, "pool", None) or DEFAULT_PERSONA_POOL)
+        runtime_input = {**input_data, "_persona_pool": pool}
+        if is_campus_pool(pool):
+            stratified = sample_stratified(
+                sampler, n=sample_size, seed=seed, target_filter=target_filter
+            )
+            personas = stratified.personas
+            sampling_meta = stratified.meta
+        else:
+            personas = sampler.sample(n=sample_size, filter_=target_filter, seed=seed)
+            sampling_meta = {
+                "sampling": "random",
+                "tier_counts": {},
+                "tier_weights": {},
+                "warnings": [],
+            }
 
         # 항목 제시 순서가 1위를 바꾼다 (2026-07-20 실측: 순서를 뒤집자 1위가
         # 학부실험실 → 기숙사로 이동). 설문 방법론의 counterbalancing을 적용해

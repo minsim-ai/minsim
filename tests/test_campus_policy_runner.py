@@ -63,24 +63,20 @@ async def test_run_uses_stratified_sampling_and_records_meta():
 
 
 @pytest.mark.asyncio
-async def test_run_on_nationwide_pool_upgrades_to_dgist_stratified():
-    """전국민 풀 + 학내 축은 전원 교직원으로 뭉개지므로 DGIST 층화로 전환한다."""
+async def test_run_on_nationwide_pool_uses_random_age_axis():
+    """전 국민 선택을 존중한다. 층화·DGIST 강제 없음."""
     sim = SIMULATION_SPECS["campus_policy"].runner_factory()
     result = await sim.run(
         AGENDA_INPUT,
-        sample_size=100,
+        sample_size=30,
         seed=42,
         llm_client=StubLLMClient(),
         sampler=PersonaSampler(pool="nationwide"),
     )
-    assert result.metrics["sampling"]["sampling"] == "stratified"
-    assert result.metrics["persona_pool"] == "dgist"
-    rankings = result.metrics.get("tier_housing_matrix") or result.metrics.get("tier_rankings") or {}
-    # 학부생 등 실제 캠퍼스 계층이 비어 있지 않아야 한다.
-    staff_only = False
-    if "tier_rankings" in result.metrics:
-        counts = {k: v.get("n", 0) for k, v in result.metrics["tier_rankings"].items()}
-        staff_only = counts.get("교직원", 0) == result.total_responses
-    assert not staff_only
+    assert result.metrics["sampling"]["sampling"] == "random"
+    assert result.metrics["persona_pool"] == "nationwide"
+    assert result.metrics.get("tier_axis_label") in ("연령대", None) or "20대" in (
+        result.metrics.get("tier_axis") or []
+    )
     warnings = " ".join(result.metrics["sampling"].get("warnings") or [])
-    assert "DGIST" in warnings or "교직원" in warnings
+    assert "DGIST" not in warnings

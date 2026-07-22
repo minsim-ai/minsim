@@ -260,8 +260,8 @@ async def test_run_rejects_item_count_out_of_range():
 
 
 @pytest.mark.asyncio
-async def test_run_upgrades_nationwide_sampler_to_dgist_stratified():
-    """학식/셔틀 같은 학내 안건을 전국민 풀로 돌리면 100% 교직원이 된다. 방지."""
+async def test_run_honors_nationwide_pool_with_age_axis():
+    """전 국민 선택을 존중한다. 학내 계층 축을 강제하면 전원 교직원으로 뭉개진다."""
     from src.data.sampler import PersonaSampler
     from src.llm.base import LLMResponse
     from src.simulations.registry import SIMULATION_SPECS
@@ -274,7 +274,6 @@ async def test_run_upgrades_nationwide_sampler_to_dgist_stratified():
                 for line in content.splitlines()
                 if line.startswith("- ")
             ]
-            # 프롬프트 항목 블록만 사용 (3~6개).
             items = listed[:4] if len(listed) >= 4 else listed
             payload = {
                 "ranking": items,
@@ -290,19 +289,26 @@ async def test_run_upgrades_nationwide_sampler_to_dgist_stratified():
     sim = SIMULATION_SPECS["campus_priority"].runner_factory()
     result = await sim.run(
         INPUT,
-        sample_size=100,
+        sample_size=50,
         seed=42,
         llm_client=FixedRankStub(),
         sampler=PersonaSampler(pool="nationwide"),
     )
-    assert result.metrics["sampling"]["sampling"] == "stratified"
-    assert result.metrics["persona_pool"] == "dgist"
+    assert result.metrics["sampling"]["sampling"] == "random"
+    assert result.metrics["persona_pool"] == "nationwide"
+    assert result.metrics["tier_axis_label"] == "연령대"
+    assert "20대" in result.metrics["tier_axis"]
     counts = {k: v["n"] for k, v in result.metrics["tier_rankings"].items()}
-    assert counts.get("학부생", 0) > 0
-    assert counts.get("석·박사 재학", 0) > 0
-    assert counts.get("교직원", 0) < result.total_responses
+    assert counts.get("교직원", 0) == 0
+    assert sum(counts.values()) == result.total_responses - result.parse_failed
     warnings = " ".join(result.metrics["sampling"].get("warnings") or [])
-    assert "교직원" in warnings or "DGIST" in warnings
+    assert "DGIST" not in warnings
+    # 실제 표본이 전국민인지 직업 라벨로 확인
+    occupations = [
+        (getattr(row, "persona", None) or {}).get("occupation", "")
+        for row in result.raw_results[:10]
+    ]
+    assert not any(str(o).startswith("DGIST") for o in occupations)
 
 
 def test_strips_ordinal_prefix_from_ranking():

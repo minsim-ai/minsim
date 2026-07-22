@@ -6257,9 +6257,11 @@ html[data-theme="minsim-dark"] {
   border-radius: var(--r);
 }
 
-/* Free-survey / campus-priority results: cards need explicit padding (base .card has none). */
+/* Free-survey / campus-priority results: cards need explicit padding (base .card has none).
+   Shared minsim-result-* names are the hard contract; sim-specific aliases stay for one release. */
 .minsim-open-survey,
-.minsim-campus-priority {
+.minsim-campus-priority,
+.minsim-result-stack {
   display: grid;
   gap: 14px;
 }
@@ -6267,7 +6269,11 @@ html[data-theme="minsim-dark"] {
 .minsim-shell .minsim-open-survey > .card,
 .minsim-open-survey > .card,
 .minsim-shell .minsim-campus-priority > .card,
-.minsim-campus-priority > .card {
+.minsim-campus-priority > .card,
+.minsim-shell .minsim-result-stack > .card,
+.minsim-result-stack > .card,
+.minsim-result-card,
+.minsim-shell .minsim-result-card {
   padding: 20px 22px;
 }
 
@@ -6413,7 +6419,8 @@ html[data-theme="minsim-dark"] {
   background: var(--lime);
 }
 
-.minsim-campus-priority-callout {
+.minsim-campus-priority-callout,
+.minsim-result-callout {
   display: flex;
   gap: 12px;
   align-items: flex-start;
@@ -6423,7 +6430,8 @@ html[data-theme="minsim-dark"] {
   background: var(--surface-2, var(--bg-2));
 }
 
-.minsim-campus-priority-callout-badge {
+.minsim-campus-priority-callout-badge,
+.minsim-result-callout-badge {
   flex: none;
   margin-top: 2px;
   padding: 3px 8px;
@@ -6434,7 +6442,8 @@ html[data-theme="minsim-dark"] {
   font-size: 11px;
 }
 
-.minsim-campus-priority-callout-title {
+.minsim-campus-priority-callout-title,
+.minsim-result-callout-title {
   margin: 0;
   font-size: 14px;
   font-weight: 650;
@@ -6442,7 +6451,8 @@ html[data-theme="minsim-dark"] {
   line-height: 1.45;
 }
 
-.minsim-campus-priority-inversion-list {
+.minsim-campus-priority-inversion-list,
+.minsim-result-inversion-list {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -6450,7 +6460,8 @@ html[data-theme="minsim-dark"] {
   gap: 10px;
 }
 
-.minsim-campus-priority-inversion-item {
+.minsim-campus-priority-inversion-item,
+.minsim-result-inversion-item {
   display: grid;
   gap: 4px;
   padding: 12px 14px;
@@ -6462,19 +6473,24 @@ html[data-theme="minsim-dark"] {
   color: var(--fg);
 }
 
-.minsim-campus-priority-reasons {
+.minsim-campus-priority-reasons,
+.minsim-result-reasons {
   display: grid;
   gap: 14px;
 }
 
-.minsim-campus-priority-reason-group {
+.minsim-campus-priority-reason-group,
+.minsim-open-survey-reason-group,
+.minsim-result-reason-group {
   border: 1px solid var(--border-soft);
   border-radius: var(--r-sm);
   background: var(--surface-2, var(--bg-2));
   padding: 14px 16px;
 }
 
-.minsim-campus-priority-reason-group h4 {
+.minsim-campus-priority-reason-group h4,
+.minsim-open-survey-reason-group h4,
+.minsim-result-reason-group h4 {
   margin: 0 0 10px;
   color: var(--fg);
   font-size: 13.5px;
@@ -6483,7 +6499,9 @@ html[data-theme="minsim-dark"] {
   overflow-wrap: anywhere;
 }
 
-.minsim-campus-priority-reason-group ul {
+.minsim-campus-priority-reason-group ul,
+.minsim-open-survey-reason-group ul,
+.minsim-result-reason-group ul {
   margin: 0;
   padding: 0;
   list-style: none;
@@ -6491,8 +6509,11 @@ html[data-theme="minsim-dark"] {
   gap: 10px;
 }
 
-.minsim-campus-priority-reason-group li {
-  display: grid;
+/* Hard layout: preflight leaves spans inline without this → wall of text + inline N명. */
+.minsim-campus-priority-reason-group li,
+.minsim-open-survey-reason-group li,
+.minsim-result-reason-group li {
+  display: grid !important;
   gap: 4px;
   padding-top: 10px;
   border-top: 1px dashed var(--border-soft);
@@ -6502,12 +6523,19 @@ html[data-theme="minsim-dark"] {
   overflow-wrap: anywhere;
 }
 
-.minsim-campus-priority-reason-group li:first-child {
+.minsim-campus-priority-reason-group li:first-child,
+.minsim-open-survey-reason-group li:first-child,
+.minsim-result-reason-group li:first-child {
   padding-top: 0;
   border-top: 0;
 }
 
-.minsim-campus-priority-reason-group li .muted {
+.minsim-campus-priority-reason-group li .muted,
+.minsim-open-survey-reason-group li .muted,
+.minsim-result-reason-group li .muted,
+.minsim-campus-priority-reason-group li .minsim-result-reason-count,
+.minsim-result-reason-group li .minsim-result-reason-count {
+  display: block;
   font-size: 12px;
 }
 

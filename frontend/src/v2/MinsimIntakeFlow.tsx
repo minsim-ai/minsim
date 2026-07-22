@@ -482,8 +482,18 @@ function preselectedPersonaPool(projectKind?: string | null): string {
 }
 
 
-function PersonaPoolPicker({ value, onSelect }: { value: string; onSelect: (pool: string) => void }) {
+function PersonaPoolPicker({
+  value,
+  onSelect,
+  simulationType,
+}: {
+  value: string
+  onSelect: (pool: string) => void
+  simulationType?: string
+}) {
   const [pools, setPools] = useState<PersonaPoolOption[]>(DEFAULT_POOL_OPTIONS)
+  const isCampusSim =
+    simulationType === 'campus_priority' || simulationType === 'campus_policy' || simulationType === 'open_survey'
 
   useEffect(() => {
     let cancelled = false
@@ -530,6 +540,13 @@ function PersonaPoolPicker({ value, onSelect }: { value: string; onSelect: (pool
           </button>
         ))}
       </div>
+      {isCampusSim && (
+        <p className="minsim-run-control-note" style={{ marginTop: 8 }}>
+          {value === 'dgist'
+            ? 'DGIST 구성원 풀: 학내 소속·거주 기준으로 나눕니다.'
+            : '전 국민 풀: 연령·성별 기준으로 나눕니다. 학내 소속 축은 쓰지 않습니다.'}
+        </p>
+      )}
     </div>
   )
 }
@@ -809,7 +826,11 @@ function ActionPanel({
           )}
           <PanelSizePicker value={sampleSize} onSelect={onSampleSizeChange} />
           {countryId === 'kr' && (
-            <PersonaPoolPicker value={personaPool} onSelect={onPersonaPoolChange} />
+            <PersonaPoolPicker
+              value={personaPool}
+              onSelect={onPersonaPoolChange}
+              simulationType={simulationType}
+            />
           )}
         </div>
 
