@@ -180,6 +180,9 @@ export function ProjectsPage() {
                     onClick={() => setKind(spec.kind)}
                     aria-pressed={kind === spec.kind}
                   >
+                    {kind === spec.kind ? (
+                      <span className="minsim-project-kind-selected">✓ 선택됨</span>
+                    ) : null}
                     <b>{spec.label}</b>
                     <span>{spec.blurb}</span>
                   </button>

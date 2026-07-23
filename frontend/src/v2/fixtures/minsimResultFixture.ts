@@ -1,4 +1,5 @@
 import type { RunResultEnvelope } from '../../types/api'
+import { reconcileCampusPolicyMetrics } from '../campusPolicyCopy'
 import { adaptRunResult } from '../resultAdapter'
 import { buildMinsimReport } from '../minsimReport'
 
@@ -375,12 +376,19 @@ export function runMinsimResultFixtureCheck(): MinsimResultFixtureCheck {
   const report = buildMinsimReport(minsimResultFixture)
   const failures: string[] = []
 
+  if (view.cards.some((card) => card.label.includes('구조화') || card.label.includes('파싱'))) {
+    failures.push('user-facing metric cards must not use 구조화/파싱 jargon')
+  }
+  if (!view.cards.some((card) => card.label === '응답 정리 성공')) {
+    failures.push('expected 응답 정리 성공 metric card')
+  }
+
   if (view.winnerLabel !== 'B안') failures.push(`expected B안 winner, got ${view.winnerLabel}`)
   if (view.segmentMatrices.length < 2) failures.push('expected age and province segment matrices')
   if (view.evidenceQuotes.length < 2) failures.push('expected evidence quotes from raw results')
   if (view.recommendations.length === 0) failures.push('expected recommendations')
   if (view.methodology.some((item) => /seed\s*\d+/i.test(item))) failures.push('expected no seed in methodology')
-  if (!view.methodology.some((item) => item.includes('구조화 성공'))) failures.push('expected parse-success methodology line')
+  if (!view.methodology.some((item) => item.includes('응답 정리 성공'))) failures.push('expected parse-success methodology line')
 
   if (!report.oppRisk) {
     failures.push('expected opportunity/risk map')
@@ -395,6 +403,24 @@ export function runMinsimResultFixtureCheck(): MinsimResultFixtureCheck {
   }
   if (!report.objections.some((item) => item.reason.includes('가격') && item.pct > 0)) {
     failures.push('expected price objection derived from persona reasons')
+  }
+
+  // campus_policy: headcount 찬성 majority + negative net_support must reconcile (#2)
+  const campusConflict = reconcileCampusPolicyMetrics({
+    stance_distribution: {
+      찬성: { count: 86, pct: 53.8 },
+      반대: { count: 72, pct: 45.0 },
+      판단유보: { count: 2, pct: 1.2 },
+    },
+    net_support: -6.3,
+    strong_opposition_pct: 44.4,
+  })
+  if (!campusConflict.conflict) failures.push('expected campus headcount/net_support conflict flag')
+  if (!campusConflict.oneLiner.includes('머릿수') || !campusConflict.oneLiner.includes('-6.3')) {
+    failures.push(`expected reconciled campus one-liner, got ${campusConflict.oneLiner}`)
+  }
+  if (campusConflict.oneLiner.includes('소폭 높') && campusConflict.oneLiner.includes('부정') && !campusConflict.oneLiner.includes('순지지도')) {
+    failures.push('reconciled line must not leave majority vs net_support unexplained')
   }
 
   const priceReport = buildMinsimReport(priceOptimizationFixture)

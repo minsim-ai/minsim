@@ -1,4 +1,5 @@
-import type { JsonObject, RawPersonaResult, RunResultEnvelope } from '../types/api'
+import type { CampusPolicyMetrics, JsonObject, RawPersonaResult, RunResultEnvelope } from '../types/api'
+import { reconcileCampusPolicyMetrics } from './campusPolicyCopy'
 import {
   displayName as legacyDisplayName,
   isMaleLabel,
@@ -281,6 +282,16 @@ export function buildMinsimReport(result: RunResultEnvelope, options: { complete
   const parseSuccessRate = parseSuccess(result)
   const total = result.total_responses
   const status = confidenceLabel(total, parseSuccessRate)
+
+  // campus_policy: when headcount majority and intensity-weighted net_support disagree,
+  // force a reconciled one-liner so the report does not sound self-contradictory (#2).
+  const campusReconcile = result.simulation_type === 'campus_policy'
+    ? reconcileCampusPolicyMetrics(metrics as unknown as CampusPolicyMetrics)
+    : null
+  if (campusReconcile?.conflict) {
+    agent.headline = campusReconcile.oneLiner
+    agent.summary = `${campusReconcile.oneLiner} ${campusReconcile.legend}`
+  }
 
   const sentiment = deriveSentiment(result.raw_results)
   // Suppress the near-always-100% intent bar when preferred prices are the KPI.

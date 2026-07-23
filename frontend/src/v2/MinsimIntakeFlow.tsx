@@ -450,7 +450,8 @@ function PanelSizePicker({ value, onSelect }: { value: number; onSelect: (size: 
             aria-pressed={value === preset}
             onClick={() => onSelect(preset)}
           >
-            {preset.toLocaleString()}명
+            <span>{preset.toLocaleString()}명</span>
+            {value === preset ? <span className="minsim-run-option-state">선택됨</span> : null}
           </button>
         ))}
       </div>
@@ -536,7 +537,8 @@ function PersonaPoolPicker({
             title={pool.available ? undefined : '데이터셋 준비 중'}
             onClick={() => pool.available && onSelect(pool.id)}
           >
-            {pool.label}
+            <span>{pool.label}</span>
+            {value === pool.id ? <span className="minsim-run-option-state">선택됨</span> : null}
           </button>
         ))}
       </div>
