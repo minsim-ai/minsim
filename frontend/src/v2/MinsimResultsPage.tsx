@@ -77,17 +77,16 @@ export function MinsimResultsPage({ projectId, runId }: { projectId: string | nu
   const [state, setState] = useState<ResultsState>({ project: null, run: null, result: null, loading: true, error: null })
   const [actionError, setActionError] = useState<string | null>(null)
   const [feedbackText, setFeedbackText] = useState('')
-  const [intendedAction, setIntendedAction] = useState('')
   const [feedbackNotice, setFeedbackNotice] = useState<string | null>(null)
   const [actionPending, setActionPending] = useState<'feedback' | null>(null)
 
   /**
-   * 피드백은 화면 맨 아래에 있고 '피드백 저장'으로만 서버에 간다.
+   * 제보 폼은 화면 맨 아래에 있고 '제보 보내기'로만 서버에 간다.
    * 상단 툴바 버튼으로 나가면 적던 글이 경고 없이 사라진다.
    */
   const leaveGuard = (path: string) => {
-    const unsaved = !feedbackNotice && Boolean(feedbackText.trim() || intendedAction.trim())
-    if (unsaved && !window.confirm('작성 중인 피드백이 저장되지 않았습니다. 저장하지 않고 나갈까요?')) return
+    const unsaved = !feedbackNotice && Boolean(feedbackText.trim())
+    if (unsaved && !window.confirm('작성 중인 제보가 저장되지 않았습니다. 저장하지 않고 나갈까요?')) return
     navigateTo(path)
   }
 
@@ -201,15 +200,11 @@ export function MinsimResultsPage({ projectId, runId }: { projectId: string | nu
       setActionError(null)
       setActionPending('feedback')
       await submitProjectRunFeedback(projectId, runId, {
-        usefulness_score: 4,
-        trust_score: 4,
-        actionability_score: 4,
-        intended_action: intendedAction,
-        free_text: feedbackText,
+        free_text: feedbackText || null,
+        result_expectation: 'bug_or_issue',
       })
-      setFeedbackNotice('피드백을 저장했습니다.')
+      setFeedbackNotice('제보 감사합니다. 확인 후 개선할게요.')
       setFeedbackText('')
-      setIntendedAction('')
     } catch (err) {
       setActionError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -344,19 +339,29 @@ export function MinsimResultsPage({ projectId, runId }: { projectId: string | nu
 
         <hr className="hr" />
 
-        {/* feedback */}
+        {/* feedback / bug report — reuses existing run feedback API */}
         <section style={{ padding: '40px 0 64px' }}>
-          <SectionHead kicker="결과 피드백" title="이 결과, 쓸 만했나요?" />
+          <SectionHead
+            kicker="제보"
+            title="버그·오류 제보"
+            sub="짧게 알려주시면 바로 확인해요."
+          />
           <form className="card" style={{ padding: 22 }} onSubmit={submitFeedback}>
-            <label className="col" style={{ gap: 6, marginBottom: 12 }}>
-              <span className="lbl">이 결과로 무엇을 할 예정인가요?</span>
-              <input className="inp" value={intendedAction} onChange={(event) => setIntendedAction(event.target.value)} placeholder="예) A안은 폐기, B안 헤드라인으로 상세페이지 제작" />
-            </label>
             <label className="col" style={{ gap: 6, marginBottom: 16 }}>
-              <span className="lbl">부족했던 점</span>
-              <textarea className="inp" value={feedbackText} onChange={(event) => setFeedbackText(event.target.value)} placeholder="결과 해석, 질문 흐름, 보고서에서 아쉬웠던 점을 적어주세요." />
+              <span className="lbl">어디가 이상했나요?</span>
+              <textarea
+                className="inp"
+                value={feedbackText}
+                onChange={(event) => setFeedbackText(event.target.value)}
+                rows={4}
+                required
+                minLength={5}
+                placeholder="예) 연령대 표가 비어 보여요 / 지도 숫자가 안 맞아요 / 로딩이 끝나지 않아요 / 버튼이 안 눌려요"
+              />
             </label>
-            <button className="btn primary block" type="submit" disabled={actionPending !== null}>{actionPending === 'feedback' ? '저장 중…' : '피드백 저장'}</button>
+            <button className="btn primary block" type="submit" disabled={actionPending !== null || !feedbackText.trim()}>
+              {actionPending === 'feedback' ? '보내는 중…' : '제보 보내기'}
+            </button>
             {feedbackNotice && <p className="muted" style={{ fontSize: 12.5, marginTop: 10 }}>{feedbackNotice}</p>}
           </form>
         </section>
@@ -670,7 +675,7 @@ function Verdict({ report, onExport }: { report: MinsimReport; onExport: () => v
     isIntentReport || isPriceReport
       ? { l: segment.metricLabel, v: `${segment.overallPct}%`, s: `전체 합성 패널 중 ${segment.focusLabel}` }
       : { l: '선호 격차', v: run.gap, s: runnerUp ? `1위−2위 (${winner.id}−${runnerUp.id})` : '1위 기준' },
-    { l: '해석 상태', v: run.status, s: `구조화 성공 ${run.structured}` },
+    { l: '해석 상태', v: run.status, s: `응답 정리 성공 ${run.structured}` },
   ]
   const reportKicker = isPriceReport
     ? '가격 수용도 보고서'

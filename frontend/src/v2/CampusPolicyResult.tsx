@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { getRunSurvey, type SurveyExportResponse } from '../api/runs'
 import type { CampusPolicyMetrics } from '../types/api'
+import { reconcileCampusPolicyMetrics } from './campusPolicyCopy'
 
 const FALLBACK_TIER_ORDER = ['학부생', '석·박사 재학', '박사후연구원', '교직원']
 const FALLBACK_HOUSING_ORDER = ['기숙사', '현풍 원룸', '대구 시내 통근']
@@ -56,9 +57,46 @@ export function CampusPolicyResult({
   const housingOrder = metrics.housing_axis?.length ? metrics.housing_axis : FALLBACK_HOUSING_ORDER
   const tierAxisLabel = metrics.tier_axis_label || '계층'
   const housingAxisLabel = metrics.housing_axis_label || '거주'
+  const reconcile = reconcileCampusPolicyMetrics(metrics)
 
   return (
     <div className="col" style={{ gap: 14 }}>
+      <section
+        className="card"
+        style={{
+          borderColor: reconcile.conflict ? 'var(--segment-watch)' : 'var(--border)',
+          background: reconcile.conflict
+            ? 'color-mix(in srgb, var(--segment-watch) 8%, var(--surface))'
+            : undefined,
+        }}
+      >
+        <div className="lbl-mono" style={{ marginBottom: 8, color: 'var(--lime)' }}>
+          {reconcile.conflict ? '머릿수와 순지지도가 갈립니다' : '찬반 · 순지지도 한눈에'}
+        </div>
+        <p style={{ fontWeight: 650, fontSize: 15, lineHeight: 1.55, margin: 0 }}>{reconcile.oneLiner}</p>
+        <p className="muted" style={{ fontSize: 12.5, lineHeight: 1.55, marginTop: 10 }}>
+          {reconcile.legend}
+        </p>
+        <ul className="row" style={{ gap: 14, listStyle: 'none', padding: 0, marginTop: 12, flexWrap: 'wrap' }}>
+          {STANCE_ORDER.map((stance) => {
+            const item = metrics.stance_distribution[stance]
+            if (!item) return null
+            return (
+              <li key={stance}>
+                <span style={{ color: STANCE_COLOR[stance] }}>■</span> {stance}{' '}
+                <b>{item.count}명</b> <span className="lbl-mono">({item.pct}%)</span>
+              </li>
+            )
+          })}
+          <li>
+            <span className="lbl-mono">순지지도 {signed(metrics.net_support)}%p</span>
+          </li>
+          <li>
+            <span className="lbl-mono">강한 반대 {metrics.strong_opposition_pct}%</span>
+          </li>
+        </ul>
+      </section>
+
       {metrics.unresolved_choice && (
         <div className="card" role="alert" style={{ borderColor: 'var(--segment-churn)' }}>
           <b>이 안건은 찬반 질문이 아닙니다</b>
@@ -183,8 +221,8 @@ export function CampusPolicyResult({
           </span>
         </div>
         <p className="muted" style={{ fontSize: 12.5 }}>
-          2026-07-21 실측: 선택지 순서만 바꿔도 전체 찬성률이 50.0% → 25.3%로 움직였습니다.
-          이 수치를 의사결정 근거로 쓰지 마세요. 위의 계층 비교를 보세요.
+          머릿수 비율만 보면 방향을 오해하기 쉽습니다. 위 카드의 순지지도(강도 가중)와 함께 보세요.
+          선택지 순서만 바꿔도 절대 찬성률이 크게 움직일 수 있어, 의사결정 단독 근거로 쓰지 마세요.
         </p>
         <p className="muted" style={{ marginTop: 8 }}>
           강도 가중 순찬성 {signed(metrics.net_support)}%p · 강한 반대(강도 4–5){' '}

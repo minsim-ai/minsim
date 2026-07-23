@@ -147,7 +147,7 @@ function buildReportHtml(report: MinsimReport, meta: MinsimPdfMeta, title: strin
     <div class="metrics">
       <div class="metric"><div class="kicker">응답 표본</div><div class="v">${run.panel}명</div><div class="s">유효 ${run.valid}명</div></div>
       <div class="metric"><div class="kicker">${escapeHtml(report.segment.metricLabel)}</div><div class="v">${winner ? `${winner.pct}%` : '—'}</div><div class="s">${winner ? escapeHtml(winner.label) : '집계 중'}</div></div>
-      <div class="metric"><div class="kicker">해석 상태</div><div class="v" style="font-size:15px">${escapeHtml(run.status)}</div><div class="s">구조화 성공 ${escapeHtml(run.structured)}</div></div>
+      <div class="metric"><div class="kicker">해석 상태</div><div class="v" style="font-size:15px">${escapeHtml(run.status)}</div><div class="s">응답 정리 성공 ${escapeHtml(run.structured)}</div></div>
     </div>
     ${runnerUp ? `<p class="muted">비교 기준 · ${escapeHtml(runnerUp.label)} ${runnerUp.pct}% · 격차 ${escapeHtml(run.gap)}</p>` : ''}
   </section>
