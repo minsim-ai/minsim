@@ -31,6 +31,7 @@ import { SectionBoundary } from './SectionBoundary'
 import { CampusPolicyResult } from './CampusPolicyResult'
 import { CampusPriorityResult } from './CampusPriorityResult'
 import { OpenSurveyResult } from './OpenSurveyResult'
+import { FocusGroupSection } from './FocusGroupSection'
 import { hasDedicatedRenderer } from '../simulations/registry'
 
 const OPT: Record<string, string> = {
@@ -309,6 +310,15 @@ export function MinsimResultsPage({ projectId, runId }: { projectId: string | nu
         {state.result?.simulation_type === 'open_survey' && (
           <SectionBoundary title="설문 응답 분해">
             <OpenSurveyResult metrics={state.result.metrics as unknown as OpenSurveyMetrics} />
+          </SectionBoundary>
+        )}
+        {state.result?.simulation_type === 'open_survey' && projectId && (
+          <SectionBoundary title="9인 포커스 그룹">
+            <FocusGroupSection
+              projectId={projectId}
+              runId={runId}
+              metrics={state.result.metrics as unknown as OpenSurveyMetrics}
+            />
           </SectionBoundary>
         )}
         {state.result?.simulation_type === 'campus_priority' && (

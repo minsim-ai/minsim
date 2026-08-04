@@ -13,13 +13,16 @@ def consume_interactive_llm_action(
     store: SQLiteRunStore,
     user: UserRecord | None,
     action_type: str,
+    units: int = 1,
 ) -> None:
     if user is None:
         return
+    safe_units = max(1, int(units))
     allowed, _ = store.try_consume_interactive_llm_action(
         user_id=user.user_id,
         action_type=action_type,
         limit=INTERACTIVE_LLM_ACTIONS_PER_HOUR,
+        units=safe_units,
     )
     if not allowed:
         raise ServiceError(
@@ -29,5 +32,6 @@ def consume_interactive_llm_action(
             details={
                 "action_type": action_type,
                 "limit_per_hour": INTERACTIVE_LLM_ACTIONS_PER_HOUR,
+                "units": safe_units,
             },
         )

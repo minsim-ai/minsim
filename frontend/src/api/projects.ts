@@ -1,5 +1,8 @@
 import { requestJson } from './client'
 import type {
+  FocusGroupCreateRequest,
+  FocusGroupListResponse,
+  FocusGroupResponse,
   InterviewThreadCreateRequest,
   InterviewThreadListResponse,
   InterviewThreadMessageRequest,
@@ -143,3 +146,37 @@ export function askProjectRunInterviewThread(
     },
   )
 }
+
+export function listProjectRunFocusGroups(
+  projectId: string,
+  runId: string,
+): Promise<FocusGroupListResponse> {
+  return requestJson<FocusGroupListResponse>(
+    `/api/projects/${enc(projectId)}/runs/${enc(runId)}/focus-groups`,
+  )
+}
+
+export function createProjectRunFocusGroup(
+  projectId: string,
+  runId: string,
+  payload: FocusGroupCreateRequest,
+): Promise<FocusGroupResponse> {
+  return requestJson<FocusGroupResponse>(
+    `/api/projects/${enc(projectId)}/runs/${enc(runId)}/focus-groups`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+  )
+}
+
+export function getProjectRunFocusGroup(
+  projectId: string,
+  runId: string,
+  focusGroupId: string,
+): Promise<FocusGroupResponse> {
+  return requestJson<FocusGroupResponse>(
+    `/api/projects/${enc(projectId)}/runs/${enc(runId)}/focus-groups/${enc(focusGroupId)}`,
+  )
+}
+

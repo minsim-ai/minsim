@@ -2,9 +2,6 @@ import { useEffect, useState } from 'react'
 import { CircleCheck, FlaskConical, Folder, LoaderCircle } from 'lucide-react'
 import { getProject, listProjectRuns } from '../api/projects'
 import { GitHubStarCta } from '../components/GitHubStarCta'
-import { SimulationProgress } from '../components/SimulationProgress'
-import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion'
-import { getSimulationLabel } from '../simulations/registry'
 import type { ProjectResponse, RunSnapshot } from '../types/api'
 import { navigateTo } from './navigation'
 import { terminalRunCopy } from './runTerminalCopy'
@@ -31,7 +28,6 @@ export function MinsimLoadingPage({
   runId: string | null
 }) {
   const [state, setState] = useState<LoadingState>({ project: null, run: null, error: null })
-  const prefersReducedMotion = usePrefersReducedMotion()
 
   useEffect(() => {
     if (!projectId || !runId) {
@@ -156,25 +152,7 @@ export function MinsimLoadingPage({
     )
   }
 
-  if (!prefersReducedMotion) {
-    return (
-      <SimulationProgress
-        snapshot={run}
-        resultAvailable={Boolean(run?.status === 'completed' && run.result_available)}
-        runLabel={`${projectName} · ${run ? getSimulationLabel(run.simulation_type) : '시뮬레이션 준비'}`}
-        stageTitle={isReportGenerating ? '리포트를 생성 중입니다.' : `${total.toLocaleString('ko-KR')}명의 합성 페르소나가 응답하는 중`}
-        stageBody={isReportGenerating ? '응답을 검토하고 근거와 세그먼트를 정리하고 있습니다.' : `${phaseLabel} · ${done.toLocaleString('ko-KR')} / ${total.toLocaleString('ko-KR')}명 응답 완료`}
-        pendingLabel="분석 중"
-        completeLabel="결과 보기"
-        onComplete={() => {
-          if (projectId && runId) {
-            navigateTo(`/results?project_id=${encodeURIComponent(projectId)}&run_id=${encodeURIComponent(runId)}`)
-          }
-        }}
-      />
-    )
-  }
-
+  // No Three.js / face-particle immersive loader — always the simple progress UI.
   return (
     <div className="wrap" style={{ paddingTop: 40, paddingBottom: 80, maxWidth: 860, margin: '0 auto' }}>
       <div className="spread" style={{ marginBottom: 26, gap: 12, flexWrap: 'wrap' }}>

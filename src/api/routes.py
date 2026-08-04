@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import json
 import logging
 import os
@@ -48,6 +49,9 @@ from src.api.schemas import (
     IntakeSessionSaveRequest,
     InterviewThreadCreateRequest,
     InterviewThreadListResponse,
+    FocusGroupCreateRequest,
+    FocusGroupListResponse,
+    FocusGroupResponse,
     InterviewThreadMessageRequest,
     InterviewThreadResponse,
     ProjectCreateRequest,
@@ -109,6 +113,7 @@ from src.services.autofill_service import (
     normalize_autofill,
 )
 from src.services.errors import ServiceError
+from src.services.focus_group_service import FocusGroupService
 from src.services.export_service import build_run_export_response
 from src.services.llm_usage_service import consume_interactive_llm_action
 from src.services.project_service import ProjectService
@@ -138,6 +143,21 @@ def _llm_client(request: Request) -> LLMClientProtocol:
 
 def _project_service(request: Request) -> ProjectService:
     return ProjectService(_store(request), enqueue_run=_enqueue_run(request))
+
+
+
+def _focus_group_service(request: Request) -> FocusGroupService:
+    enqueue = getattr(request.app.state, "enqueue_focus_group", None)
+    if enqueue is None:
+        from src.jobs.queue import enqueue_focus_group
+
+        enqueue = enqueue_focus_group
+    return FocusGroupService(
+        _store(request),
+        enqueue_focus_group=enqueue,
+        run_inline=bool(getattr(request.app.state, "focus_group_run_inline", False)),
+    )
+
 
 
 def _error(status_code: int, response: ErrorResponse) -> HTTPException:
@@ -243,6 +263,70 @@ def _is_admin(email: str) -> bool:
     return email.strip().lower() in _admin_emails()
 
 
+def _admin_private_only() -> bool:
+    """When true, admin UI/API only from loopback, private LAN, or Tailscale CGNAT."""
+    return os.getenv("KORESIM_ADMIN_PRIVATE_ONLY", "false").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def _is_private_or_tailscale_ip(host: str) -> bool:
+    raw = (host or "").strip()
+    if not raw:
+        return False
+    # Strip IPv6 brackets / zone ids / portless forms.
+    if raw.startswith("[") and "]" in raw:
+        raw = raw[1 : raw.index("]")]
+    if "%" in raw:
+        raw = raw.split("%", 1)[0]
+    try:
+        ip = ipaddress.ip_address(raw)
+    except ValueError:
+        return False
+    # Tailscale uses CGNAT 100.64.0.0/10 (is_private is False for this range).
+    if ip in ipaddress.ip_network("100.64.0.0/10"):
+        return True
+    return bool(ip.is_loopback or ip.is_private or ip.is_link_local)
+
+
+def _request_peer_host(request: Request) -> str:
+    if request.client is None:
+        return ""
+    return (request.client.host or "").strip()
+
+
+def _request_forwarded_client_host(request: Request) -> str:
+    for header in ("cf-connecting-ip", "x-real-ip"):
+        value = (request.headers.get(header) or "").strip()
+        if value:
+            return value
+    xff = (request.headers.get("x-forwarded-for") or "").strip()
+    if xff:
+        return xff.split(",", 1)[0].strip()
+    return ""
+
+
+def admin_client_network_allowed(request: Request) -> bool:
+    """Allow admin only from private/Tailscale when KORESIM_ADMIN_PRIVATE_ONLY is on.
+
+    Cloudflare tunnel peers are loopback; use CF-Connecting-IP / XFF in that case
+    so public internet users cannot reach /admin while local and Tailscale can.
+    """
+    if not _admin_private_only():
+        return True
+    peer = _request_peer_host(request)
+    forwarded = _request_forwarded_client_host(request)
+    # Loopback / Starlette TestClient synthetic peer: trust proxy headers when present.
+    if peer in {"127.0.0.1", "::1", "testclient"}:
+        if forwarded:
+            return _is_private_or_tailscale_ip(forwarded)
+        return True
+    return _is_private_or_tailscale_ip(peer or forwarded)
+
+
 def _admin_retention_days() -> int:
     raw_value = os.getenv("KORESIM_DATA_RETENTION_DAYS", "180")
     try:
@@ -279,6 +363,14 @@ def _require_user(request: Request) -> UserRecord:
 
 
 def _require_admin_user(request: Request) -> UserRecord:
+    if not admin_client_network_allowed(request):
+        raise _error(
+            403,
+            ErrorResponse(
+                code=ErrorCode.INVALID_REQUEST,
+                message="관리자 API는 내부 네트워크(Tailscale/로컬)에서만 사용할 수 있습니다.",
+            ),
+        )
     user = _user_record_for_request(request)
     if user is None or not _is_admin(user.email):
         raise _error(
@@ -1294,6 +1386,60 @@ def run_project_run_persuasion(
     except ServiceError as exc:
         raise _service_error(exc) from exc
 
+
+
+
+@router.post("/api/projects/{project_id}/runs/{run_id}/focus-groups")
+def create_project_run_focus_group(
+    request: Request,
+    project_id: str,
+    run_id: str,
+    payload: FocusGroupCreateRequest,
+) -> FocusGroupResponse:
+    try:
+        return _focus_group_service(request).create_focus_group(
+            _user_record_for_request(request),
+            project_id,
+            run_id,
+            payload,
+            llm_client=getattr(request.app.state, "llm_client", None),
+        )
+    except ServiceError as exc:
+        raise _service_error(exc) from exc
+
+
+@router.get("/api/projects/{project_id}/runs/{run_id}/focus-groups")
+def list_project_run_focus_groups(
+    request: Request,
+    project_id: str,
+    run_id: str,
+) -> FocusGroupListResponse:
+    try:
+        return _focus_group_service(request).list_focus_groups(
+            _user_record_for_request(request),
+            project_id,
+            run_id,
+        )
+    except ServiceError as exc:
+        raise _service_error(exc) from exc
+
+
+@router.get("/api/projects/{project_id}/runs/{run_id}/focus-groups/{focus_group_id}")
+def get_project_run_focus_group(
+    request: Request,
+    project_id: str,
+    run_id: str,
+    focus_group_id: str,
+) -> FocusGroupResponse:
+    try:
+        return _focus_group_service(request).get_focus_group(
+            _user_record_for_request(request),
+            project_id,
+            run_id,
+            focus_group_id,
+        )
+    except ServiceError as exc:
+        raise _service_error(exc) from exc
 
 @router.get("/api/projects/{project_id}/runs/{run_id}/interview-threads")
 def list_project_run_interview_threads(

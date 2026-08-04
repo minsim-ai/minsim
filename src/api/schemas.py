@@ -1004,6 +1004,36 @@ class InterviewThreadListResponse(APIModel):
     threads: list[InterviewThreadResponse]
 
 
+class FocusGroupCreateRequest(APIModel):
+    cohort_option: str = Field(min_length=1, max_length=400)
+    moderator_prompt: str | None = Field(default=None, max_length=800)
+    panel_size: int = Field(default=9, ge=9, le=9)
+    seed: int | None = Field(default=None, ge=0, le=2_147_483_647)
+
+
+class FocusGroupResponse(APIModel):
+    schema_version: str = "focus-group/v1"
+    focus_group_id: str
+    project_id: str
+    run_id: str
+    status: Literal["queued", "running", "completed", "failed"]
+    created_at: str
+    updated_at: str
+    completed_at: str | None = None
+    error: str | None = None
+    config: dict[str, Any] = Field(default_factory=dict)
+    progress: dict[str, Any] | None = None
+    panel: list[dict[str, Any]] = Field(default_factory=list)
+    timeline: list[dict[str, Any]] = Field(default_factory=list)
+    stance_table: list[dict[str, Any]] | None = None
+    summary: dict[str, Any] | None = None
+    token_usage: dict[str, Any] | None = None
+
+
+class FocusGroupListResponse(APIModel):
+    focus_groups: list[FocusGroupResponse]
+
+
 class AdminOverviewResponse(APIModel):
     users: int
     runs: int

@@ -11273,3 +11273,68 @@ html[data-theme='minsim-dark'] .btn.btn-ai {
     min-height: 240px;
   }
 }
+
+
+/* Focus group (open_survey) */
+.minsim-focus-group-card {
+  padding: 18px 18px 20px;
+}
+.minsim-focus-group-panel {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+}
+.minsim-focus-group-member {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+  font-size: 13px;
+}
+.minsim-focus-group-timeline {
+  display: grid;
+  gap: 10px;
+  border-left: 3px solid color-mix(in srgb, var(--accent, #0f6b5c) 35%, var(--border-soft));
+  padding-left: 14px;
+  margin-left: 4px;
+}
+.minsim-focus-group-turn {
+  padding: 10px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+}
+.minsim-focus-group-turn.is-mod {
+  background: color-mix(in srgb, var(--warn, #f59e0b) 10%, var(--surface));
+}
+.minsim-focus-group-turn p {
+  margin: 6px 0 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+.minsim-focus-group-turn-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+.minsim-focus-group-stance {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.minsim-focus-group-stance th,
+.minsim-focus-group-stance td {
+  border: 1px solid var(--border-soft);
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+.minsim-focus-group-stance th {
+  font-size: 12px;
+  color: var(--fg-faint);
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+}

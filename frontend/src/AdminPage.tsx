@@ -255,16 +255,32 @@ export function AdminPage() {
           )}
         />
         <AdminTable
-          title="최근 실행"
+          title="최근 리포트 · 실행"
           rows={state.runs}
-          columns={['user_email', 'simulation_type', 'status', 'sample_size', 'done_count', 'created_at']}
+          columns={[
+            'created_at',
+            'status',
+            'user_email',
+            'simulation_type',
+            'run_id',
+            'sample_size',
+            'done_count',
+            'completed_at',
+          ]}
         />
       </section>
 
       <AdminTable
-        title="결과 피드백"
+        title="버그 · 피드백 제보"
         rows={state.feedback}
-        columns={['user_email', 'usefulness_score', 'trust_score', 'actionability_score', 'intended_action', 'free_text', 'created_at']}
+        columns={[
+          'created_at',
+          'user_email',
+          'run_id',
+          'result_expectation',
+          'free_text',
+          'usefulness_score',
+        ]}
       />
     </main>
   )
@@ -406,11 +422,35 @@ function formatConversion(value: unknown): string {
   return `${value.toLocaleString('ko-KR')}%`
 }
 
+/** ISO timestamps → Asia/Seoul, e.g. 2026-07-23 01:55:31 KST */
+function formatAdminTimestampKst(value: string): string | null {
+  const trimmed = value.trim()
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(trimmed)) return null
+  const date = new Date(trimmed)
+  if (Number.isNaN(date.getTime())) return null
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).formatToParts(date)
+  const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? ''
+  return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}:${get('second')} KST`
+}
+
 function formatAdminValue(value: unknown): string {
   if (value === null || value === undefined || value === '') return '-'
   if (typeof value === 'number') return value.toLocaleString('ko-KR')
   if (typeof value === 'boolean') return value ? '예' : '아니오'
-  if (typeof value === 'string') return value.length > 72 ? `${value.slice(0, 72)}...` : value
+  if (typeof value === 'string') {
+    const kst = formatAdminTimestampKst(value)
+    if (kst) return kst
+    return value.length > 72 ? `${value.slice(0, 72)}...` : value
+  }
   return JSON.stringify(value)
 }
 
@@ -420,10 +460,12 @@ function humanizeAdminColumn(column: string): string {
     actionability_score: '실행성',
     analytics_events: '이벤트',
     app_viewed: '앱 진입',
+    completed_at: '완료 시각',
     completed_runs: '완료',
     count: '수',
-    created_at: '생성',
+    created_at: '생성 시각',
     done_count: '완료 수',
+    last_seen_at: '마지막 접속',
     event_name: '이벤트',
     export_clicked: 'Export',
     feedback: '피드백',
@@ -433,7 +475,6 @@ function humanizeAdminColumn(column: string): string {
     intake_count: 'Intake',
     intake_started: 'Intake 시작',
     intended_action: '후속 행동',
-    last_seen_at: '마지막 접속',
     page: '페이지',
     paid_users: '유료 계정',
     plan: '플랜',
