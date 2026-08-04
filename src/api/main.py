@@ -17,7 +17,7 @@ from src.api.auth import (
     read_session_user,
     set_local_dev_session_cookie,
 )
-from src.api.routes import router
+from src.api.routes import admin_client_network_allowed, router
 from src.api.security import (
     apply_security_headers,
     ensure_csrf_cookie,
@@ -37,11 +37,15 @@ def create_app(
     *,
     store: SQLiteRunStore | None = None,
     enqueue_run_func: Callable[[str], str] | None = None,
+    enqueue_focus_group_func: Callable[[str], str] | None = None,
     llm_client: LLMClientProtocol | None = None,
+    focus_group_run_inline: bool = False,
 ) -> FastAPI:
     app = FastAPI(title="Arabesque API", version="0.1.0")
     app.state.run_store = store or SQLiteRunStore()
     app.state.enqueue_run = enqueue_run_func or enqueue_run
+    app.state.enqueue_focus_group = enqueue_focus_group_func
+    app.state.focus_group_run_inline = focus_group_run_inline
     app.state.llm_client = llm_client
 
     @app.middleware("http")
@@ -56,6 +60,23 @@ def create_app(
         # Keep a CSRF cookie available for same-origin SPA mutations.
         ensure_csrf_cookie(response, request)
         return response
+
+    @app.middleware("http")
+    async def block_public_admin_surface(request: Request, call_next):
+        """Hide /admin and /api/admin/* from public internet when private-only is on."""
+        path = request.url.path
+        is_admin_path = path == "/admin" or path.startswith("/admin/") or path.startswith("/api/admin")
+        if is_admin_path and not admin_client_network_allowed(request):
+            return JSONResponse(
+                status_code=403,
+                content={
+                    "detail": {
+                        "code": "ADMIN_PRIVATE_NETWORK_ONLY",
+                        "message": "Admin is only available on the internal network (Tailscale/local).",
+                    }
+                },
+            )
+        return await call_next(request)
 
     @app.middleware("http")
     async def require_app_session(request: Request, call_next):

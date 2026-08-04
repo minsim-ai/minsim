@@ -520,3 +520,18 @@ def _partial_result(raw: SimResult) -> dict[str, Any]:
         "model_alias": raw.model_alias,
         "metadata": raw.metadata or {},
     }
+
+
+
+def run_focus_group_job(focus_group_id: str, sqlite_path: str | None = None) -> dict[str, Any]:
+    """Execute a persisted focus-group session (open_survey pilot).
+
+    Domain failure is persisted as status=failed then re-raised so RQ marks the
+    job failed (FailedJobRegistry) instead of a green false success.
+    """
+    from src.services.focus_group_service import execute_focus_group_job
+
+    result = execute_focus_group_job(focus_group_id, sqlite_path=sqlite_path)
+    if result.get("status") == "failed":
+        raise RuntimeError(str(result.get("error") or "focus_group_failed"))
+    return result

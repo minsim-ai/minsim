@@ -55,3 +55,37 @@ def check_redis_connection(connection: Redis | None = None) -> dict[str, object]
     connection = connection or get_redis_connection()
     connection.ping()
     return {"ok": True, "url": REDIS_URL}
+
+
+def _focus_group_job_failure(job, _connection, _exc_type, exc_value, _traceback) -> None:  # type: ignore[no-untyped-def]
+    """RQ failure hook: ensure sticky queued/running rows become failed."""
+    try:
+        focus_group_id = str((job.args or [None])[0] or "")
+        if not focus_group_id:
+            return
+        from src.jobs.store import SQLiteRunStore
+
+        store = SQLiteRunStore()
+        record = store.get_focus_group_by_id(focus_group_id)
+        if record is None or record.status in {"completed", "failed"}:
+            return
+        store.mark_focus_group_failed(
+            focus_group_id,
+            error=f"rq_job_failed: {exc_value}"[:800],
+        )
+    except Exception:
+        # Never break RQ's failure pipeline.
+        pass
+
+
+def enqueue_focus_group(focus_group_id: str) -> str:
+    from src.jobs.worker import run_focus_group_job
+
+    job = get_queue().enqueue(
+        run_focus_group_job,
+        focus_group_id,
+        job_timeout="30m",
+        result_ttl=3600,
+        on_failure=_focus_group_job_failure,
+    )
+    return job.id
