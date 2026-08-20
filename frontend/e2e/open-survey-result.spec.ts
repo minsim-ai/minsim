@@ -95,7 +95,7 @@ test('자유 설문 결과가 질문과 선택지 분포를 표시한다', async
   await mockOpenSurvey(page)
   await page.goto('/results?project_id=survey-demo&run_id=survey-run')
 
-  await expect(page.getByText(METRICS.question)).toBeVisible()
+  await expect(page.locator('.minsim-open-survey-question')).toHaveText(METRICS.question)
 
   const section = page.locator('.minsim-open-survey-card', { hasText: '선택지별 응답' })
   await expect(section).toBeVisible()

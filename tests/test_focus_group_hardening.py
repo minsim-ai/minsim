@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 
 from src.api.schemas import FocusGroupCreateRequest, RunCreateRequest
 from src.jobs.models import RunStatusValue
@@ -13,7 +12,6 @@ from src.services.focus_group_service import (
     FocusGroupService,
     execute_focus_group_job,
 )
-from src.services.errors import ServiceError
 
 
 def _user(store: SQLiteRunStore, email: str = "hard@example.com"):
