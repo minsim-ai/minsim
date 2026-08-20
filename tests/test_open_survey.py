@@ -145,6 +145,7 @@ def test_nationwide_pool_uses_age_axis_not_campus_tiers():
 
 
 @pytest.mark.asyncio
+@pytest.mark.requires_dataset
 async def test_run_rotates_options_without_breaking_parsing():
     """회전 배치가 파싱을 깨뜨렸던 전례가 있다. stub으로 고정한다."""
     from src.data.sampler import PersonaSampler

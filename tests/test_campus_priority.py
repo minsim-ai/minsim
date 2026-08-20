@@ -343,6 +343,7 @@ def test_rotate_groups_is_deterministic():
 
 
 @pytest.mark.asyncio
+@pytest.mark.requires_dataset
 async def test_run_survives_multiple_rotation_batches():
     """회전 배치는 여러 번 run()을 돈다. 클라이언트 수명 회귀를 여기서 잡는다."""
     import json

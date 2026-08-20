@@ -1,6 +1,10 @@
 """워크트리 부트스트랩이 끝나면 DGIST 풀이 실제로 쓸 수 있어야 한다."""
+import pytest
+
 from src.data.pools import pool_metadata
 from src.data.sampler import PersonaSampler
+
+pytestmark = pytest.mark.requires_dataset
 
 
 def test_dgist_pool_is_available_when_parquet_linked():

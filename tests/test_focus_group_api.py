@@ -175,6 +175,7 @@ def test_focus_group_api_happy_path_and_schema(tmp_path, monkeypatch) -> None:
         store=store,
         enqueue_run_func=lambda rid: f"job-{rid}",
         enqueue_focus_group_func=_enqueue,
+        focus_group_run_inline=True,
         llm_client=fake,
     )
     client = TestClient(app)
