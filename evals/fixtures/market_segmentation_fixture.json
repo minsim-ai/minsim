@@ -1,0 +1,300 @@
+{
+  "simulation_type": "market_segmentation",
+  "name": "market_segmentation_fixture",
+  "input_data": {
+    "category": "홈트레이닝 앱",
+    "product_family": "구독형 운동 코칭 앱",
+    "core_questions": [
+      "어떤 사람들이 홈트레이닝 앱을 쓰는가",
+      "무엇이 구매를 막는가"
+    ]
+  },
+  "personas": [
+    {
+      "uuid": "fixture-001",
+      "age": 24,
+      "sex": "여자",
+      "province": "서울",
+      "district": "서울-마포구",
+      "occupation": "대학원생",
+      "education_level": "대학원",
+      "marital_status": "미혼",
+      "family_type": "1인가구",
+      "housing_type": "오피스텔",
+      "professional_persona": "트렌드와 모바일 생산성 도구에 민감하다.",
+      "family_persona": "혼자 살며 구매 결정을 빠르게 내린다.",
+      "culinary_persona": "카페와 편의 서비스를 자주 이용한다.",
+      "persona": "새로운 기기를 먼저 써 보는 소비자다."
+    },
+    {
+      "uuid": "fixture-002",
+      "age": 37,
+      "sex": "남자",
+      "province": "경기",
+      "district": "경기-성남시",
+      "occupation": "개발자",
+      "education_level": "4년제 대학교",
+      "marital_status": "기혼",
+      "family_type": "부부+자녀",
+      "housing_type": "아파트",
+      "professional_persona": "업무 효율과 기기 성능을 중요하게 본다.",
+      "family_persona": "가족 지출을 고려해 실용성을 따진다.",
+      "culinary_persona": "주말 외식을 계획적으로 한다.",
+      "persona": "기능 설명이 명확한 광고를 선호한다."
+    },
+    {
+      "uuid": "fixture-003",
+      "age": 46,
+      "sex": "여자",
+      "province": "부산",
+      "district": "부산-해운대구",
+      "occupation": "자영업",
+      "education_level": "2~3년제 전문대학",
+      "marital_status": "기혼",
+      "family_type": "부부",
+      "housing_type": "아파트",
+      "professional_persona": "가격 대비 체감 가치를 중요하게 본다.",
+      "family_persona": "배우자와 상의해 큰 구매를 결정한다.",
+      "culinary_persona": "지역 맛집과 실속 소비를 선호한다.",
+      "persona": "과장보다 안정적인 인상을 선호한다."
+    },
+    {
+      "uuid": "fixture-004",
+      "age": 31,
+      "sex": "여자",
+      "province": "대구",
+      "district": "대구-수성구",
+      "occupation": "마케터",
+      "education_level": "4년제 대학교",
+      "marital_status": "미혼",
+      "family_type": "부모 동거",
+      "housing_type": "아파트",
+      "professional_persona": "브랜드 메시지와 감성 표현에 민감하다.",
+      "family_persona": "가족에게 제품을 추천하는 편이다.",
+      "culinary_persona": "신제품 체험을 즐긴다.",
+      "persona": "광고 문구의 신선함을 중시한다."
+    },
+    {
+      "uuid": "fixture-005",
+      "age": 52,
+      "sex": "남자",
+      "province": "대전",
+      "district": "대전-유성구",
+      "occupation": "공무원",
+      "education_level": "4년제 대학교",
+      "marital_status": "기혼",
+      "family_type": "부부+자녀",
+      "housing_type": "아파트",
+      "professional_persona": "안정성과 신뢰를 중요하게 판단한다.",
+      "family_persona": "자녀 교육비와 생활비를 함께 고려한다.",
+      "culinary_persona": "검증된 브랜드를 선호한다.",
+      "persona": "차분한 설명에 설득되는 소비자다."
+    },
+    {
+      "uuid": "fixture-006",
+      "age": 29,
+      "sex": "남자",
+      "province": "인천",
+      "district": "인천-연수구",
+      "occupation": "영업직",
+      "education_level": "4년제 대학교",
+      "marital_status": "미혼",
+      "family_type": "1인가구",
+      "housing_type": "원룸",
+      "professional_persona": "이동 중 모바일 업무를 자주 처리한다.",
+      "family_persona": "개인 만족을 우선해 소비한다.",
+      "culinary_persona": "배달과 간편식을 자주 이용한다.",
+      "persona": "짧고 강한 메시지에 반응한다."
+    },
+    {
+      "uuid": "fixture-007",
+      "age": 63,
+      "sex": "여자",
+      "province": "경남",
+      "district": "경남-창원시",
+      "occupation": "퇴직자",
+      "education_level": "고등학교",
+      "marital_status": "기혼",
+      "family_type": "부부",
+      "housing_type": "단독주택",
+      "professional_persona": "복잡한 기능보다 쉬운 설명을 선호한다.",
+      "family_persona": "가족과 통화와 사진 공유를 자주 한다.",
+      "culinary_persona": "건강과 익숙함을 중요하게 본다.",
+      "persona": "부담 없는 표현에 호감을 느낀다."
+    },
+    {
+      "uuid": "fixture-008",
+      "age": 41,
+      "sex": "남자",
+      "province": "전북",
+      "district": "전북-전주시",
+      "occupation": "교사",
+      "education_level": "대학원",
+      "marital_status": "기혼",
+      "family_type": "부부+자녀",
+      "housing_type": "아파트",
+      "professional_persona": "학생과 학부모 커뮤니케이션에 모바일을 쓴다.",
+      "family_persona": "아이 교육과 가족 기록을 중요하게 생각한다.",
+      "culinary_persona": "가족 외식과 집밥을 균형 있게 즐긴다.",
+      "persona": "의미가 분명한 메시지를 선호한다."
+    },
+    {
+      "uuid": "fixture-009",
+      "age": 35,
+      "sex": "여자",
+      "province": "광주",
+      "district": "광주-북구",
+      "occupation": "간호사",
+      "education_level": "2~3년제 전문대학",
+      "marital_status": "미혼",
+      "family_type": "부모 동거",
+      "housing_type": "아파트",
+      "professional_persona": "교대 근무 중 빠른 사용성을 중시한다.",
+      "family_persona": "부모와 생활비를 나누어 부담한다.",
+      "culinary_persona": "건강한 식단과 휴식을 중요하게 본다.",
+      "persona": "실용적인 혜택에 반응한다."
+    },
+    {
+      "uuid": "fixture-010",
+      "age": 57,
+      "sex": "남자",
+      "province": "강원",
+      "district": "강원-춘천시",
+      "occupation": "택시기사",
+      "education_level": "고등학교",
+      "marital_status": "기혼",
+      "family_type": "부부",
+      "housing_type": "아파트",
+      "professional_persona": "길 안내와 통화 안정성을 중요하게 본다.",
+      "family_persona": "배우자와 함께 쓰기 쉬운 제품을 찾는다.",
+      "culinary_persona": "익숙한 식당과 단골집을 선호한다.",
+      "persona": "복잡한 표현보다 신뢰감 있는 문구를 선호한다."
+    }
+  ],
+  "responses": [
+    {
+      "uuid": "fixture-001",
+      "response": "관심: 관심있음\n세그먼트: 바쁜 자기관리족\n니즈: 짧은 시간에 운동 끝내기\n페인: 꾸준히 할 자신이 없음\n이유: 시간이 없어서 짧은 루틴이 필요합니다."
+    },
+    {
+      "uuid": "fixture-002",
+      "response": "관심: 관심있음\n세그먼트: 바쁜 자기관리족\n니즈: 출퇴근 전후 운동\n페인: 헬스장 갈 시간이 없음\n이유: 직장인이라 시간이 부족합니다."
+    },
+    {
+      "uuid": "fixture-003",
+      "response": "관심: 관심있음\n세그먼트: 재택 초보 운동러\n니즈: 쉬운 동작 안내\n페인: 자세를 잘 몰라 다칠까 걱정됨\n이유: 운동을 처음 시작합니다."
+    },
+    {
+      "uuid": "fixture-004",
+      "response": "관심: 관심있음\n세그먼트: 재택 초보 운동러\n니즈: 초보자용 커리큘럼\n페인: 어떤 운동부터 해야할지 모름\n이유: 기초부터 배우고 싶습니다."
+    },
+    {
+      "uuid": "fixture-005",
+      "response": "관심: 관심있음\n세그먼트: 체형관리 중년층\n니즈: 무릎에 무리 없는 운동\n페인: 강도 높은 운동은 부담스러움\n이유: 관절 건강을 신경 씁니다."
+    },
+    {
+      "uuid": "fixture-006",
+      "response": "관심: 관심없음\n니즈: 없음\n페인: 운동 자체에 관심이 없음\n이유: 다른 취미를 더 즐깁니다."
+    },
+    {
+      "uuid": "fixture-007",
+      "response": "관심: 가격저항\n니즈: 무료 콘텐츠로 충분함\n페인: 매달 구독료가 부담됨\n이유: 유튜브 무료 영상으로도 충분합니다."
+    },
+    {
+      "uuid": "fixture-008",
+      "response": "관심: 관심있음\n세그먼트: 바쁜 자기관리족\n니즈: 알림으로 습관 만들기\n페인: 꾸준함 유지가 어려움\n이유: 알림이 있으면 계속할 수 있을 것 같습니다."
+    },
+    {
+      "uuid": "fixture-009",
+      "response": "니즈: 세그먼트 항목이 빠졌습니다\n페인: 없음\n이유: 세그먼트를 답하지 않았습니다."
+    },
+    {
+      "uuid": "fixture-010",
+      "response": "관심: 관심있음\n세그먼트: 짧은 이름을 답하세요\n니즈: 예시 문구를 그대로 복사함\n페인: 없음\n이유: 템플릿 문구를 그대로 복사했습니다."
+    }
+  ],
+  "expected": {
+    "total_responses": 10,
+    "parse_failed": 2,
+    "metrics": {
+      "category": "홈트레이닝 앱",
+      "segment_counts": {
+        "바쁜 자기관리족": 3,
+        "재택 초보 운동러": 2,
+        "체형관리 중년층": 1
+      },
+      "segment_pct": {
+        "바쁜 자기관리족": 37.5,
+        "재택 초보 운동러": 25.0,
+        "체형관리 중년층": 12.5
+      },
+      "interest_breakdown": {
+        "관심있음": 6,
+        "관심없음": 1,
+        "가격저항": 1
+      },
+      "tag_aliases": {},
+      "needs": [
+        {
+          "label": "짧은 시간에 운동 끝내기",
+          "count": 1
+        },
+        {
+          "label": "출퇴근 전후 운동",
+          "count": 1
+        },
+        {
+          "label": "쉬운 동작 안내",
+          "count": 1
+        },
+        {
+          "label": "초보자용 커리큘럼",
+          "count": 1
+        },
+        {
+          "label": "무릎에 무리 없는 운동",
+          "count": 1
+        },
+        {
+          "label": "알림으로 습관 만들기",
+          "count": 1
+        }
+      ],
+      "pains": [
+        {
+          "label": "꾸준히 할 자신이 없음",
+          "count": 1
+        },
+        {
+          "label": "헬스장 갈 시간이 없음",
+          "count": 1
+        },
+        {
+          "label": "자세를 잘 몰라 다칠까 걱정됨",
+          "count": 1
+        },
+        {
+          "label": "어떤 운동부터 해야할지 모름",
+          "count": 1
+        },
+        {
+          "label": "강도 높은 운동은 부담스러움",
+          "count": 1
+        },
+        {
+          "label": "운동 자체에 관심이 없음",
+          "count": 1
+        },
+        {
+          "label": "매달 구독료가 부담됨",
+          "count": 1
+        },
+        {
+          "label": "꾸준함 유지가 어려움",
+          "count": 1
+        }
+      ],
+      "recommended_first_target": "바쁜 자기관리족"
+    }
+  }
+}

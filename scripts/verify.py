@@ -46,6 +46,11 @@ def main() -> int:
         run(["uv", "run", "python", "evals/run_creative_fixture_eval.py"])
         run(["uv", "run", "python", "evals/run_result_envelope_fixture_eval.py"])
         run(["uv", "run", "python", "evals/run_agent_eval.py"])
+        run(["uv", "run", "python", "evals/run_generic_suite_fixture_eval.py"])
+        run(["uv", "run", "python", "evals/run_campus_policy_fixture_eval.py"])
+        run(["uv", "run", "python", "evals/run_campus_priority_fixture_eval.py"])
+        run(["uv", "run", "python", "evals/run_open_survey_fixture_eval.py"])
+        run(["uv", "run", "python", "evals/run_startup_item_validation_fixture_eval.py"])
         run(
             [
                 "uv",
