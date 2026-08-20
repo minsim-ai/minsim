@@ -1,5 +1,3 @@
-import pytest
-
 from src.agent.prompt_builder import build_system_prompt
 from src.llm.base import LLMRequest, LLMResponse
 from src.services.followup_service import (
@@ -123,7 +121,6 @@ def test_interview_system_prompt_excludes_culinary_persona() -> None:
     assert "식습관" in interview_prompt
 
 
-@pytest.mark.requires_dataset
 def test_run_followup_uses_original_seed_and_returns_answers() -> None:
     client = FakeFollowupLLM()
     result = run_followup(

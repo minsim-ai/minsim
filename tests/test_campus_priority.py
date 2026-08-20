@@ -260,7 +260,6 @@ async def test_run_rejects_item_count_out_of_range():
 
 
 @pytest.mark.asyncio
-@pytest.mark.requires_dataset
 async def test_run_honors_nationwide_pool_with_age_axis():
     """전 국민 선택을 존중한다. 학내 계층 축을 강제하면 전원 교직원으로 뭉개진다."""
     from src.data.sampler import PersonaSampler

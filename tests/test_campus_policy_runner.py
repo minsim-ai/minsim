@@ -64,7 +64,6 @@ async def test_run_uses_stratified_sampling_and_records_meta():
 
 
 @pytest.mark.asyncio
-@pytest.mark.requires_dataset
 async def test_run_on_nationwide_pool_uses_random_age_axis():
     """전 국민 선택을 존중한다. 층화·DGIST 강제 없음."""
     sim = SIMULATION_SPECS["campus_policy"].runner_factory()
