@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { generateIntakeCandidates, getIntakeSession, listIntakeHistory, saveIntakeSession } from "../../api/intake";
-import { advanceIntakeSession, createInitialIntakeSession } from "../../intake/planner";
-import { buildCreativeTestingPayload, buildGenericSimulationPayload, buildIntakeRunProvenance } from "../../intake/payloadBuilder";
-import { asString, asStringArray, createSlot, upsertSlot } from "../../intake/slotUtils";
-import type { CreativeCandidate, CreativeCandidateAngle, IntakeSession, IntakeSlotValue } from "../../intake/types";
-import type { IntakeCreativeCandidate, IntakeHistoryItem, IntakeSessionResponse, JsonObject, RunCreateRequest, SimulationType } from "../../types/api";
+import { generateIntakeCandidates, getIntakeSession, listIntakeHistory, saveIntakeSession } from "../../../api/intake";
+import { advanceIntakeSession, createInitialIntakeSession } from "../../../intake/planner";
+import { buildCreativeTestingPayload, buildGenericSimulationPayload, buildIntakeRunProvenance } from "../../../intake/payloadBuilder";
+import { asString, asStringArray, createSlot, upsertSlot } from "../../../intake/slotUtils";
+import type { CreativeCandidate, CreativeCandidateAngle, IntakeSession, IntakeSlotValue } from "../../../intake/types";
+import type { IntakeCreativeCandidate, IntakeHistoryItem, IntakeSessionResponse, JsonObject, RunCreateRequest, SimulationType } from "../../../types/api";
 import { AssumptionReviewMessage } from "./AssumptionReviewMessage";
 import { CandidateReviewMessage } from "./CandidateReviewMessage";
 import { DynamicFormMessage } from "./DynamicFormMessage";

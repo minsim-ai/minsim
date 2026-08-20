@@ -1,30 +1,30 @@
 import { useState, useRef, useEffect, useMemo, useCallback, useLayoutEffect } from "react";
-import { APIError } from "./api/client";
-import { recordAnalyticsEvent } from "./api/analytics";
-import { getUserUsage, googleLogin } from "./api/auth";
-import { linkIntakeSessionRun } from "./api/intake";
-import { cancelRun, createRun, getPresets, getRun } from "./api/runs";
-import { AuthStatus } from "./components/AuthStatus";
+import { APIError } from "../../api/client";
+import { recordAnalyticsEvent } from "../../api/analytics";
+import { getUserUsage, googleLogin } from "../../api/auth";
+import { linkIntakeSessionRun } from "../../api/intake";
+import { cancelRun, createRun, getPresets, getRun } from "../../api/runs";
+import { AuthStatus } from "../../components/AuthStatus";
 import {
   applyPublicConfig,
   clampSampleSize,
   DEFAULT_SAMPLE_SIZE,
   EVENT_BANNER,
   EVENT_MODE_ENABLED,
-} from "./config/limits";
-import { GoalFirstChatFlow } from "./components/intake/GoalFirstChatFlow";
-import { useRunEvents } from "./hooks/useRunEvents";
-import type { DemoPreset, RunCreateRequest, SimulationType, TargetFilter, UserUsageResponse } from "./types/api";
+} from "../../config/limits";
+import { GoalFirstChatFlow } from "./intake/GoalFirstChatFlow";
+import { useRunEvents } from "./useRunEvents";
+import type { DemoPreset, RunCreateRequest, SimulationType, TargetFilter, UserUsageResponse } from "../../types/api";
 import {
   simulations,
   introPlaceholders,
   chatSteps,
-} from "./data/mockData";
+} from "./mockData";
 import {
   chatScenarioCountsBySimulation,
   chatScenarioFixtures,
   type ChatScenarioFixture,
-} from "./data/chatScenarioFixtures";
+} from "./chatScenarioFixtures";
 
 /* ─── 타입 ─── */
 type ChatState = {
@@ -880,7 +880,7 @@ function ClassicRunLoading({
   onCancel,
   onComplete,
 }: {
-  snapshot: import('./types/api').RunSnapshot | null;
+  snapshot: import('../../types/api').RunSnapshot | null;
   onCancel: () => void;
   onComplete: () => void;
 }) {

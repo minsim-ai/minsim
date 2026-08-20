@@ -1,7 +1,7 @@
-import { draftPolicyFields } from "../../api/intake";
+import { draftPolicyFields } from "../../../api/intake";
 import { useState } from "react";
 import { Plus, X } from "lucide-react";
-import type { DynamicFormSchema } from "../../intake/types";
+import type { DynamicFormSchema } from "../../../intake/types";
 
 const POLICY_DRAFT_FIELDS = ["current_state", "proposed_change", "tradeoffs"];
 
