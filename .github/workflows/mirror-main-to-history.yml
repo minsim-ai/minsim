@@ -1,0 +1,20 @@
+name: mirror-main-to-history
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Force-push main onto history/full-timeline
+        run: git push origin HEAD:refs/heads/history/full-timeline --force
