@@ -63,14 +63,20 @@ async def test_run_uses_stratified_sampling_and_records_meta():
 
 
 @pytest.mark.asyncio
-async def test_run_on_nationwide_pool_stays_random():
-    """전국 풀은 계층 개념이 없으므로 층화하지 않는다."""
+async def test_run_on_nationwide_pool_uses_random_age_axis():
+    """전 국민 선택을 존중한다. 층화·DGIST 강제 없음."""
     sim = SIMULATION_SPECS["campus_policy"].runner_factory()
     result = await sim.run(
         AGENDA_INPUT,
-        sample_size=10,
+        sample_size=30,
         seed=42,
         llm_client=StubLLMClient(),
-        sampler=PersonaSampler(),
+        sampler=PersonaSampler(pool="nationwide"),
     )
     assert result.metrics["sampling"]["sampling"] == "random"
+    assert result.metrics["persona_pool"] == "nationwide"
+    assert result.metrics.get("tier_axis_label") in ("연령대", None) or "20대" in (
+        result.metrics.get("tier_axis") or []
+    )
+    warnings = " ".join(result.metrics["sampling"].get("warnings") or [])
+    assert "DGIST" not in warnings

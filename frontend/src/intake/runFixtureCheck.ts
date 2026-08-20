@@ -385,8 +385,11 @@ function checkPriceOptionalFormDoesNotLoop(): string[] {
     type: "form_submit",
     values: {},
   });
-  const repeatedMessage = "가격 최적화 시뮬레이션에 필요한 정보를 입력해주세요. 모르는 항목은 비워두고 나중에 보완할 수 있습니다.";
-  const repeatCount = submittedOptionalBlank.messages.filter((message) => message.content === repeatedMessage).length;
+  // Replan must not reopen the optional form after skip (regression: form asked twice).
+  const afterReplan = prepareIntakeSession(submittedOptionalBlank);
+  const softOptionalMessage =
+    "가격 최적화에 도움이 되는 선택 정보입니다. 모르면 「넘어가기」로 바로 진행할 수 있습니다.";
+  const softCount = afterReplan.messages.filter((message) => message.content === softOptionalMessage).length;
   const failures: string[] = [];
 
   if (collected.action?.type !== "show_form") {
@@ -395,8 +398,11 @@ function checkPriceOptionalFormDoesNotLoop(): string[] {
   if (submittedOptionalBlank.action?.type !== "run_ready") {
     failures.push(`price optional form loop: expected blank optional submit to become run_ready, got ${submittedOptionalBlank.action?.type}`);
   }
-  if (repeatCount > 1) {
-    failures.push(`price optional form loop: expected form prompt at most once, got ${repeatCount}`);
+  if (afterReplan.action?.type !== "run_ready") {
+    failures.push(`price optional form loop: expected replan after skip to stay run_ready, got ${afterReplan.action?.type}`);
+  }
+  if (softCount > 1) {
+    failures.push(`price optional form loop: expected soft optional prompt at most once after replan, got ${softCount}`);
   }
   return failures;
 }

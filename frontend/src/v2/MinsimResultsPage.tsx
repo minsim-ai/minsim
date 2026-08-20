@@ -31,6 +31,7 @@ import { SectionBoundary } from './SectionBoundary'
 import { CampusPolicyResult } from './CampusPolicyResult'
 import { CampusPriorityResult } from './CampusPriorityResult'
 import { OpenSurveyResult } from './OpenSurveyResult'
+import { FocusGroupSection } from './FocusGroupSection'
 import { hasDedicatedRenderer } from '../simulations/registry'
 
 const OPT: Record<string, string> = {
@@ -77,17 +78,16 @@ export function MinsimResultsPage({ projectId, runId }: { projectId: string | nu
   const [state, setState] = useState<ResultsState>({ project: null, run: null, result: null, loading: true, error: null })
   const [actionError, setActionError] = useState<string | null>(null)
   const [feedbackText, setFeedbackText] = useState('')
-  const [intendedAction, setIntendedAction] = useState('')
   const [feedbackNotice, setFeedbackNotice] = useState<string | null>(null)
   const [actionPending, setActionPending] = useState<'feedback' | null>(null)
 
   /**
-   * 피드백은 화면 맨 아래에 있고 '피드백 저장'으로만 서버에 간다.
+   * 제보 폼은 화면 맨 아래에 있고 '제보 보내기'로만 서버에 간다.
    * 상단 툴바 버튼으로 나가면 적던 글이 경고 없이 사라진다.
    */
   const leaveGuard = (path: string) => {
-    const unsaved = !feedbackNotice && Boolean(feedbackText.trim() || intendedAction.trim())
-    if (unsaved && !window.confirm('작성 중인 피드백이 저장되지 않았습니다. 저장하지 않고 나갈까요?')) return
+    const unsaved = !feedbackNotice && Boolean(feedbackText.trim())
+    if (unsaved && !window.confirm('작성 중인 제보가 저장되지 않았습니다. 저장하지 않고 나갈까요?')) return
     navigateTo(path)
   }
 
@@ -201,15 +201,11 @@ export function MinsimResultsPage({ projectId, runId }: { projectId: string | nu
       setActionError(null)
       setActionPending('feedback')
       await submitProjectRunFeedback(projectId, runId, {
-        usefulness_score: 4,
-        trust_score: 4,
-        actionability_score: 4,
-        intended_action: intendedAction,
-        free_text: feedbackText,
+        free_text: feedbackText || null,
+        result_expectation: 'bug_or_issue',
       })
-      setFeedbackNotice('피드백을 저장했습니다.')
+      setFeedbackNotice('제보 감사합니다. 확인 후 개선할게요.')
       setFeedbackText('')
-      setIntendedAction('')
     } catch (err) {
       setActionError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -316,6 +312,15 @@ export function MinsimResultsPage({ projectId, runId }: { projectId: string | nu
             <OpenSurveyResult metrics={state.result.metrics as unknown as OpenSurveyMetrics} />
           </SectionBoundary>
         )}
+        {state.result?.simulation_type === 'open_survey' && projectId && (
+          <SectionBoundary title="9인 포커스 그룹">
+            <FocusGroupSection
+              projectId={projectId}
+              runId={runId}
+              metrics={state.result.metrics as unknown as OpenSurveyMetrics}
+            />
+          </SectionBoundary>
+        )}
         {state.result?.simulation_type === 'campus_priority' && (
           <SectionBoundary title="우선순위 분해">
             <CampusPriorityResult
@@ -344,19 +349,29 @@ export function MinsimResultsPage({ projectId, runId }: { projectId: string | nu
 
         <hr className="hr" />
 
-        {/* feedback */}
+        {/* feedback / bug report — reuses existing run feedback API */}
         <section style={{ padding: '40px 0 64px' }}>
-          <SectionHead kicker="결과 피드백" title="이 결과, 쓸 만했나요?" />
+          <SectionHead
+            kicker="제보"
+            title="버그·오류 제보"
+            sub="짧게 알려주시면 바로 확인해요."
+          />
           <form className="card" style={{ padding: 22 }} onSubmit={submitFeedback}>
-            <label className="col" style={{ gap: 6, marginBottom: 12 }}>
-              <span className="lbl">이 결과로 무엇을 할 예정인가요?</span>
-              <input className="inp" value={intendedAction} onChange={(event) => setIntendedAction(event.target.value)} placeholder="예) A안은 폐기, B안 헤드라인으로 상세페이지 제작" />
-            </label>
             <label className="col" style={{ gap: 6, marginBottom: 16 }}>
-              <span className="lbl">부족했던 점</span>
-              <textarea className="inp" value={feedbackText} onChange={(event) => setFeedbackText(event.target.value)} placeholder="결과 해석, 질문 흐름, 보고서에서 아쉬웠던 점을 적어주세요." />
+              <span className="lbl">어디가 이상했나요?</span>
+              <textarea
+                className="inp"
+                value={feedbackText}
+                onChange={(event) => setFeedbackText(event.target.value)}
+                rows={4}
+                required
+                minLength={5}
+                placeholder="예) 연령대 표가 비어 보여요 / 지도 숫자가 안 맞아요 / 로딩이 끝나지 않아요 / 버튼이 안 눌려요"
+              />
             </label>
-            <button className="btn primary block" type="submit" disabled={actionPending !== null}>{actionPending === 'feedback' ? '저장 중…' : '피드백 저장'}</button>
+            <button className="btn primary block" type="submit" disabled={actionPending !== null || !feedbackText.trim()}>
+              {actionPending === 'feedback' ? '보내는 중…' : '제보 보내기'}
+            </button>
             {feedbackNotice && <p className="muted" style={{ fontSize: 12.5, marginTop: 10 }}>{feedbackNotice}</p>}
           </form>
         </section>
@@ -379,7 +394,7 @@ function FinalSummaryCard({ report }: { report: MinsimReport }) {
       />
       <div className="card minsim-final-summary-grid" style={{ padding: 24, display: 'grid', gridTemplateColumns: 'minmax(180px, .8fr) 1.2fr', gap: 24 }}>
         <div className="col minsim-final-summary-lead" style={{ gap: 10, borderRight: '1px solid var(--border-soft)', paddingRight: 20 }}>
-          <span className="lbl-mono">1위 {report.segment.mode === 'segment' ? '세그먼트' : '반응'}</span>
+          <span className="lbl-mono">1위 {report.segment.mode === 'segment' ? '세그먼트' : report.segment.mode === 'price' ? '선호 가격' : '반응'}</span>
           {summary.winner ? (
             <>
               <span style={{ fontSize: 30, fontWeight: 700, color: 'var(--lime)', lineHeight: 1.1 }}>
@@ -664,22 +679,30 @@ function Verdict({ report, onExport }: { report: MinsimReport; onExport: () => v
   const { run, winner, runnerUp, segment } = report
   if (!winner) return null
   const isIntentReport = segment.mode === 'intent'
+  const isPriceReport = segment.mode === 'price'
   const metrics = [
     { l: '응답 표본', v: `${run.panel.toLocaleString('ko-KR')}명`, s: `유효 응답 ${run.valid.toLocaleString('ko-KR')}명` },
-    isIntentReport
+    isIntentReport || isPriceReport
       ? { l: segment.metricLabel, v: `${segment.overallPct}%`, s: `전체 합성 패널 중 ${segment.focusLabel}` }
       : { l: '선호 격차', v: run.gap, s: runnerUp ? `1위−2위 (${winner.id}−${runnerUp.id})` : '1위 기준' },
-    { l: '해석 상태', v: run.status, s: `구조화 성공 ${run.structured}` },
+    { l: '해석 상태', v: run.status, s: `응답 정리 성공 ${run.structured}` },
   ]
+  const reportKicker = isPriceReport
+    ? '가격 수용도 보고서'
+    : isIntentReport
+      ? '행동 의향 예측 보고서'
+      : run.gap === '집계 중'
+        ? '분석 보고서'
+        : '크리에이티브 비교 분석 보고서'
   return (
     <section style={{ paddingTop: 30, paddingBottom: 34 }}>
       <div className="spread" style={{ marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
-        <Kicker>{isIntentReport ? '행동 의향 예측 보고서' : run.gap === '집계 중' ? '분석 보고서' : '크리에이티브 비교 분석 보고서'}</Kicker>
+        <Kicker>{reportKicker}</Kicker>
       </div>
       <div className="result-verdict-grid">
         <div className="col" style={{ gap: 22 }}>
           <div>
-            <span className="badge lime" style={{ marginBottom: 16 }}>{isIntentReport ? '핵심 관측' : '먼저 선택'} · {winner.label}</span>
+            <span className="badge lime" style={{ marginBottom: 16 }}>{isIntentReport || isPriceReport ? '핵심 관측' : '먼저 선택'} · {winner.label}</span>
             <h1 style={{ fontSize: 'clamp(24px, 6.2vw, 38px)', lineHeight: 1.18, marginTop: 14, letterSpacing: '-.025em', fontWeight: 600 }}>{winner.text}</h1>
             <p className="muted" style={{ fontSize: 15, lineHeight: 1.65, marginTop: 16, maxWidth: 640 }}>
               {run.verdictLine} {run.conclusion}
@@ -891,7 +914,13 @@ function AiReport({ report }: { report: MinsimReport }) {
 function MarketResponse({ report }: { report: MinsimReport }) {
   const { creatives, winner, runnerUp, keywords } = report
   const mode = report.segment.mode
-  const distributionLabel = mode === 'intent' ? '행동 의향' : mode === 'segment' ? '세그먼트 점유' : '선호도'
+  const distributionLabel = mode === 'intent'
+    ? '행동 의향'
+    : mode === 'segment'
+      ? '세그먼트 점유'
+      : mode === 'price'
+        ? '선호 가격'
+        : '선호도'
   // A/B preference board — not applicable when there are no creatives/choices.
   if (creatives.length === 0) return null
   return (
@@ -925,12 +954,16 @@ function MarketResponse({ report }: { report: MinsimReport }) {
               <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>
                 {mode === 'segment'
                   ? `이름 있는 세그먼트 1위: ${winner.label}`
-                  : `${winner.label}이 가장 많이 ${mode === 'intent' ? '관측됐습니다' : '선택됐습니다'}`}
+                  : mode === 'price'
+                    ? `선호 가격 1위: ${winner.label}`
+                    : `${winner.label}이 가장 많이 ${mode === 'intent' ? '관측됐습니다' : '선택됐습니다'}`}
               </div>
               <p className="muted" style={{ fontSize: 13, lineHeight: 1.6 }}>
                 {mode === 'segment'
                   ? `${winner.label} 세그먼트가 ${winner.count}명(${winner.pct}%)으로 1순위 타깃 후보입니다.`
-                  : `${winner.label}이 ${winner.count}명(${winner.pct}%)에게서 ${mode === 'intent' ? '나타나 가장 큰 행동 의향 집단입니다.' : '선택돼 가장 강한 반응을 얻었습니다.'}`}
+                  : mode === 'price'
+                    ? `${winner.label}을 ${winner.count}명(${winner.pct}%)이 가장 선호했습니다. 가격대별 누적 수요 곡선과 함께 해석하세요.`
+                    : `${winner.label}이 ${winner.count}명(${winner.pct}%)에게서 ${mode === 'intent' ? '나타나 가장 큰 행동 의향 집단입니다.' : '선택돼 가장 강한 반응을 얻었습니다.'}`}
                 {runnerUp ? ` 다음 ${runnerUp.label}(${runnerUp.count}명·${runnerUp.pct}%)보다 ${report.run.gap} 높습니다.` : ''}
                 {mode === 'segment' && report.creatives.some((item) => item.id === '기타')
                   ? ' ‘기타 롱테일(잔여)’은 상위 세그먼트 밖 라벨 합이며 타깃으로 해석하지 않습니다.'
@@ -963,8 +996,8 @@ function AgeFullTable({ report }: { report: MinsimReport }) {
   const legend = sortedLegend.slice(0, 9)
   const hiddenColumns = sortedLegend.length - legend.length
   const mode = report.segment.mode
-  const titleNoun = mode === 'intent' ? '반응' : mode === 'segment' ? '세그먼트 점유' : '선호'
-  const cellNoun = mode === 'intent' ? '행동 의향' : mode === 'segment' ? '세그먼트 점유' : '후보의 선택'
+  const titleNoun = mode === 'intent' ? '반응' : mode === 'segment' ? '세그먼트 점유' : mode === 'price' ? '선호 가격' : '선호'
+  const cellNoun = mode === 'intent' ? '행동 의향' : mode === 'segment' ? '세그먼트 점유' : mode === 'price' ? '선호 가격' : '후보의 선택'
   const gridTemplate = `minmax(72px, 1.2fr) repeat(${legend.length}, minmax(54px, .85fr)) minmax(52px, .75fr)`
   return (
     <section style={{ padding: '40px 0' }}>
@@ -1398,6 +1431,18 @@ function Methodology({ report }: { report: MinsimReport }) {
   const { sampleAge, sampleRegion, run } = report
   const maxReg = Math.max(1, ...sampleRegion.map(([, n]) => n))
   const totalAge = sampleAge.reduce((sum, [, n]) => sum + n, 0)
+  // Stack segments need explicit height — `.row` uses align-items:center so
+  // empty width-only spans collapse to 0px and leave a blank white track.
+  const ageParts: [string, number][] = sampleAge.map(([label, n]) => [
+    label,
+    totalAge > 0 ? (n / totalAge) * 100 : 0,
+  ])
+  const ageAria = sampleAge
+    .map(([label, n]) => {
+      const pct = totalAge > 0 ? Math.round((n / totalAge) * 100) : 0
+      return `${label} ${pct}% (${n}명)`
+    })
+    .join(', ')
   return (
     <section style={{ padding: '40px 0' }}>
       <SectionHead kicker="검증 정보" title="방법론과 신뢰 정보" />
@@ -1405,37 +1450,40 @@ function Methodology({ report }: { report: MinsimReport }) {
         <div className="card" style={{ padding: 20 }}>
           <div className="lbl-mono" style={{ marginBottom: 16 }}>표본 구성 · 연령대</div>
           <div
-            className="row"
+            className="minsim-sample-age-track"
             role="img"
-            aria-label={`연령대별 표본 구성: ${sampleAge.map(([label, n]) => `${label} ${n}명`).join(', ')}`}
-            style={{
-              height: 16,
-              borderRadius: 5,
-              overflow: 'hidden',
-              background: 'var(--surface-3)',
-              border: '1px solid var(--border-soft)',
-              marginBottom: 14,
-            }}
+            aria-label={`연령대별 표본 구성: ${ageAria}`}
           >
-            {sampleAge.map(([label, n], index) => (
-              <span
+            {ageParts.map(([label, pct], index) => (
+              <div
                 key={label}
-                title={`${label} ${n}명`}
+                className="minsim-sample-age-seg"
+                title={`${label} ${Math.round(pct)}%`}
                 style={{
-                  width: `${totalAge ? (n / totalAge) * 100 : 0}%`,
-                  minWidth: n > 0 ? 3 : 0,
-                  // Solid blues — faint/dim + opacity made the gauge disappear on light cards.
+                  width: `${Math.max(pct, 0)}%`,
+                  minWidth: pct > 0 ? 3 : 0,
                   background: STACK_FALLBACK[index % STACK_FALLBACK.length],
                 }}
               />
             ))}
           </div>
-          <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-            {sampleAge.map(([label, n]) => (
-              <span key={label} className="lbl" style={{ fontSize: 11 }}>
-                {label} <b style={{ color: 'var(--fg)', fontWeight: 600 }}>{n}명</b>{n < 10 ? ' · 참고' : ''}
-              </span>
-            ))}
+          <div className="minsim-sample-age-legend" role="list">
+            {sampleAge.map(([label, n], index) => {
+              const pct = totalAge > 0 ? Math.round((n / totalAge) * 100) : 0
+              return (
+                <span key={label} className="minsim-sample-age-legend-item" role="listitem">
+                  <i
+                    aria-hidden="true"
+                    style={{ background: STACK_FALLBACK[index % STACK_FALLBACK.length] }}
+                  />
+                  <span>
+                    {label}{' '}
+                    <b>{pct}%</b>
+                    <span className="faint"> · {n}명{n < 10 ? ' · 참고' : ''}</span>
+                  </span>
+                </span>
+              )
+            })}
           </div>
         </div>
         <div className="card" style={{ padding: 20 }}>

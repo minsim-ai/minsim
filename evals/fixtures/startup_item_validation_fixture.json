@@ -1,0 +1,386 @@
+{
+  "name": "startup_item_validation_fixture",
+  "input_data": {
+    "item_name": "구독형 반려식물 관리 키트",
+    "item_description": "매달 씨앗과 배양토, 스마트 센서를 배송해 반려식물을 키우도록 돕는 구독 서비스입니다.",
+    "problem_statement": "식물을 자주 죽이는 초보 반려식물 집사들이 관리 방법을 몰라 포기합니다.",
+    "key_features": [
+      "토양 습도 센서",
+      "월간 맞춤 큐레이션",
+      "앱 알림"
+    ],
+    "alternatives": [
+      "일반 화분 세트",
+      "동네 꽃집 상담"
+    ],
+    "price_hint": "월 15,000원"
+  },
+  "personas": [
+    {
+      "uuid": "fixture-001",
+      "age": 24,
+      "sex": "여자",
+      "province": "서울",
+      "district": "서울-마포구",
+      "occupation": "대학원생",
+      "education_level": "대학원",
+      "marital_status": "미혼",
+      "family_type": "1인가구",
+      "housing_type": "오피스텔",
+      "professional_persona": "트렌드와 모바일 생산성 도구에 민감하다.",
+      "family_persona": "혼자 살며 구매 결정을 빠르게 내린다.",
+      "culinary_persona": "카페와 편의 서비스를 자주 이용한다.",
+      "persona": "새로운 기기를 먼저 써 보는 소비자다."
+    },
+    {
+      "uuid": "fixture-002",
+      "age": 37,
+      "sex": "남자",
+      "province": "경기",
+      "district": "경기-성남시",
+      "occupation": "개발자",
+      "education_level": "4년제 대학교",
+      "marital_status": "기혼",
+      "family_type": "부부+자녀",
+      "housing_type": "아파트",
+      "professional_persona": "업무 효율과 기기 성능을 중요하게 본다.",
+      "family_persona": "가족 지출을 고려해 실용성을 따진다.",
+      "culinary_persona": "주말 외식을 계획적으로 한다.",
+      "persona": "기능 설명이 명확한 광고를 선호한다."
+    },
+    {
+      "uuid": "fixture-003",
+      "age": 46,
+      "sex": "여자",
+      "province": "부산",
+      "district": "부산-해운대구",
+      "occupation": "자영업",
+      "education_level": "2~3년제 전문대학",
+      "marital_status": "기혼",
+      "family_type": "부부",
+      "housing_type": "아파트",
+      "professional_persona": "가격 대비 체감 가치를 중요하게 본다.",
+      "family_persona": "배우자와 상의해 큰 구매를 결정한다.",
+      "culinary_persona": "지역 맛집과 실속 소비를 선호한다.",
+      "persona": "과장보다 안정적인 인상을 선호한다."
+    },
+    {
+      "uuid": "fixture-004",
+      "age": 31,
+      "sex": "여자",
+      "province": "대구",
+      "district": "대구-수성구",
+      "occupation": "마케터",
+      "education_level": "4년제 대학교",
+      "marital_status": "미혼",
+      "family_type": "부모 동거",
+      "housing_type": "아파트",
+      "professional_persona": "브랜드 메시지와 감성 표현에 민감하다.",
+      "family_persona": "가족에게 제품을 추천하는 편이다.",
+      "culinary_persona": "신제품 체험을 즐긴다.",
+      "persona": "광고 문구의 신선함을 중시한다."
+    },
+    {
+      "uuid": "fixture-005",
+      "age": 52,
+      "sex": "남자",
+      "province": "대전",
+      "district": "대전-유성구",
+      "occupation": "공무원",
+      "education_level": "4년제 대학교",
+      "marital_status": "기혼",
+      "family_type": "부부+자녀",
+      "housing_type": "아파트",
+      "professional_persona": "안정성과 신뢰를 중요하게 판단한다.",
+      "family_persona": "자녀 교육비와 생활비를 함께 고려한다.",
+      "culinary_persona": "검증된 브랜드를 선호한다.",
+      "persona": "차분한 설명에 설득되는 소비자다."
+    },
+    {
+      "uuid": "fixture-006",
+      "age": 29,
+      "sex": "남자",
+      "province": "인천",
+      "district": "인천-연수구",
+      "occupation": "영업직",
+      "education_level": "4년제 대학교",
+      "marital_status": "미혼",
+      "family_type": "1인가구",
+      "housing_type": "원룸",
+      "professional_persona": "이동 중 모바일 업무를 자주 처리한다.",
+      "family_persona": "개인 만족을 우선해 소비한다.",
+      "culinary_persona": "배달과 간편식을 자주 이용한다.",
+      "persona": "짧고 강한 메시지에 반응한다."
+    },
+    {
+      "uuid": "fixture-007",
+      "age": 63,
+      "sex": "여자",
+      "province": "경남",
+      "district": "경남-창원시",
+      "occupation": "퇴직자",
+      "education_level": "고등학교",
+      "marital_status": "기혼",
+      "family_type": "부부",
+      "housing_type": "단독주택",
+      "professional_persona": "복잡한 기능보다 쉬운 설명을 선호한다.",
+      "family_persona": "가족과 통화와 사진 공유를 자주 한다.",
+      "culinary_persona": "건강과 익숙함을 중요하게 본다.",
+      "persona": "부담 없는 표현에 호감을 느낀다."
+    },
+    {
+      "uuid": "fixture-008",
+      "age": 41,
+      "sex": "남자",
+      "province": "전북",
+      "district": "전북-전주시",
+      "occupation": "교사",
+      "education_level": "대학원",
+      "marital_status": "기혼",
+      "family_type": "부부+자녀",
+      "housing_type": "아파트",
+      "professional_persona": "학생과 학부모 커뮤니케이션에 모바일을 쓴다.",
+      "family_persona": "아이 교육과 가족 기록을 중요하게 생각한다.",
+      "culinary_persona": "가족 외식과 집밥을 균형 있게 즐긴다.",
+      "persona": "의미가 분명한 메시지를 선호한다."
+    },
+    {
+      "uuid": "fixture-009",
+      "age": 35,
+      "sex": "여자",
+      "province": "광주",
+      "district": "광주-북구",
+      "occupation": "간호사",
+      "education_level": "2~3년제 전문대학",
+      "marital_status": "미혼",
+      "family_type": "부모 동거",
+      "housing_type": "아파트",
+      "professional_persona": "교대 근무 중 빠른 사용성을 중시한다.",
+      "family_persona": "부모와 생활비를 나누어 부담한다.",
+      "culinary_persona": "건강한 식단과 휴식을 중요하게 본다.",
+      "persona": "실용적인 혜택에 반응한다."
+    },
+    {
+      "uuid": "fixture-010",
+      "age": 57,
+      "sex": "남자",
+      "province": "강원",
+      "district": "강원-춘천시",
+      "occupation": "택시기사",
+      "education_level": "고등학교",
+      "marital_status": "기혼",
+      "family_type": "부부",
+      "housing_type": "아파트",
+      "professional_persona": "길 안내와 통화 안정성을 중요하게 본다.",
+      "family_persona": "배우자와 함께 쓰기 쉬운 제품을 찾는다.",
+      "culinary_persona": "익숙한 식당과 단골집을 선호한다.",
+      "persona": "복잡한 표현보다 신뢰감 있는 문구를 선호한다."
+    }
+  ],
+  "responses": [
+    {
+      "uuid": "fixture-001",
+      "response": "[needs_segment]\n문제공감: 5\n현재해결: 화분을 여러 번 죽였다\n니즈: 시간절약\n셀프세그먼트: 실용검토층\n이유: 관리법을 몰라서 힘들었습니다.\n\n[competition_positioning]\n대안: 동네 꽃집 상담\n대안만족도: 2\n차별점: 뚜렷함\n포지셔닝: 전문가가 대신 관리해주는 느낌입니다.\n\n[acceptance_price]\n수용의향: 수용\n지불의향가격: 15000\n이유: 센서가 있어 실패 확률이 줄 것 같습니다.",
+      "error": null
+    },
+    {
+      "uuid": "fixture-002",
+      "response": "[needs_segment]\n문제공감: 4\n현재해결: 화분 방치\n니즈: 즐거움\n셀프세그먼트: 적극수용층\n이유: 새로운 취미로 시도해보고 싶습니다.\n\n[competition_positioning]\n대안: 일반 화분 세트\n대안만족도: 3\n차별점: 뚜렷함\n포지셔닝: 관리가 훨씬 쉬워 보입니다.\n\n[acceptance_price]\n수용의향: 수용\n지불의향가격: 15000\n이유: 가격이 합리적이라 바로 구독하겠습니다.",
+      "error": null
+    },
+    {
+      "uuid": "fixture-003",
+      "response": "[needs_segment]\n문제공감: 3\n현재해결: 인터넷 검색으로 해결\n니즈: 비용절감\n셀프세그먼트: 가격민감층\n이유: 무료 정보로도 어느 정도 해결됩니다.\n\n[competition_positioning]\n대안: 일반 화분 세트\n대안만족도: 4\n차별점: 약간\n포지셔닝: 큰 차이는 못 느끼지만 편리해 보입니다.\n\n[acceptance_price]\n수용의향: 관망\n지불의향가격: 5000\n이유: 가격이 조금 부담스럽습니다.\n\n[adoption_barrier]\n장벽: 가격부담\n전환조건상태: 조건부수용\n조건: 월 5천원 이하면 구독하겠습니다.",
+      "error": null
+    },
+    {
+      "uuid": "fixture-004",
+      "response": "[needs_segment]\n문제공감: 5\n현재해결: 매번 실패\n니즈: 불안해소\n셀프세그먼트: 실용검토층\n이유: 이번엔 제대로 키우고 싶습니다.\n\n[competition_positioning]\n대안: 동네 꽃집 상담\n대안만족도: 2\n차별점: 뚜렷함\n포지셔닝: 센서 알림이 실질적으로 도움이 됩니다.\n\n[acceptance_price]\n수용의향: 수용\n지불의향가격: 20000\n이유: 실패를 줄여준다면 충분히 지불할 가치가 있습니다.",
+      "error": null
+    },
+    {
+      "uuid": "fixture-005",
+      "response": "[needs_segment]\n문제공감: 2\n현재해결: 그냥 포기함\n니즈: 기타\n셀프세그먼트: 무관심층\n이유: 식물 키우기에 큰 관심이 없습니다.\n\n[competition_positioning]\n대안: 없음\n대안만족도: 3\n차별점: 없음\n포지셔닝: 굳이 필요성을 못 느낍니다.\n\n[acceptance_price]\n수용의향: 거부\n지불의향가격: 0\n이유: 관심이 없어서 구독할 생각이 없습니다.\n\n[adoption_barrier]\n장벽: 필요성낮음\n전환조건상태: 여전히거부\n조건: 특별한 조건이 없습니다.",
+      "error": null
+    },
+    {
+      "uuid": "fixture-006",
+      "response": "[needs_segment]\n문제공감: 4\n현재해결: 가끔 물만 줌\n니즈: 건강\n셀프세그먼트: 대안만족층\n이유: 지금 방식도 나쁘지 않다고 생각합니다.\n\n[competition_positioning]\n대안: 일반 화분 세트\n대안만족도: 4\n차별점: 약간\n포지셔닝: 지금 방식과 크게 다르지 않아 보입니다.\n\n[acceptance_price]\n수용의향: 관망\n지불의향가격: 10000\n이유: 지금 방식에 대체로 만족합니다.\n\n[adoption_barrier]\n장벽: 대안만족\n전환조건상태: 조건부수용\n조건: 센서 데이터가 확실히 유용하면 바꾸겠습니다.",
+      "error": null
+    },
+    {
+      "uuid": "fixture-007",
+      "response": "[needs_segment]\n문제공감: 5\n현재해결: 매번 죽여서 포기 직전\n니즈: 불안해소\n셀프세그먼트: 적극수용층\n이유: 더 이상 실패하고 싶지 않습니다.\n\n[competition_positioning]\n대안: 동네 꽃집 상담\n대안만족도: 1\n차별점: 뚜렷함\n포지셔닝: 전문 상담보다 훨씬 편리합니다.\n\n[acceptance_price]\n수용의향: 수용\n지불의향가격: 15000\n이유: 실패를 막아준다면 바로 구독하겠습니다.",
+      "error": null
+    },
+    {
+      "uuid": "fixture-008",
+      "response": "[needs_segment]\n문제공감: 3\n현재해결: 가족이 대신 관리\n니즈: 시간절약\n셀프세그먼트: 실용검토층\n이유: 직접 관리할 시간이 부족합니다.\n\n[competition_positioning]\n대안: 일반 화분 세트\n대안만족도: 3\n차별점: 약간\n포지셔닝: 편리함은 있지만 결정적이지는 않습니다.\n\n[acceptance_price]\n수용의향: 거부\n지불의향가격: 0\n이유: 신뢰가 부족해서 아직은 어렵습니다.\n\n[adoption_barrier]\n장벽: 신뢰부족\n전환조건상태: 여전히거부\n조건: 후기가 더 쌓이면 고려하겠습니다.",
+      "error": null
+    },
+    {
+      "uuid": "fixture-009",
+      "response": "[needs_segment]\n현재해결: 문제공감 항목이 빠졌습니다\n니즈: 건강\n셀프세그먼트: 실용검토층\n이유: 문제공감 점수를 답하지 않았습니다.",
+      "error": "PARSING_FAILED: needs_segment"
+    },
+    {
+      "uuid": "fixture-010",
+      "response": "[needs_segment]\n문제공감: 4\n현재해결: 가끔 관리함\n니즈: 성취\n셀프세그먼트: 실용검토층\n이유: 직접 키워보는 성취감을 느끼고 싶습니다.\n\n[competition_positioning]\n대안: 일반 화분 세트\n대안만족도: 3\n차별점: 약간\n포지셔닝: 차별점이 있어 보입니다.\n\n[acceptance_price]\n지불의향가격: 10000\n이유: 의향 항목이 비어 있습니다.",
+      "error": "PARSING_FAILED: acceptance_price"
+    }
+  ],
+  "expected": {
+    "total_responses": 10,
+    "parse_failed": 2,
+    "metrics": {
+      "protocol_id": "startup_item_validation_v1",
+      "intent_counts": {
+        "수용": 4,
+        "관망": 2,
+        "거부": 2
+      },
+      "intent_pct": {
+        "수용": 50.0,
+        "관망": 25.0,
+        "거부": 25.0
+      },
+      "segment_counts": {
+        "실용검토층": 3,
+        "적극수용층": 2,
+        "가격민감층": 1,
+        "무관심층": 1,
+        "대안만족층": 1
+      },
+      "segment_pct": {
+        "실용검토층": 37.5,
+        "적극수용층": 25.0,
+        "가격민감층": 12.5,
+        "무관심층": 12.5,
+        "대안만족층": 12.5
+      },
+      "problem_empathy_avg": 3.88,
+      "problem_empathy_distribution": {
+        "1": 0,
+        "2": 1,
+        "3": 2,
+        "4": 2,
+        "5": 3
+      },
+      "need_category_counts": {
+        "시간절약": 2,
+        "즐거움": 1,
+        "비용절감": 1,
+        "불안해소": 2,
+        "기타": 1,
+        "건강": 1
+      },
+      "alternative_counts": {
+        "동네 꽃집 상담": 3,
+        "일반 화분 세트": 4,
+        "없음": 1
+      },
+      "alternative_satisfaction_avg": 2.75,
+      "differentiation_counts": {
+        "뚜렷함": 4,
+        "약간": 3,
+        "없음": 1
+      },
+      "differentiation_recognized_pct": 87.5,
+      "wtp_median": 15000,
+      "wtp_p25": 11250,
+      "wtp_p75": 15000,
+      "barrier_counts": {
+        "가격부담": 1,
+        "필요성낮음": 1,
+        "대안만족": 1,
+        "신뢰부족": 1
+      },
+      "condition_status_counts": {
+        "조건부수용": 2,
+        "여전히거부": 2
+      },
+      "conditional_yes_count": 2,
+      "conditional_yes_rate": 25.0
+    },
+    "segments": {
+      "breakdown_by_age": {
+        "20대": {
+          "수용": 1,
+          "관망": 1
+        },
+        "30대": {
+          "수용": 2
+        },
+        "40대": {
+          "관망": 1,
+          "거부": 1
+        },
+        "50대": {
+          "거부": 1
+        },
+        "60대": {
+          "수용": 1
+        }
+      },
+      "breakdown_by_sex": {
+        "여자": {
+          "수용": 3,
+          "관망": 1
+        },
+        "남자": {
+          "수용": 1,
+          "거부": 2,
+          "관망": 1
+        }
+      },
+      "breakdown_by_province": {
+        "서울": {
+          "수용": 1
+        },
+        "경기": {
+          "수용": 1
+        },
+        "부산": {
+          "관망": 1
+        },
+        "대구": {
+          "수용": 1
+        },
+        "대전": {
+          "거부": 1
+        },
+        "인천": {
+          "관망": 1
+        },
+        "경남": {
+          "수용": 1
+        },
+        "전북": {
+          "거부": 1
+        }
+      }
+    },
+    "insights": [
+      {
+        "type": "headline_acceptance_intent",
+        "title": "Headline acceptance intent",
+        "value": 50.0,
+        "evidence": "수용의향 기준 '수용' 비율입니다."
+      },
+      {
+        "type": "top_need_category",
+        "title": "Most common need",
+        "label": "시간절약",
+        "value": 25.0,
+        "evidence": "가장 많이 선택된 핵심 니즈는 '시간절약'입니다."
+      },
+      {
+        "type": "top_adoption_barrier",
+        "title": "Top adoption barrier",
+        "label": "가격부담",
+        "value": 12.5,
+        "evidence": "비수용 응답에서 가장 자주 나온 장벽은 '가격부담'입니다."
+      }
+    ]
+  }
+}

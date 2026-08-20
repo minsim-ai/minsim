@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { BrailleBreathe } from "@zane-chen/agents-are-thinking";
-import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
+import { usePrefersReducedMotion } from "../../hooks/usePrefersReducedMotion";
 
 type ThinkingIndicatorProps = {
   className?: string;

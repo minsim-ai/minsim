@@ -1,4 +1,4 @@
-import type { SimulationType } from "../types/api";
+import type { SimulationType } from "../../types/api";
 
 export type ChatScenarioTurn = {
   stepId: string;

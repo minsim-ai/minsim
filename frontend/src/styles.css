@@ -6257,15 +6257,286 @@ html[data-theme="minsim-dark"] {
   border-radius: var(--r);
 }
 
-/* Free-survey results: cards need explicit padding (base .card has none). */
-.minsim-open-survey {
+/* Free-survey / campus-priority results: cards need explicit padding (base .card has none).
+   Shared minsim-result-* names are the hard contract; sim-specific aliases stay for one release. */
+.minsim-open-survey,
+.minsim-campus-priority,
+.minsim-result-stack {
   display: grid;
   gap: 14px;
 }
 
 .minsim-shell .minsim-open-survey > .card,
-.minsim-open-survey > .card {
+.minsim-open-survey > .card,
+.minsim-shell .minsim-campus-priority > .card,
+.minsim-campus-priority > .card,
+.minsim-shell .minsim-result-stack > .card,
+.minsim-result-stack > .card,
+.minsim-result-card,
+.minsim-shell .minsim-result-card {
   padding: 20px 22px;
+}
+
+/* Methodology sample age stacked bar — never rely on empty .row spans. */
+.minsim-sample-age-track {
+  display: flex;
+  align-items: stretch;
+  height: 16px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: var(--surface-3);
+  border: 1px solid var(--border-soft);
+  margin-bottom: 14px;
+}
+
+.minsim-sample-age-seg {
+  display: block;
+  height: 100%;
+  flex: none;
+  min-height: 100%;
+}
+
+.minsim-sample-age-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.minsim-sample-age-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--fg-dim);
+}
+
+.minsim-sample-age-legend-item i {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  flex: none;
+}
+
+.minsim-sample-age-legend-item b {
+  color: var(--fg);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Campus priority result blocks (parity with open-survey cards). */
+.minsim-campus-priority-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.minsim-campus-priority-card-head h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--fg);
+}
+
+.minsim-campus-priority-lead {
+  margin: 0 0 14px;
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+.minsim-campus-priority-options-label {
+  display: block;
+  color: var(--fg-faint);
+  font-size: 12px;
+  font-weight: 650;
+  margin-bottom: 8px;
+}
+
+.minsim-campus-priority-options ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.minsim-campus-priority-options li {
+  max-width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2, var(--bg-2));
+  color: var(--fg-dim);
+  padding: 8px 12px;
+  font-size: 13px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.minsim-campus-priority-bars {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.minsim-campus-priority-bar-meta {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--fg);
+}
+
+.minsim-campus-priority-bar-meta > span:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.minsim-campus-priority-bar-meta .lbl-mono {
+  flex: none;
+  white-space: nowrap;
+  color: var(--fg-dim);
+}
+
+.minsim-campus-priority-bar-track {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--surface-3, var(--surface-2));
+  border: 1px solid var(--border-soft);
+  overflow: hidden;
+}
+
+.minsim-campus-priority-bar-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--lime);
+}
+
+.minsim-campus-priority-callout,
+.minsim-result-callout {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm);
+  background: var(--surface-2, var(--bg-2));
+}
+
+.minsim-campus-priority-callout-badge,
+.minsim-result-callout-badge {
+  flex: none;
+  margin-top: 2px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--lime-line);
+  background: var(--lime-soft);
+  color: var(--lime);
+  font-size: 11px;
+}
+
+.minsim-campus-priority-callout-title,
+.minsim-result-callout-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--fg);
+  line-height: 1.45;
+}
+
+.minsim-campus-priority-inversion-list,
+.minsim-result-inversion-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.minsim-campus-priority-inversion-item,
+.minsim-result-inversion-item {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm);
+  background: var(--surface-2, var(--bg-2));
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--fg);
+}
+
+.minsim-campus-priority-reasons,
+.minsim-result-reasons {
+  display: grid;
+  gap: 14px;
+}
+
+.minsim-campus-priority-reason-group,
+.minsim-open-survey-reason-group,
+.minsim-result-reason-group {
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm);
+  background: var(--surface-2, var(--bg-2));
+  padding: 14px 16px;
+}
+
+.minsim-campus-priority-reason-group h4,
+.minsim-open-survey-reason-group h4,
+.minsim-result-reason-group h4 {
+  margin: 0 0 10px;
+  color: var(--fg);
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.minsim-campus-priority-reason-group ul,
+.minsim-open-survey-reason-group ul,
+.minsim-result-reason-group ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 10px;
+}
+
+/* Hard layout: preflight leaves spans inline without this → wall of text + inline N명. */
+.minsim-campus-priority-reason-group li,
+.minsim-open-survey-reason-group li,
+.minsim-result-reason-group li {
+  display: grid !important;
+  gap: 4px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border-soft);
+  color: var(--fg-dim);
+  font-size: 13.5px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.minsim-campus-priority-reason-group li:first-child,
+.minsim-open-survey-reason-group li:first-child,
+.minsim-result-reason-group li:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.minsim-campus-priority-reason-group li .muted,
+.minsim-open-survey-reason-group li .muted,
+.minsim-result-reason-group li .muted,
+.minsim-campus-priority-reason-group li .minsim-result-reason-count,
+.minsim-result-reason-group li .minsim-result-reason-count {
+  display: block;
+  font-size: 12px;
 }
 
 .minsim-open-survey-card-head {
@@ -6583,7 +6854,9 @@ html[data-theme="minsim-dark"] {
 
 @media (max-width: 640px) {
   .minsim-shell .minsim-open-survey > .card,
-  .minsim-open-survey > .card {
+  .minsim-open-survey > .card,
+  .minsim-shell .minsim-campus-priority > .card,
+  .minsim-campus-priority > .card {
     padding: 16px;
   }
 
@@ -8163,16 +8436,21 @@ html[data-theme='minsim-dark'] .btn.btn-ai {
 }
 
 .minsim-run-option {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   min-height: 44px;
   padding: 0 16px;
   border: 1.5px solid var(--border-strong);
   border-radius: 999px;
   background: var(--surface);
-  color: var(--fg);
+  color: var(--fg-dim);
   font-size: 14px;
-  font-weight: 650;
+  font-weight: 600;
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .minsim-run-option:hover:not(:disabled) {
@@ -8180,16 +8458,67 @@ html[data-theme='minsim-dark'] .btn.btn-ai {
   color: var(--fg);
 }
 
+/* Selected state must be obvious at a glance (issue #3). */
 .minsim-run-option.is-on {
   border-color: var(--lime);
-  background: var(--lime-soft);
+  border-width: 2px;
+  background: color-mix(in srgb, var(--lime) 18%, var(--surface));
+  color: var(--fg);
+  font-weight: 750;
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--lime) 35%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--lime) 25%, transparent);
+}
+
+.minsim-run-option.is-on::before {
+  content: '✓';
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.05em;
+  height: 1.05em;
+  border-radius: 999px;
+  background: var(--lime);
+  color: var(--bg);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  flex: none;
+}
+
+.minsim-run-option-state {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   color: var(--lime);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--lime) 30%, transparent);
+}
+
+.minsim-run-option:not(.is-on) .minsim-run-option-state {
+  display: none;
 }
 
 .minsim-run-option:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.minsim-project-kind-option.primary,
+.minsim-project-kind-option[aria-pressed='true'] {
+  border-color: var(--lime);
+  border-width: 2px;
+  background: color-mix(in srgb, var(--lime) 16%, var(--surface));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--lime) 28%, transparent);
+  color: var(--fg);
+  font-weight: 750;
+}
+
+.minsim-project-kind-selected {
+  display: inline-block;
+  margin-bottom: 4px;
+  color: var(--lime);
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
 }
 
 .minsim-run-select {
@@ -10943,4 +11272,69 @@ html[data-theme='minsim-dark'] .btn.btn-ai {
   .minsim-login-visual {
     min-height: 240px;
   }
+}
+
+
+/* Focus group (open_survey) */
+.minsim-focus-group-card {
+  padding: 18px 18px 20px;
+}
+.minsim-focus-group-panel {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+}
+.minsim-focus-group-member {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+  font-size: 13px;
+}
+.minsim-focus-group-timeline {
+  display: grid;
+  gap: 10px;
+  border-left: 3px solid color-mix(in srgb, var(--accent, #0f6b5c) 35%, var(--border-soft));
+  padding-left: 14px;
+  margin-left: 4px;
+}
+.minsim-focus-group-turn {
+  padding: 10px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+}
+.minsim-focus-group-turn.is-mod {
+  background: color-mix(in srgb, var(--warn, #f59e0b) 10%, var(--surface));
+}
+.minsim-focus-group-turn p {
+  margin: 6px 0 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+.minsim-focus-group-turn-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+.minsim-focus-group-stance {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.minsim-focus-group-stance th,
+.minsim-focus-group-stance td {
+  border: 1px solid var(--border-soft);
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+.minsim-focus-group-stance th {
+  font-size: 12px;
+  color: var(--fg-faint);
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
 }

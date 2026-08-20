@@ -17,6 +17,7 @@ from src.config import SQLITE_PATH
 from src.jobs.models import (
     AgentRunRecord,
     InterviewMessageRecord,
+    FocusGroupRecord,
     InterviewThreadRecord,
     IntakeEventRecord,
     IntakeHistoryRecord,
@@ -182,6 +183,36 @@ class SQLiteRunStore:
 
                 CREATE INDEX IF NOT EXISTS idx_interview_messages_thread_ordinal
                     ON interview_messages (thread_id, ordinal);
+
+                CREATE TABLE IF NOT EXISTS focus_groups (
+                    focus_group_id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    project_id TEXT NOT NULL,
+                    run_id TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    schema_version TEXT NOT NULL DEFAULT 'focus-group/v1',
+                    config_json TEXT NOT NULL DEFAULT '{}',
+                    progress_json TEXT,
+                    panel_json TEXT NOT NULL DEFAULT '[]',
+                    timeline_json TEXT NOT NULL DEFAULT '[]',
+                    stance_json TEXT,
+                    summary_json TEXT,
+                    token_usage_json TEXT,
+                    error TEXT,
+                    job_id TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    completed_at TEXT,
+                    FOREIGN KEY (user_id) REFERENCES users (user_id),
+                    FOREIGN KEY (project_id) REFERENCES projects (project_id),
+                    FOREIGN KEY (run_id) REFERENCES runs (run_id)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_focus_groups_run_created
+                    ON focus_groups (run_id, created_at);
+
+                CREATE INDEX IF NOT EXISTS idx_focus_groups_user_status
+                    ON focus_groups (user_id, status);
 
                 CREATE TABLE IF NOT EXISTS usage_ledger (
                     usage_id TEXT PRIMARY KEY,
@@ -1289,11 +1320,13 @@ class SQLiteRunStore:
         action_type: str,
         limit: int,
         window_seconds: int = 3600,
+        units: int = 1,
     ) -> tuple[bool, int]:
-        """Atomically reserve one bounded interactive LLM action."""
+        """Atomically reserve `units` bounded interactive LLM action slots."""
 
         self.init_db()
         safe_limit = max(1, limit)
+        safe_units = max(1, int(units))
         cutoff = (datetime.now(UTC) - timedelta(seconds=max(1, window_seconds))).isoformat()
         now = _utc_now()
         with self._connect() as conn:
@@ -1307,20 +1340,21 @@ class SQLiteRunStore:
                 (user_id, action_type, cutoff),
             ).fetchone()
             used = int(row["value"] if row else 0)
-            if used >= safe_limit:
+            if used + safe_units > safe_limit:
                 return False, 0
-            conn.execute(
-                """
-                INSERT INTO interactive_llm_usage (action_id, user_id, action_type, created_at)
-                VALUES (?, ?, ?, ?)
-                """,
-                (str(uuid4()), user_id, action_type, now),
-            )
+            for _ in range(safe_units):
+                conn.execute(
+                    """
+                    INSERT INTO interactive_llm_usage (action_id, user_id, action_type, created_at)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (str(uuid4()), user_id, action_type, now),
+                )
             conn.execute(
                 "DELETE FROM interactive_llm_usage WHERE created_at < ?",
                 ((datetime.now(UTC) - timedelta(days=30)).isoformat(),),
             )
-        return True, max(0, safe_limit - used - 1)
+        return True, max(0, safe_limit - used - safe_units)
 
     def reserve_free_run(self, user_id: str, run_id: str, *, reason: str) -> None:
         self._append_usage_event(
@@ -1828,6 +1862,301 @@ class SQLiteRunStore:
                 created_at=now,
             ),
         )
+
+    def create_focus_group(
+        self,
+        *,
+        user_id: str,
+        project_id: str,
+        run_id: str,
+        config: dict[str, Any],
+        panel: list[dict[str, Any]],
+        progress: dict[str, Any] | None = None,
+    ) -> FocusGroupRecord:
+        """Insert a queued focus group without active-guard (prefer create_focus_group_if_idle)."""
+        self.init_db()
+        now = _utc_now()
+        focus_group_id = f"fg_{uuid4().hex[:16]}"
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO focus_groups (
+                    focus_group_id, user_id, project_id, run_id, status, schema_version,
+                    config_json, progress_json, panel_json, timeline_json,
+                    created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, 'queued', 'focus-group/v1', ?, ?, ?, '[]', ?, ?)
+                """,
+                (
+                    focus_group_id,
+                    user_id,
+                    project_id,
+                    run_id,
+                    _json_dumps(config or {}),
+                    _json_dumps(progress) if progress is not None else None,
+                    _json_dumps(panel or []),
+                    now,
+                    now,
+                ),
+            )
+            row = conn.execute(
+                "SELECT * FROM focus_groups WHERE focus_group_id = ?",
+                (focus_group_id,),
+            ).fetchone()
+        if row is None:
+            raise RuntimeError(f"Focus group was not persisted: {focus_group_id}")
+        return self._row_to_focus_group(row)
+
+    def reclaim_stale_focus_groups(
+        self,
+        *,
+        run_id: str | None = None,
+        stale_after_seconds: int = 2100,
+    ) -> int:
+        """Mark long-inactive queued/running sessions failed so create is not bricked."""
+        self.init_db()
+        now_dt = datetime.now(UTC)
+        now = now_dt.isoformat()
+        cutoff = (now_dt - timedelta(seconds=max(60, stale_after_seconds))).isoformat()
+        error = "stale_or_worker_lost: session exceeded inactivity window"
+        with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            if run_id:
+                cur = conn.execute(
+                    """
+                    UPDATE focus_groups
+                    SET status = 'failed',
+                        error = ?,
+                        completed_at = ?,
+                        updated_at = ?
+                    WHERE run_id = ?
+                      AND status IN ('queued', 'running')
+                      AND updated_at < ?
+                    """,
+                    (error, now, now, run_id, cutoff),
+                )
+            else:
+                cur = conn.execute(
+                    """
+                    UPDATE focus_groups
+                    SET status = 'failed',
+                        error = ?,
+                        completed_at = ?,
+                        updated_at = ?
+                    WHERE status IN ('queued', 'running')
+                      AND updated_at < ?
+                    """,
+                    (error, now, now, cutoff),
+                )
+            return int(cur.rowcount or 0)
+
+    def create_focus_group_if_idle(
+        self,
+        *,
+        user_id: str,
+        project_id: str,
+        run_id: str,
+        config: dict[str, Any],
+        panel: list[dict[str, Any]],
+        progress: dict[str, Any] | None = None,
+        stale_after_seconds: int = 2100,
+    ) -> FocusGroupRecord:
+        """Atomically reclaim stale actives, enforce single active, then insert queued row."""
+        self.init_db()
+        now_dt = datetime.now(UTC)
+        now = now_dt.isoformat()
+        cutoff = (now_dt - timedelta(seconds=max(60, stale_after_seconds))).isoformat()
+        focus_group_id = f"fg_{uuid4().hex[:16]}"
+        stale_error = "stale_or_worker_lost: session exceeded inactivity window"
+        with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            conn.execute(
+                """
+                UPDATE focus_groups
+                SET status = 'failed',
+                    error = ?,
+                    completed_at = ?,
+                    updated_at = ?
+                WHERE run_id = ?
+                  AND status IN ('queued', 'running')
+                  AND updated_at < ?
+                """,
+                (stale_error, now, now, run_id, cutoff),
+            )
+            active_row = conn.execute(
+                """
+                SELECT COUNT(*) AS n FROM focus_groups
+                WHERE run_id = ? AND status IN ('queued', 'running')
+                """,
+                (run_id,),
+            ).fetchone()
+            active = int(active_row["n"] if active_row else 0)
+            if active > 0:
+                raise ValueError("focus_group_active")
+            conn.execute(
+                """
+                INSERT INTO focus_groups (
+                    focus_group_id, user_id, project_id, run_id, status, schema_version,
+                    config_json, progress_json, panel_json, timeline_json,
+                    created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, 'queued', 'focus-group/v1', ?, ?, ?, '[]', ?, ?)
+                """,
+                (
+                    focus_group_id,
+                    user_id,
+                    project_id,
+                    run_id,
+                    _json_dumps(config or {}),
+                    _json_dumps(progress) if progress is not None else None,
+                    _json_dumps(panel or []),
+                    now,
+                    now,
+                ),
+            )
+            row = conn.execute(
+                "SELECT * FROM focus_groups WHERE focus_group_id = ?",
+                (focus_group_id,),
+            ).fetchone()
+        if row is None:
+            raise RuntimeError(f"Focus group was not persisted: {focus_group_id}")
+        return self._row_to_focus_group(row)
+
+    def mark_focus_group_failed(
+        self,
+        focus_group_id: str,
+        *,
+        error: str,
+    ) -> None:
+        """Fail-closed helper: terminal failed even if status was already active."""
+        self.update_focus_group(
+            focus_group_id,
+            status="failed",
+            error=(error or "unknown_error")[:800],
+            mark_completed=True,
+        )
+
+    def list_focus_groups(self, *, user_id: str, run_id: str) -> list[FocusGroupRecord]:
+        self.init_db()
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM focus_groups
+                WHERE user_id = ? AND run_id = ?
+                ORDER BY created_at DESC
+                """,
+                (user_id, run_id),
+            ).fetchall()
+        return [self._row_to_focus_group(row) for row in rows]
+
+    def get_focus_group(self, *, user_id: str, focus_group_id: str) -> FocusGroupRecord | None:
+        self.init_db()
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM focus_groups WHERE user_id = ? AND focus_group_id = ?",
+                (user_id, focus_group_id),
+            ).fetchone()
+        return self._row_to_focus_group(row) if row else None
+
+    def get_focus_group_by_id(self, focus_group_id: str) -> FocusGroupRecord | None:
+        self.init_db()
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM focus_groups WHERE focus_group_id = ?",
+                (focus_group_id,),
+            ).fetchone()
+        return self._row_to_focus_group(row) if row else None
+
+    def count_active_focus_groups(self, *, run_id: str) -> int:
+        self.init_db()
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT COUNT(*) AS n FROM focus_groups
+                WHERE run_id = ? AND status IN ('queued', 'running')
+                """,
+                (run_id,),
+            ).fetchone()
+        return int(row["n"] if row else 0)
+
+    def update_focus_group(
+        self,
+        focus_group_id: str,
+        *,
+        status: str | None = None,
+        progress: dict[str, Any] | None = None,
+        panel: list[dict[str, Any]] | None = None,
+        timeline: list[dict[str, Any]] | None = None,
+        stance_table: list[dict[str, Any]] | None = None,
+        summary: dict[str, Any] | None = None,
+        token_usage: dict[str, Any] | None = None,
+        error: str | None = None,
+        job_id: str | None = None,
+        mark_completed: bool = False,
+    ) -> None:
+        self.init_db()
+        now = _utc_now()
+        fields: list[str] = ["updated_at = ?"]
+        values: list[Any] = [now]
+        if status is not None:
+            fields.append("status = ?")
+            values.append(status)
+        if progress is not None:
+            fields.append("progress_json = ?")
+            values.append(_json_dumps(progress))
+        if panel is not None:
+            fields.append("panel_json = ?")
+            values.append(_json_dumps(panel))
+        if timeline is not None:
+            fields.append("timeline_json = ?")
+            values.append(_json_dumps(timeline))
+        if stance_table is not None:
+            fields.append("stance_json = ?")
+            values.append(_json_dumps(stance_table))
+        if summary is not None:
+            fields.append("summary_json = ?")
+            values.append(_json_dumps(summary))
+        if token_usage is not None:
+            fields.append("token_usage_json = ?")
+            values.append(_json_dumps(token_usage))
+        if error is not None:
+            fields.append("error = ?")
+            values.append(error)
+        if job_id is not None:
+            fields.append("job_id = ?")
+            values.append(job_id)
+        if mark_completed:
+            fields.append("completed_at = ?")
+            values.append(now)
+        values.append(focus_group_id)
+        with self._connect() as conn:
+            conn.execute(
+                f"UPDATE focus_groups SET {', '.join(fields)} WHERE focus_group_id = ?",
+                tuple(values),
+            )
+
+    def _row_to_focus_group(self, row: sqlite3.Row) -> FocusGroupRecord:
+        return FocusGroupRecord(
+            focus_group_id=row["focus_group_id"],
+            user_id=row["user_id"],
+            project_id=row["project_id"],
+            run_id=row["run_id"],
+            status=row["status"],
+            schema_version=row["schema_version"] or "focus-group/v1",
+            config=_json_loads(row["config_json"], {}),
+            progress=_json_loads(row["progress_json"], None) if row["progress_json"] else None,
+            panel=_json_loads(row["panel_json"], []) or [],
+            timeline=_json_loads(row["timeline_json"], []) or [],
+            stance_table=_json_loads(row["stance_json"], None) if row["stance_json"] else None,
+            summary=_json_loads(row["summary_json"], None) if row["summary_json"] else None,
+            token_usage=_json_loads(row["token_usage_json"], None) if row["token_usage_json"] else None,
+            error=row["error"],
+            job_id=row["job_id"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+            completed_at=row["completed_at"],
+        )
+
 
     def user_owns_run(self, user_id: str, run_id: str) -> bool:
         self.init_db()

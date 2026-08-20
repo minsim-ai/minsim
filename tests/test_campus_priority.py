@@ -222,6 +222,32 @@ def test_absent_tier_reports_zero_not_missing_key():
     assert out["tier_rankings"]["박사후연구원"]["low_confidence"] is True
 
 
+def test_nationwide_aggregate_uses_age_axis_not_staff_collapse():
+    """전국민 education_level에 학내 계층 축을 쓰면 전원이 교직원이 된다."""
+    order = ["학식 질 개선", "심야 셔틀", "스터디룸 증설", "헬스장 확충"]
+
+    class Raw:
+        def __init__(self, age: int):
+            self.persona = {"age": age, "education_level": "고등학교", "occupation": "무직"}
+
+    raw = [Raw(24), Raw(35), Raw(24)]
+    parsed = [
+        {"ranking": order, "top_reason": "a", "bottom_reason": "b"},
+        {"ranking": order, "top_reason": "a", "bottom_reason": "b"},
+        {"ranking": order, "top_reason": "a", "bottom_reason": "b"},
+    ]
+    out = aggregate_campus_priority(
+        {**INPUT, "_persona_pool": "nationwide"},
+        raw,
+        parsed,
+    )
+    assert out["persona_pool"] == "nationwide"
+    assert out["tier_axis_label"] == "연령대"
+    assert out["tier_rankings"]["20대"]["n"] == 2
+    assert out["tier_rankings"]["30대"]["n"] == 1
+    assert out["tier_rankings"].get("교직원", {}).get("n", 0) == 0
+
+
 # ─── 러너 ───
 
 @pytest.mark.asyncio
@@ -231,6 +257,58 @@ async def test_run_rejects_item_count_out_of_range():
     sim = SIMULATION_SPECS["campus_priority"].runner_factory()
     with pytest.raises(ValueError, match="3~6개"):
         await sim.run({**INPUT, "items": ["하나", "둘"]}, sample_size=2)
+
+
+@pytest.mark.asyncio
+async def test_run_honors_nationwide_pool_with_age_axis():
+    """전 국민 선택을 존중한다. 학내 계층 축을 강제하면 전원 교직원으로 뭉개진다."""
+    from src.data.sampler import PersonaSampler
+    from src.llm.base import LLMResponse
+    from src.simulations.registry import SIMULATION_SPECS
+
+    class FixedRankStub:
+        async def generate(self, request):
+            content = request.messages[-1].content
+            listed = [
+                line[2:].strip()
+                for line in content.splitlines()
+                if line.startswith("- ")
+            ]
+            items = listed[:4] if len(listed) >= 4 else listed
+            payload = {
+                "ranking": items,
+                "top_reason": "본인 일과 기준",
+                "bottom_reason": "체감이 작음",
+            }
+            return LLMResponse(
+                content=json.dumps(payload, ensure_ascii=False),
+                provider="fake",
+                provider_model="stub",
+            )
+
+    sim = SIMULATION_SPECS["campus_priority"].runner_factory()
+    result = await sim.run(
+        INPUT,
+        sample_size=50,
+        seed=42,
+        llm_client=FixedRankStub(),
+        sampler=PersonaSampler(pool="nationwide"),
+    )
+    assert result.metrics["sampling"]["sampling"] == "random"
+    assert result.metrics["persona_pool"] == "nationwide"
+    assert result.metrics["tier_axis_label"] == "연령대"
+    assert "20대" in result.metrics["tier_axis"]
+    counts = {k: v["n"] for k, v in result.metrics["tier_rankings"].items()}
+    assert counts.get("교직원", 0) == 0
+    assert sum(counts.values()) == result.total_responses - result.parse_failed
+    warnings = " ".join(result.metrics["sampling"].get("warnings") or [])
+    assert "DGIST" not in warnings
+    # 실제 표본이 전국민인지 직업 라벨로 확인
+    occupations = [
+        (getattr(row, "persona", None) or {}).get("occupation", "")
+        for row in result.raw_results[:10]
+    ]
+    assert not any(str(o).startswith("DGIST") for o in occupations)
 
 
 def test_strips_ordinal_prefix_from_ranking():

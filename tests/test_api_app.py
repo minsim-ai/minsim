@@ -617,6 +617,42 @@ def test_admin_api_requires_admin_email(tmp_path, monkeypatch) -> None:
     assert response.status_code == 403
 
 
+def test_admin_private_only_blocks_public_forwarded_ip(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("KORESIM_AUTH_SECRET", "test-secret")
+    monkeypatch.setenv("KORESIM_AUTH_COOKIE_SECURE", "false")
+    monkeypatch.setenv("GOOGLE_CLIENT_ID", "google-client")
+    monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "google-secret")
+    monkeypatch.setenv("KORESIM_AUTH_TEST_LOGIN_ENABLED", "true")
+    monkeypatch.setenv("KORESIM_AUTH_TEST_EMAIL", "admin@example.com")
+    monkeypatch.setenv("KORESIM_ADMIN_EMAILS", "admin@example.com")
+    monkeypatch.setenv("KORESIM_ADMIN_PRIVATE_ONLY", "true")
+    client = TestClient(create_app(store=SQLiteRunStore(tmp_path / "runs.sqlite3")))
+    client.get("/api/auth/test-login", follow_redirects=False)
+
+    # Cloudflare tunnel: peer is loopback, real client is public internet.
+    # Use a clearly global address (8.8.8.8); some Python versions mark TEST-NET as private.
+    blocked = client.get(
+        "/api/admin/overview",
+        headers={"CF-Connecting-IP": "8.8.8.8"},
+    )
+    assert blocked.status_code == 403
+    assert blocked.json()["detail"]["code"] == "ADMIN_PRIVATE_NETWORK_ONLY"
+
+    blocked_page = client.get("/admin", headers={"CF-Connecting-IP": "8.8.8.8"})
+    assert blocked_page.status_code == 403
+
+    # Tailscale CGNAT client is allowed.
+    allowed = client.get(
+        "/api/admin/overview",
+        headers={"CF-Connecting-IP": "100.64.1.20"},
+    )
+    assert allowed.status_code == 200
+
+    # Local request without proxy headers is allowed (ops on the host).
+    local = client.get("/api/admin/overview")
+    assert local.status_code == 200
+
+
 def test_create_run_persists_queued_snapshot(tmp_path) -> None:
     store = SQLiteRunStore(tmp_path / "runs.sqlite3")
     client = TestClient(create_app(store=store, enqueue_run_func=lambda run_id: "job-1"))

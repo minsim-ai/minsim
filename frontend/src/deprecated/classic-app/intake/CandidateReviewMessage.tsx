@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { CreativeCandidate, IntakeSlotValue } from "../../intake/types";
+import type { CreativeCandidate, IntakeSlotValue } from "../../../intake/types";
 
 export function CandidateReviewMessage({
   candidates,

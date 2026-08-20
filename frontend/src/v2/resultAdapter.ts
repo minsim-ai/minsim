@@ -117,9 +117,9 @@ function buildMetricCards(result: RunResultEnvelope, parseSuccessRate: number | 
       detail: `요청 ${formatNumber(result.sample_size)}명`,
     },
     {
-      label: '구조화 성공',
+      label: '응답 정리 성공',
       value: parseSuccessRate === null ? 'N/A' : formatPct(parseSuccessRate),
-      detail: `파싱 실패 ${formatNumber(result.parse_failed)}건`,
+      detail: `읽지 못한 응답 ${formatNumber(result.parse_failed)}건`,
     },
     {
       label: '판단 상태',
@@ -151,7 +151,7 @@ function confidenceCopy(total: number, parseSuccessRate: number | null): { label
   if ((parseSuccessRate ?? 0) >= 90 && total >= 50) {
     return {
       label: '보고서 기준 충족',
-      body: '표본 규모와 구조화 성공률이 좋아 세그먼트 차이까지 함께 해석할 수 있습니다.',
+      body: '표본 규모와 응답 정리 성공률이 좋아 세그먼트 차이까지 함께 해석할 수 있습니다.',
     }
   }
   if (total >= 30) {
@@ -354,7 +354,7 @@ function buildMethodology(result: RunResultEnvelope, parseSuccessRate: number | 
     .join(' · ')
   return [
     `응답 ${formatNumber(result.total_responses)}명 · 요청 표본 ${formatNumber(result.sample_size)}명`,
-    `구조화 성공 ${parseSuccessRate === null ? 'N/A' : formatPct(parseSuccessRate)}`,
+    `응답 정리 성공 ${parseSuccessRate === null ? 'N/A' : formatPct(parseSuccessRate)}`,
     ...(countryLine ? [countryLine] : []),
     `타겟 조건 ${compactJson(result.target_filter)}`,
   ]

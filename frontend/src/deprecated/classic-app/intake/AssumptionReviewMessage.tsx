@@ -1,6 +1,6 @@
-import type { IntakeSlotValue } from '../../intake/types'
-import type { SimulationType } from '../../types/api'
-import { AssumptionReviewPanel } from './AssumptionReviewPanel'
+import type { IntakeSlotValue } from '../../../intake/types'
+import type { SimulationType } from '../../../types/api'
+import { AssumptionReviewPanel } from '../../../components/intake/AssumptionReviewPanel'
 
 export function AssumptionReviewMessage({
   assumptions,

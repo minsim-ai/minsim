@@ -3,7 +3,7 @@ title: LLM Gateway and Agentic Orchestration Design
 type: design-doc
 tags: [llm-gateway, solar, upstage, litellm, langgraph, observability]
 created: 2026-05-02
-updated: 2026-07-13
+updated: 2026-08-20
 status: approved
 related: [[../../README]], [[react-fastapi-migration]], [[harness-engineering-controls]], [[data-governance-and-io-boundary]], [[evaluation-framework]], [[../phases/phase-7-llm-gateway-orchestration]], [[../execution/ai-system-hardening-solar-v1]]
 ---
@@ -12,15 +12,17 @@ related: [[../../README]], [[react-fastapi-migration]], [[harness-engineering-co
 
 ## 1. Current Decision
 
-KoreaSim의 **현재 live** provider는 OpenAI Chat Completions
-(`LLM_BACKEND=openai`, 단일 `OPENAI_API_KEY`/`MONO_API_KEY`)다.
-task-tiered 모델: persona `gpt-5.4-nano`, strong `gpt-5.4-mini`, agents
-`gpt-5.6-luna`. 전역 RPM은 Redis sliding window (`LLM_MAX_RPM`, multi-worker
-공유). RQ worker 5 + `CONCURRENCY=96` (2026-07-22 multi-worker gate 통과).
-Upstage Solar는 명시적 env rollback. 운영 문서:
+KoreaSim의 **현재 live** provider는 Upstage Solar Pro 2
+(`LLM_BACKEND=upstage`, 기본값)다. OpenAI Chat Completions
+(`LLM_BACKEND=openai`, 단일 `OPENAI_API_KEY`/`MONO_API_KEY`) 경로는
+task-tiered 모델(persona `gpt-5.4-nano`, strong `gpt-5.4-mini`, agents
+`gpt-5.6-luna`)과 Redis sliding window 전역 RPM(`LLM_MAX_RPM`,
+multi-worker 공유)까지 준비·검증(RQ worker 5 + `CONCURRENCY=96`,
+2026-07-22 multi-worker gate 통과)되어 있으나, 아직 컷오버되지 않은
+**대기 상태의 전환 경로**다. 운영 문서:
 [[../execution/openai-multi-worker-rpm-v1]],
-[[../runbooks/llm-openai-langfuse-operations]]. Gemini는 명시적 compatibility이며
-자동 fallback으로 사용하지 않는다.
+[[../runbooks/llm-openai-langfuse-operations]]. Gemini는 명시적 rollback
+전용이며 자동 fallback으로 사용하지 않는다.
 
 Ollama는 현재 제품·운영 fallback이 아니다. 과거 검증 artifact와 adapter는
 감사 기록/호환 코드로 남길 수 있지만, 지원 backend allowlist와 LiteLLM 활성
@@ -49,9 +51,9 @@ flowchart TD
   RQ --> SAMPLE["Persona sampler"]
   SAMPLE --> BATCH["Async batch simulator: 50-200"]
   BATCH --> CLIENT["Provider-agnostic LLMClient"]
-  CLIENT --> UP["Upstage Solar Pro 2 target"]
+  CLIENT --> UP["Upstage Solar Pro 2 (live)"]
   CLIENT --> LITE["LiteLLM optional gateway"]
-  CLIENT -. "temporary compatibility" .-> GEM["Gemini live until Solar credential"]
+  CLIENT -. "explicit rollback only" .-> GEM["Gemini"]
   BATCH --> AGG["Aggregate result envelope"]
   AGG --> GRAPH["LangGraph result workflow"]
   GRAPH --> ANALYSIS["AnalysisAgent"]

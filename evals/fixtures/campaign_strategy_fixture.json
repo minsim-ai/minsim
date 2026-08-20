@@ -1,0 +1,349 @@
+{
+  "simulation_type": "campaign_strategy",
+  "name": "campaign_strategy_fixture",
+  "input_data": {
+    "product_context": "신규 출시된 단백질 간식 브랜드",
+    "budget": 5000000,
+    "channels": [
+      {
+        "name": "인스타그램",
+        "description": "숏폼 광고와 인플루언서 협업"
+      },
+      {
+        "name": "유튜브",
+        "description": "리뷰 영상 및 프리롤 광고"
+      },
+      {
+        "name": "이메일뉴스레터",
+        "description": "기존 구독자 대상 프로모션"
+      }
+    ],
+    "messages": [
+      {
+        "name": "건강메시지",
+        "creative": "하루 단백질을 간편하게"
+      },
+      {
+        "name": "맛메시지",
+        "creative": "맛있어서 계속 찾게 되는 간식"
+      }
+    ]
+  },
+  "personas": [
+    {
+      "uuid": "fixture-001",
+      "age": 24,
+      "sex": "여자",
+      "province": "서울",
+      "district": "서울-마포구",
+      "occupation": "대학원생",
+      "education_level": "대학원",
+      "marital_status": "미혼",
+      "family_type": "1인가구",
+      "housing_type": "오피스텔",
+      "professional_persona": "트렌드와 모바일 생산성 도구에 민감하다.",
+      "family_persona": "혼자 살며 구매 결정을 빠르게 내린다.",
+      "culinary_persona": "카페와 편의 서비스를 자주 이용한다.",
+      "persona": "새로운 기기를 먼저 써 보는 소비자다."
+    },
+    {
+      "uuid": "fixture-002",
+      "age": 37,
+      "sex": "남자",
+      "province": "경기",
+      "district": "경기-성남시",
+      "occupation": "개발자",
+      "education_level": "4년제 대학교",
+      "marital_status": "기혼",
+      "family_type": "부부+자녀",
+      "housing_type": "아파트",
+      "professional_persona": "업무 효율과 기기 성능을 중요하게 본다.",
+      "family_persona": "가족 지출을 고려해 실용성을 따진다.",
+      "culinary_persona": "주말 외식을 계획적으로 한다.",
+      "persona": "기능 설명이 명확한 광고를 선호한다."
+    },
+    {
+      "uuid": "fixture-003",
+      "age": 46,
+      "sex": "여자",
+      "province": "부산",
+      "district": "부산-해운대구",
+      "occupation": "자영업",
+      "education_level": "2~3년제 전문대학",
+      "marital_status": "기혼",
+      "family_type": "부부",
+      "housing_type": "아파트",
+      "professional_persona": "가격 대비 체감 가치를 중요하게 본다.",
+      "family_persona": "배우자와 상의해 큰 구매를 결정한다.",
+      "culinary_persona": "지역 맛집과 실속 소비를 선호한다.",
+      "persona": "과장보다 안정적인 인상을 선호한다."
+    },
+    {
+      "uuid": "fixture-004",
+      "age": 31,
+      "sex": "여자",
+      "province": "대구",
+      "district": "대구-수성구",
+      "occupation": "마케터",
+      "education_level": "4년제 대학교",
+      "marital_status": "미혼",
+      "family_type": "부모 동거",
+      "housing_type": "아파트",
+      "professional_persona": "브랜드 메시지와 감성 표현에 민감하다.",
+      "family_persona": "가족에게 제품을 추천하는 편이다.",
+      "culinary_persona": "신제품 체험을 즐긴다.",
+      "persona": "광고 문구의 신선함을 중시한다."
+    },
+    {
+      "uuid": "fixture-005",
+      "age": 52,
+      "sex": "남자",
+      "province": "대전",
+      "district": "대전-유성구",
+      "occupation": "공무원",
+      "education_level": "4년제 대학교",
+      "marital_status": "기혼",
+      "family_type": "부부+자녀",
+      "housing_type": "아파트",
+      "professional_persona": "안정성과 신뢰를 중요하게 판단한다.",
+      "family_persona": "자녀 교육비와 생활비를 함께 고려한다.",
+      "culinary_persona": "검증된 브랜드를 선호한다.",
+      "persona": "차분한 설명에 설득되는 소비자다."
+    },
+    {
+      "uuid": "fixture-006",
+      "age": 29,
+      "sex": "남자",
+      "province": "인천",
+      "district": "인천-연수구",
+      "occupation": "영업직",
+      "education_level": "4년제 대학교",
+      "marital_status": "미혼",
+      "family_type": "1인가구",
+      "housing_type": "원룸",
+      "professional_persona": "이동 중 모바일 업무를 자주 처리한다.",
+      "family_persona": "개인 만족을 우선해 소비한다.",
+      "culinary_persona": "배달과 간편식을 자주 이용한다.",
+      "persona": "짧고 강한 메시지에 반응한다."
+    },
+    {
+      "uuid": "fixture-007",
+      "age": 63,
+      "sex": "여자",
+      "province": "경남",
+      "district": "경남-창원시",
+      "occupation": "퇴직자",
+      "education_level": "고등학교",
+      "marital_status": "기혼",
+      "family_type": "부부",
+      "housing_type": "단독주택",
+      "professional_persona": "복잡한 기능보다 쉬운 설명을 선호한다.",
+      "family_persona": "가족과 통화와 사진 공유를 자주 한다.",
+      "culinary_persona": "건강과 익숙함을 중요하게 본다.",
+      "persona": "부담 없는 표현에 호감을 느낀다."
+    },
+    {
+      "uuid": "fixture-008",
+      "age": 41,
+      "sex": "남자",
+      "province": "전북",
+      "district": "전북-전주시",
+      "occupation": "교사",
+      "education_level": "대학원",
+      "marital_status": "기혼",
+      "family_type": "부부+자녀",
+      "housing_type": "아파트",
+      "professional_persona": "학생과 학부모 커뮤니케이션에 모바일을 쓴다.",
+      "family_persona": "아이 교육과 가족 기록을 중요하게 생각한다.",
+      "culinary_persona": "가족 외식과 집밥을 균형 있게 즐긴다.",
+      "persona": "의미가 분명한 메시지를 선호한다."
+    },
+    {
+      "uuid": "fixture-009",
+      "age": 35,
+      "sex": "여자",
+      "province": "광주",
+      "district": "광주-북구",
+      "occupation": "간호사",
+      "education_level": "2~3년제 전문대학",
+      "marital_status": "미혼",
+      "family_type": "부모 동거",
+      "housing_type": "아파트",
+      "professional_persona": "교대 근무 중 빠른 사용성을 중시한다.",
+      "family_persona": "부모와 생활비를 나누어 부담한다.",
+      "culinary_persona": "건강한 식단과 휴식을 중요하게 본다.",
+      "persona": "실용적인 혜택에 반응한다."
+    },
+    {
+      "uuid": "fixture-010",
+      "age": 57,
+      "sex": "남자",
+      "province": "강원",
+      "district": "강원-춘천시",
+      "occupation": "택시기사",
+      "education_level": "고등학교",
+      "marital_status": "기혼",
+      "family_type": "부부",
+      "housing_type": "아파트",
+      "professional_persona": "길 안내와 통화 안정성을 중요하게 본다.",
+      "family_persona": "배우자와 함께 쓰기 쉬운 제품을 찾는다.",
+      "culinary_persona": "익숙한 식당과 단골집을 선호한다.",
+      "persona": "복잡한 표현보다 신뢰감 있는 문구를 선호한다."
+    }
+  ],
+  "responses": [
+    {
+      "uuid": "fixture-001",
+      "response": "채널: 인스타그램\n메시지: 건강메시지\n반응: 클릭\n의향: 5\n이유: 건강 정보를 자주 찾아봅니다."
+    },
+    {
+      "uuid": "fixture-002",
+      "response": "채널: 유튜브\n메시지: 맛메시지\n반응: 관심\n의향: 4\n이유: 리뷰 영상을 보고 결정하는 편입니다."
+    },
+    {
+      "uuid": "fixture-003",
+      "response": "채널: 인스타그램\n메시지: 맛메시지\n반응: 클릭\n의향: 5\n이유: 인플루언서 추천을 신뢰합니다."
+    },
+    {
+      "uuid": "fixture-004",
+      "response": "채널: 이메일뉴스레터\n메시지: 건강메시지\n반응: 관심\n의향: 3\n이유: 구독 중인 뉴스레터라 눈에 띕니다."
+    },
+    {
+      "uuid": "fixture-005",
+      "response": "채널: 유튜브\n메시지: 건강메시지\n반응: 무시\n의향: 2\n이유: 광고 자체를 잘 보지 않습니다."
+    },
+    {
+      "uuid": "fixture-006",
+      "response": "채널: 인스타그램\n메시지: 건강메시지\n반응: 클릭\n의향: 4\n이유: 짧은 영상이 눈길을 끕니다."
+    },
+    {
+      "uuid": "fixture-007",
+      "response": "채널: 이메일뉴스레터\n메시지: 맛메시지\n반응: 거부\n의향: 1\n이유: 이메일 광고는 잘 안 봅니다."
+    },
+    {
+      "uuid": "fixture-008",
+      "response": "채널: 인스타그램\n메시지: 맛메시지\n반응: 관심\n의향: 4\n이유: 피드에서 자주 노출됩니다."
+    },
+    {
+      "uuid": "fixture-009",
+      "response": "메시지: 채널 항목이 빠졌습니다\n반응: 클릭\n의향: 3\n이유: 채널을 답하지 않았습니다."
+    },
+    {
+      "uuid": "fixture-010",
+      "response": "채널: 인스타그램\n반응: 무응답\n의향: 3\n이유: 메시지와 반응 항목이 잘못되었습니다."
+    }
+  ],
+  "expected": {
+    "total_responses": 10,
+    "parse_failed": 2,
+    "metrics": {
+      "budget": 5000000,
+      "choice_counts": {
+        "인스타그램": 4,
+        "유튜브": 2,
+        "이메일뉴스레터": 2
+      },
+      "choice_pct": {
+        "인스타그램": 50.0,
+        "유튜브": 25.0,
+        "이메일뉴스레터": 25.0
+      },
+      "channel_counts": {
+        "인스타그램": 4,
+        "유튜브": 2,
+        "이메일뉴스레터": 2
+      },
+      "channel_pct": {
+        "인스타그램": 50.0,
+        "유튜브": 25.0,
+        "이메일뉴스레터": 25.0
+      },
+      "message_counts": {
+        "건강메시지": 4,
+        "맛메시지": 4
+      },
+      "message_pct": {
+        "건강메시지": 50.0,
+        "맛메시지": 50.0
+      },
+      "reaction_counts": {
+        "클릭": 3,
+        "관심": 3,
+        "무시": 1,
+        "거부": 1
+      },
+      "reaction_pct": {
+        "클릭": 37.5,
+        "관심": 37.5,
+        "무시": 12.5,
+        "거부": 12.5
+      },
+      "best_combinations": [
+        {
+          "label": "인스타그램 / 건강메시지",
+          "average_score": 4.5,
+          "count": 2
+        },
+        {
+          "label": "인스타그램 / 맛메시지",
+          "average_score": 4.5,
+          "count": 2
+        },
+        {
+          "label": "유튜브 / 맛메시지",
+          "average_score": 4.0,
+          "count": 1
+        },
+        {
+          "label": "이메일뉴스레터 / 건강메시지",
+          "average_score": 3.0,
+          "count": 1
+        },
+        {
+          "label": "유튜브 / 건강메시지",
+          "average_score": 2.0,
+          "count": 1
+        },
+        {
+          "label": "이메일뉴스레터 / 맛메시지",
+          "average_score": 1.0,
+          "count": 1
+        }
+      ],
+      "top_reasons": [
+        {
+          "label": "건강 정보를 자주 찾아봅니다.",
+          "count": 1
+        },
+        {
+          "label": "리뷰 영상을 보고 결정하는 편입니다.",
+          "count": 1
+        },
+        {
+          "label": "인플루언서 추천을 신뢰합니다.",
+          "count": 1
+        },
+        {
+          "label": "구독 중인 뉴스레터라 눈에 띕니다.",
+          "count": 1
+        },
+        {
+          "label": "광고 자체를 잘 보지 않습니다.",
+          "count": 1
+        },
+        {
+          "label": "짧은 영상이 눈길을 끕니다.",
+          "count": 1
+        },
+        {
+          "label": "이메일 광고는 잘 안 봅니다.",
+          "count": 1
+        },
+        {
+          "label": "피드에서 자주 노출됩니다.",
+          "count": 1
+        }
+      ]
+    }
+  }
+}

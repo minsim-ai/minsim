@@ -686,7 +686,7 @@ function buildReportAnalysis(result: RunResultEnvelope, metricSections: MetricSe
     confidenceBody = '구조화 실패가 의미 있게 발생했습니다. 원문 응답 확인 후 결론을 좁히는 편이 좋습니다.'
   } else if (result.total_responses >= 200 && (parseSuccessRate ?? 0) >= 90) {
     confidenceLabel = '보고서 기준 충족'
-    confidenceBody = '표본 규모와 구조화 성공률이 좋아 세그먼트 차이까지 함께 해석할 수 있습니다.'
+    confidenceBody = '표본 규모와 응답 정리 성공률이 좋아 세그먼트 차이까지 함께 해석할 수 있습니다.'
   } else if (result.total_responses >= 50) {
     confidenceLabel = '의사결정 보조 가능'
     confidenceBody = '전체 방향성은 읽을 수 있고, 큰 세그먼트 차이는 보조 근거로 사용할 수 있습니다.'
@@ -1122,7 +1122,7 @@ function TrustLayer({
   const generatedAt = snapshot?.completed_at ?? snapshot?.updated_at ?? snapshot?.created_at
   const cards = [
     { label: '응답 커버리지', value: `${formatNumber(result.total_responses)}/${formatNumber(result.sample_size)}` },
-    { label: '구조화 성공', value: formatPercent(parseSuccessRate) },
+    { label: '응답 정리 성공', value: formatPercent(parseSuccessRate) },
     { label: '해석 범위', value: analysis.confidenceLabel },
     { label: '유효 응답', value: `${formatNumber(analysis.validResponses)}명` },
   ]
@@ -1366,7 +1366,7 @@ function ReportHero({
           <article>
             <p>해석 상태</p>
             <strong>{analysis.confidenceLabel}</strong>
-            <span>{analysis.parseSuccessRate !== null ? `구조화 성공 ${formatPct(analysis.parseSuccessRate)}` : '구조화율 없음'}</span>
+            <span>{analysis.parseSuccessRate !== null ? `응답 정리 성공 ${formatPct(analysis.parseSuccessRate)}` : '응답 정리율 없음'}</span>
           </article>
         </div>
         <div className="ks-report-hero-actions">

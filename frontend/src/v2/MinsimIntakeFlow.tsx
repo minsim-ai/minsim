@@ -450,7 +450,8 @@ function PanelSizePicker({ value, onSelect }: { value: number; onSelect: (size: 
             aria-pressed={value === preset}
             onClick={() => onSelect(preset)}
           >
-            {preset.toLocaleString()}명
+            <span>{preset.toLocaleString()}명</span>
+            {value === preset ? <span className="minsim-run-option-state">선택됨</span> : null}
           </button>
         ))}
       </div>
@@ -482,8 +483,18 @@ function preselectedPersonaPool(projectKind?: string | null): string {
 }
 
 
-function PersonaPoolPicker({ value, onSelect }: { value: string; onSelect: (pool: string) => void }) {
+function PersonaPoolPicker({
+  value,
+  onSelect,
+  simulationType,
+}: {
+  value: string
+  onSelect: (pool: string) => void
+  simulationType?: string
+}) {
   const [pools, setPools] = useState<PersonaPoolOption[]>(DEFAULT_POOL_OPTIONS)
+  const isCampusSim =
+    simulationType === 'campus_priority' || simulationType === 'campus_policy' || simulationType === 'open_survey'
 
   useEffect(() => {
     let cancelled = false
@@ -526,10 +537,18 @@ function PersonaPoolPicker({ value, onSelect }: { value: string; onSelect: (pool
             title={pool.available ? undefined : '데이터셋 준비 중'}
             onClick={() => pool.available && onSelect(pool.id)}
           >
-            {pool.label}
+            <span>{pool.label}</span>
+            {value === pool.id ? <span className="minsim-run-option-state">선택됨</span> : null}
           </button>
         ))}
       </div>
+      {isCampusSim && (
+        <p className="minsim-run-control-note" style={{ marginTop: 8 }}>
+          {value === 'dgist'
+            ? 'DGIST 구성원 풀: 학내 소속·거주 기준으로 나눕니다.'
+            : '전 국민 풀: 연령·성별 기준으로 나눕니다. 학내 소속 축은 쓰지 않습니다.'}
+        </p>
+      )}
     </div>
   )
 }
@@ -809,7 +828,11 @@ function ActionPanel({
           )}
           <PanelSizePicker value={sampleSize} onSelect={onSampleSizeChange} />
           {countryId === 'kr' && (
-            <PersonaPoolPicker value={personaPool} onSelect={onPersonaPoolChange} />
+            <PersonaPoolPicker
+              value={personaPool}
+              onSelect={onPersonaPoolChange}
+              simulationType={simulationType}
+            />
           )}
         </div>
 

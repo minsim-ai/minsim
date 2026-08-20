@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { getRun } from '../api/runs'
-import type { RunEventType, RunSnapshot } from '../types/api'
+import { getRun } from '../../api/runs'
+import type { RunEventType, RunSnapshot } from '../../types/api'
 
 const RUN_EVENT_TYPES: RunEventType[] = [
   'snapshot',

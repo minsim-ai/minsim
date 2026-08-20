@@ -1,31 +1,30 @@
 import { useState, useRef, useEffect, useMemo, useCallback, useLayoutEffect } from "react";
-import { APIError } from "./api/client";
-import { recordAnalyticsEvent } from "./api/analytics";
-import { getUserUsage, googleLogin } from "./api/auth";
-import { linkIntakeSessionRun } from "./api/intake";
-import { cancelRun, createRun, getPresets, getRun } from "./api/runs";
-import { AuthStatus } from "./components/AuthStatus";
+import { APIError } from "../../api/client";
+import { recordAnalyticsEvent } from "../../api/analytics";
+import { getUserUsage, googleLogin } from "../../api/auth";
+import { linkIntakeSessionRun } from "../../api/intake";
+import { cancelRun, createRun, getPresets, getRun } from "../../api/runs";
+import { AuthStatus } from "../../components/AuthStatus";
 import {
   applyPublicConfig,
   clampSampleSize,
   DEFAULT_SAMPLE_SIZE,
   EVENT_BANNER,
   EVENT_MODE_ENABLED,
-} from "./config/limits";
-import { GoalFirstChatFlow } from "./components/intake/GoalFirstChatFlow";
-import { SimulationProgress } from "./components/SimulationProgress";
-import { useRunEvents } from "./hooks/useRunEvents";
-import type { DemoPreset, RunCreateRequest, SimulationType, TargetFilter, UserUsageResponse } from "./types/api";
+} from "../../config/limits";
+import { GoalFirstChatFlow } from "./intake/GoalFirstChatFlow";
+import { useRunEvents } from "./useRunEvents";
+import type { DemoPreset, RunCreateRequest, SimulationType, TargetFilter, UserUsageResponse } from "../../types/api";
 import {
   simulations,
   introPlaceholders,
   chatSteps,
-} from "./data/mockData";
+} from "./mockData";
 import {
   chatScenarioCountsBySimulation,
   chatScenarioFixtures,
   type ChatScenarioFixture,
-} from "./data/chatScenarioFixtures";
+} from "./chatScenarioFixtures";
 
 /* ─── 타입 ─── */
 type ChatState = {
@@ -863,15 +862,75 @@ function App() {
       </div>
 
       {phase === 'loading' && (
-        <SimulationProgress
+        <ClassicRunLoading
           snapshot={runEvents.snapshot}
+          onCancel={handleCancel}
           onComplete={() => {
             if (activeRunId) navigateToResults(activeRunId);
           }}
-          onCancel={handleCancel}
         />
       )}
     </main>
+  );
+}
+
+/** Simple loading panel (no WebGL / face particles). */
+function ClassicRunLoading({
+  snapshot,
+  onCancel,
+  onComplete,
+}: {
+  snapshot: import('../../types/api').RunSnapshot | null;
+  onCancel: () => void;
+  onComplete: () => void;
+}) {
+  const total = Math.max(0, snapshot?.total_count || snapshot?.sample_size || 0);
+  const done = Math.max(0, Math.min(snapshot?.done_count ?? 0, total || snapshot?.done_count || 0));
+  const pct = snapshot?.progress_pct ?? (total > 0 ? (done / total) * 100 : 4);
+  const ready = Boolean(snapshot?.status === 'completed' && snapshot.result_available);
+
+  return (
+    <div
+      className="ks-classic-loading"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 50,
+        background: 'var(--bg)',
+        display: 'grid',
+        placeItems: 'center',
+        padding: 24,
+      }}
+    >
+      <div className="card" style={{ width: 'min(440px, 100%)', padding: 28 }}>
+        <div className="kicker" style={{ marginBottom: 8 }}>실행 중</div>
+        <h2 style={{ fontSize: 22, margin: '0 0 8px' }}>
+          {ready ? '결과가 준비되었습니다' : '합성 페르소나가 응답하는 중…'}
+        </h2>
+        <p className="muted" style={{ fontSize: 13.5, lineHeight: 1.55, margin: '0 0 18px' }}>
+          {done.toLocaleString('ko-KR')}
+          {total > 0 ? ` / ${total.toLocaleString('ko-KR')}` : ''}명 응답 완료
+        </p>
+        <div
+          className="bar"
+          style={{ height: 10, marginBottom: 18 }}
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(pct)}
+        >
+          <i style={{ width: `${Math.max(3, Math.min(100, pct))}%` }} />
+        </div>
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+          <button type="button" className="btn ghost sm" onClick={onCancel}>
+            취소
+          </button>
+          <button type="button" className="btn primary sm" disabled={!ready} onClick={onComplete}>
+            {ready ? '결과 보기' : '분석 중…'}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

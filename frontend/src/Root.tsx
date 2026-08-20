@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { AdminPage } from "./AdminPage";
-import ClassicApp from "./App";
+import ClassicApp from "./deprecated/classic-app/App";
 import { LandingPage } from "./LandingPage";
 import { LoginPage } from "./LoginPage";
 import { ResultsPage as ClassicResultsPage, ResultsStoryPage } from "./ResultsPage";

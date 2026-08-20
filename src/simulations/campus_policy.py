@@ -16,6 +16,7 @@ from src.data.pools import DEFAULT_PERSONA_POOL
 from src.data.respondent_axes import (
     classify_primary,
     classify_secondary,
+    is_campus_pool,
     normalize_pool,
     primary_axis_label,
     primary_axis_order,
@@ -444,14 +445,10 @@ class CampusPolicySimulation(GenericPersonaSimulation):
         trace_metadata: dict[str, object] | None = None,
     ) -> GenericSimulationResult:
         sampler = sampler or PersonaSampler()
-        runtime_input = {**input_data, "_persona_pool": getattr(sampler, "pool", DEFAULT_PERSONA_POOL)}
-        sampling_meta: dict[str, Any] = {
-            "sampling": "random",
-            "tier_counts": {},
-            "tier_weights": {},
-            "warnings": [],
-        }
-        if sampler.pool != DEFAULT_PERSONA_POOL:
+        # Honor selected pool: DGIST → stratified campus axes; nationwide → random + age/sex.
+        pool = normalize_pool(getattr(sampler, "pool", None) or DEFAULT_PERSONA_POOL)
+        runtime_input = {**input_data, "_persona_pool": pool}
+        if is_campus_pool(pool):
             stratified = sample_stratified(
                 sampler, n=sample_size, seed=seed, target_filter=target_filter
             )
@@ -459,6 +456,12 @@ class CampusPolicySimulation(GenericPersonaSimulation):
             sampling_meta = stratified.meta
         else:
             personas = sampler.sample(n=sample_size, filter_=target_filter, seed=seed)
+            sampling_meta = {
+                "sampling": "random",
+                "tier_counts": {},
+                "tier_weights": {},
+                "warnings": [],
+            }
 
         simulator = BatchSimulator(
             purpose=self.purpose,

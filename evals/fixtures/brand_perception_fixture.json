@@ -1,0 +1,353 @@
+{
+  "simulation_type": "brand_perception",
+  "name": "brand_perception_fixture",
+  "input_data": {
+    "brand_name": "그린리프",
+    "category": "친환경 생활용품",
+    "attributes": [
+      "신뢰",
+      "가격",
+      "디자인",
+      "지속가능성"
+    ],
+    "context_note": "마트 진열대에서 처음 보는 상황"
+  },
+  "personas": [
+    {
+      "uuid": "fixture-001",
+      "age": 24,
+      "sex": "여자",
+      "province": "서울",
+      "district": "서울-마포구",
+      "occupation": "대학원생",
+      "education_level": "대학원",
+      "marital_status": "미혼",
+      "family_type": "1인가구",
+      "housing_type": "오피스텔",
+      "professional_persona": "트렌드와 모바일 생산성 도구에 민감하다.",
+      "family_persona": "혼자 살며 구매 결정을 빠르게 내린다.",
+      "culinary_persona": "카페와 편의 서비스를 자주 이용한다.",
+      "persona": "새로운 기기를 먼저 써 보는 소비자다."
+    },
+    {
+      "uuid": "fixture-002",
+      "age": 37,
+      "sex": "남자",
+      "province": "경기",
+      "district": "경기-성남시",
+      "occupation": "개발자",
+      "education_level": "4년제 대학교",
+      "marital_status": "기혼",
+      "family_type": "부부+자녀",
+      "housing_type": "아파트",
+      "professional_persona": "업무 효율과 기기 성능을 중요하게 본다.",
+      "family_persona": "가족 지출을 고려해 실용성을 따진다.",
+      "culinary_persona": "주말 외식을 계획적으로 한다.",
+      "persona": "기능 설명이 명확한 광고를 선호한다."
+    },
+    {
+      "uuid": "fixture-003",
+      "age": 46,
+      "sex": "여자",
+      "province": "부산",
+      "district": "부산-해운대구",
+      "occupation": "자영업",
+      "education_level": "2~3년제 전문대학",
+      "marital_status": "기혼",
+      "family_type": "부부",
+      "housing_type": "아파트",
+      "professional_persona": "가격 대비 체감 가치를 중요하게 본다.",
+      "family_persona": "배우자와 상의해 큰 구매를 결정한다.",
+      "culinary_persona": "지역 맛집과 실속 소비를 선호한다.",
+      "persona": "과장보다 안정적인 인상을 선호한다."
+    },
+    {
+      "uuid": "fixture-004",
+      "age": 31,
+      "sex": "여자",
+      "province": "대구",
+      "district": "대구-수성구",
+      "occupation": "마케터",
+      "education_level": "4년제 대학교",
+      "marital_status": "미혼",
+      "family_type": "부모 동거",
+      "housing_type": "아파트",
+      "professional_persona": "브랜드 메시지와 감성 표현에 민감하다.",
+      "family_persona": "가족에게 제품을 추천하는 편이다.",
+      "culinary_persona": "신제품 체험을 즐긴다.",
+      "persona": "광고 문구의 신선함을 중시한다."
+    },
+    {
+      "uuid": "fixture-005",
+      "age": 52,
+      "sex": "남자",
+      "province": "대전",
+      "district": "대전-유성구",
+      "occupation": "공무원",
+      "education_level": "4년제 대학교",
+      "marital_status": "기혼",
+      "family_type": "부부+자녀",
+      "housing_type": "아파트",
+      "professional_persona": "안정성과 신뢰를 중요하게 판단한다.",
+      "family_persona": "자녀 교육비와 생활비를 함께 고려한다.",
+      "culinary_persona": "검증된 브랜드를 선호한다.",
+      "persona": "차분한 설명에 설득되는 소비자다."
+    },
+    {
+      "uuid": "fixture-006",
+      "age": 29,
+      "sex": "남자",
+      "province": "인천",
+      "district": "인천-연수구",
+      "occupation": "영업직",
+      "education_level": "4년제 대학교",
+      "marital_status": "미혼",
+      "family_type": "1인가구",
+      "housing_type": "원룸",
+      "professional_persona": "이동 중 모바일 업무를 자주 처리한다.",
+      "family_persona": "개인 만족을 우선해 소비한다.",
+      "culinary_persona": "배달과 간편식을 자주 이용한다.",
+      "persona": "짧고 강한 메시지에 반응한다."
+    },
+    {
+      "uuid": "fixture-007",
+      "age": 63,
+      "sex": "여자",
+      "province": "경남",
+      "district": "경남-창원시",
+      "occupation": "퇴직자",
+      "education_level": "고등학교",
+      "marital_status": "기혼",
+      "family_type": "부부",
+      "housing_type": "단독주택",
+      "professional_persona": "복잡한 기능보다 쉬운 설명을 선호한다.",
+      "family_persona": "가족과 통화와 사진 공유를 자주 한다.",
+      "culinary_persona": "건강과 익숙함을 중요하게 본다.",
+      "persona": "부담 없는 표현에 호감을 느낀다."
+    },
+    {
+      "uuid": "fixture-008",
+      "age": 41,
+      "sex": "남자",
+      "province": "전북",
+      "district": "전북-전주시",
+      "occupation": "교사",
+      "education_level": "대학원",
+      "marital_status": "기혼",
+      "family_type": "부부+자녀",
+      "housing_type": "아파트",
+      "professional_persona": "학생과 학부모 커뮤니케이션에 모바일을 쓴다.",
+      "family_persona": "아이 교육과 가족 기록을 중요하게 생각한다.",
+      "culinary_persona": "가족 외식과 집밥을 균형 있게 즐긴다.",
+      "persona": "의미가 분명한 메시지를 선호한다."
+    },
+    {
+      "uuid": "fixture-009",
+      "age": 35,
+      "sex": "여자",
+      "province": "광주",
+      "district": "광주-북구",
+      "occupation": "간호사",
+      "education_level": "2~3년제 전문대학",
+      "marital_status": "미혼",
+      "family_type": "부모 동거",
+      "housing_type": "아파트",
+      "professional_persona": "교대 근무 중 빠른 사용성을 중시한다.",
+      "family_persona": "부모와 생활비를 나누어 부담한다.",
+      "culinary_persona": "건강한 식단과 휴식을 중요하게 본다.",
+      "persona": "실용적인 혜택에 반응한다."
+    },
+    {
+      "uuid": "fixture-010",
+      "age": 57,
+      "sex": "남자",
+      "province": "강원",
+      "district": "강원-춘천시",
+      "occupation": "택시기사",
+      "education_level": "고등학교",
+      "marital_status": "기혼",
+      "family_type": "부부",
+      "housing_type": "아파트",
+      "professional_persona": "길 안내와 통화 안정성을 중요하게 본다.",
+      "family_persona": "배우자와 함께 쓰기 쉬운 제품을 찾는다.",
+      "culinary_persona": "익숙한 식당과 단골집을 선호한다.",
+      "persona": "복잡한 표현보다 신뢰감 있는 문구를 선호한다."
+    }
+  ],
+  "responses": [
+    {
+      "uuid": "fixture-001",
+      "response": "점수: 5\n연상어: 친환경, 신뢰, 깔끔함\n긍정: 포장이 깔끔함\n부정: 가격이 다소 높음\n이유: 친환경 이미지가 강하게 느껴집니다."
+    },
+    {
+      "uuid": "fixture-002",
+      "response": "점수: 4\n연상어: 착한소비, 자연\n긍정: 성분이 안전해 보임\n부정: 브랜드 인지도가 낮음\n이유: 성분표를 보니 안심이 됩니다."
+    },
+    {
+      "uuid": "fixture-003",
+      "response": "점수: 3\n연상어: 무난함\n긍정: 디자인이 심플함\n부정: 특별한 인상이 없음\n이유: 다른 친환경 브랜드와 비슷해 보입니다."
+    },
+    {
+      "uuid": "fixture-004",
+      "response": "점수: 5\n연상어: 지속가능성, 신뢰, 프리미엄\n긍정: 지속가능성 메시지가 명확함\n부정: 가격이 부담됨\n이유: 가치소비에 잘 맞는 브랜드입니다."
+    },
+    {
+      "uuid": "fixture-005",
+      "response": "점수: 2\n연상어: 낯섦\n긍정: 없음\n부정: 처음 보는 브랜드라 신뢰가 안 감\n이유: 검증된 브랜드가 아니라 망설여집니다."
+    },
+    {
+      "uuid": "fixture-006",
+      "response": "점수: 4\n연상어: 자연, 깨끗함\n긍정: 향이 자연스러움\n부정: 용량이 적음\n이유: 성분과 향이 마음에 듭니다."
+    },
+    {
+      "uuid": "fixture-007",
+      "response": "점수: 3\n연상어: 평범함\n긍정: 무난한 디자인\n부정: 눈에 띄지 않음\n이유: 특별히 끌리지는 않습니다."
+    },
+    {
+      "uuid": "fixture-008",
+      "response": "점수: 4\n연상어: 신뢰, 친환경\n긍정: 인증 마크가 많음\n부정: 온라인 후기가 적음\n이유: 인증이 많아 믿음이 갑니다."
+    },
+    {
+      "uuid": "fixture-009",
+      "response": "연상어: 점수 항목이 빠졌습니다\n긍정: 없음\n부정: 없음\n이유: 점수를 답하지 않았습니다."
+    },
+    {
+      "uuid": "fixture-010",
+      "response": "점수: 6\n연상어: 잘못된 점수\n긍정: 없음\n부정: 범위를 벗어난 점수\n이유: 1~5 범위를 벗어났습니다."
+    }
+  ],
+  "expected": {
+    "total_responses": 10,
+    "parse_failed": 2,
+    "metrics": {
+      "brand_name": "그린리프",
+      "score_counts": {
+        "5": 2,
+        "4": 3,
+        "3": 2,
+        "2": 1
+      },
+      "score_pct": {
+        "5": 25.0,
+        "4": 37.5,
+        "3": 25.0,
+        "2": 12.5
+      },
+      "average_score": 3.75,
+      "associations": [
+        {
+          "label": "신뢰",
+          "count": 3
+        },
+        {
+          "label": "친환경",
+          "count": 2
+        },
+        {
+          "label": "자연",
+          "count": 2
+        },
+        {
+          "label": "깔끔함",
+          "count": 1
+        },
+        {
+          "label": "착한소비",
+          "count": 1
+        },
+        {
+          "label": "무난함",
+          "count": 1
+        },
+        {
+          "label": "지속가능성",
+          "count": 1
+        },
+        {
+          "label": "프리미엄",
+          "count": 1
+        },
+        {
+          "label": "낯섦",
+          "count": 1
+        },
+        {
+          "label": "깨끗함",
+          "count": 1
+        },
+        {
+          "label": "평범함",
+          "count": 1
+        }
+      ],
+      "positive_themes": [
+        {
+          "label": "포장이 깔끔함",
+          "count": 1
+        },
+        {
+          "label": "성분이 안전해 보임",
+          "count": 1
+        },
+        {
+          "label": "디자인이 심플함",
+          "count": 1
+        },
+        {
+          "label": "지속가능성 메시지가 명확함",
+          "count": 1
+        },
+        {
+          "label": "없음",
+          "count": 1
+        },
+        {
+          "label": "향이 자연스러움",
+          "count": 1
+        },
+        {
+          "label": "무난한 디자인",
+          "count": 1
+        },
+        {
+          "label": "인증 마크가 많음",
+          "count": 1
+        }
+      ],
+      "negative_themes": [
+        {
+          "label": "가격이 다소 높음",
+          "count": 1
+        },
+        {
+          "label": "브랜드 인지도가 낮음",
+          "count": 1
+        },
+        {
+          "label": "특별한 인상이 없음",
+          "count": 1
+        },
+        {
+          "label": "가격이 부담됨",
+          "count": 1
+        },
+        {
+          "label": "처음 보는 브랜드라 신뢰가 안 감",
+          "count": 1
+        },
+        {
+          "label": "용량이 적음",
+          "count": 1
+        },
+        {
+          "label": "눈에 띄지 않음",
+          "count": 1
+        },
+        {
+          "label": "온라인 후기가 적음",
+          "count": 1
+        }
+      ]
+    }
+  }
+}

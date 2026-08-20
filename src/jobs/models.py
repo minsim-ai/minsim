@@ -134,6 +134,28 @@ class InterviewMessageRecord:
 
 
 @dataclass(frozen=True)
+class FocusGroupRecord:
+    focus_group_id: str
+    user_id: str
+    project_id: str
+    run_id: str
+    status: str
+    schema_version: str = "focus-group/v1"
+    config: dict[str, Any] = field(default_factory=dict)
+    progress: dict[str, Any] | None = None
+    panel: list[dict[str, Any]] = field(default_factory=list)
+    timeline: list[dict[str, Any]] = field(default_factory=list)
+    stance_table: list[dict[str, Any]] | None = None
+    summary: dict[str, Any] | None = None
+    token_usage: dict[str, Any] | None = None
+    error: str | None = None
+    job_id: str | None = None
+    created_at: str = ""
+    updated_at: str = ""
+    completed_at: str | None = None
+
+
+@dataclass(frozen=True)
 class RunEventRecord:
     run_id: str
     event_type: RunEventType

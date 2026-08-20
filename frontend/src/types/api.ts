@@ -900,6 +900,37 @@ export interface InterviewThreadListResponse {
   threads: InterviewThreadResponse[]
 }
 
+export interface FocusGroupCreateRequest {
+  cohort_option: string
+  moderator_prompt?: string | null
+  panel_size?: number
+  seed?: number | null
+}
+
+export interface FocusGroupResponse {
+  schema_version: string
+  focus_group_id: string
+  project_id: string
+  run_id: string
+  status: 'queued' | 'running' | 'completed' | 'failed'
+  created_at: string
+  updated_at: string
+  completed_at?: string | null
+  error?: string | null
+  config: JsonObject
+  progress?: JsonObject | null
+  panel: JsonObject[]
+  timeline: JsonObject[]
+  stance_table?: JsonObject[] | null
+  summary?: JsonObject | null
+  token_usage?: JsonObject | null
+}
+
+export interface FocusGroupListResponse {
+  focus_groups: FocusGroupResponse[]
+}
+
+
 export interface AdminOverviewResponse {
   users: number
   runs: number
