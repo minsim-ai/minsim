@@ -1,5 +1,19 @@
 import pytest
 
+from src import config
+from src.runtime import event_mode
+
+
+@pytest.fixture(autouse=True)
+def isolate_event_mode(monkeypatch: pytest.MonkeyPatch) -> None:
+    # KORESIM_EVENT_MODE is read once into a module constant at import time
+    # (and re-imported by value into src.runtime.event_mode), so a developer's
+    # local .env leaks into every test unless both bindings are patched here.
+    # Tests that want event mode on (e.g. test_event_mode.py) override this
+    # explicitly with their own monkeypatch.setattr call.
+    monkeypatch.setattr(config, "KORESIM_EVENT_MODE", False)
+    monkeypatch.setattr(event_mode, "KORESIM_EVENT_MODE", False)
+
 
 @pytest.fixture(autouse=True)
 def isolate_app_auth_env(monkeypatch: pytest.MonkeyPatch) -> None:
