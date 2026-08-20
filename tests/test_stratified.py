@@ -4,6 +4,8 @@ from src.data.campus_tiers import TIER_ORDER, classify_tier
 from src.data.sampler import PersonaSampler
 from src.data.stratified import DEFAULT_TIER_MINIMUMS, sample_stratified
 
+pytestmark = pytest.mark.requires_dataset
+
 
 @pytest.fixture
 def sampler():

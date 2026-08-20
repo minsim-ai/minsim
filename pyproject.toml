@@ -34,6 +34,9 @@ dev = [
 [tool.pytest.ini_options]
 pythonpath = ["."]
 asyncio_mode = "auto"
+markers = [
+    "requires_dataset: needs real persona parquet data not committed to git (see scripts/download_dataset.py, scripts/import_dgist_personas.py)",
+]
 
 [tool.coverage.run]
 source = [

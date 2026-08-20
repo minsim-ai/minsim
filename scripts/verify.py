@@ -36,6 +36,14 @@ def main() -> int:
         action="store_true",
         help="Skip the Playwright booth journey (requires the frontend build).",
     )
+    parser.add_argument(
+        "--skip-dataset-tests",
+        action="store_true",
+        help=(
+            "Skip tests marked requires_dataset (need real persona parquet "
+            "data that isn't committed to git, e.g. the DGIST pool)."
+        ),
+    )
     args = parser.parse_args()
 
     try:
@@ -51,17 +59,18 @@ def main() -> int:
         run(["uv", "run", "python", "evals/run_campus_priority_fixture_eval.py"])
         run(["uv", "run", "python", "evals/run_open_survey_fixture_eval.py"])
         run(["uv", "run", "python", "evals/run_startup_item_validation_fixture_eval.py"])
-        run(
-            [
-                "uv",
-                "run",
-                "pytest",
-                *PYTEST_COV_TARGETS,
-                "--cov-report=term-missing",
-                "--cov-fail-under=85",
-                "tests",
-            ]
-        )
+        pytest_command = [
+            "uv",
+            "run",
+            "pytest",
+            *PYTEST_COV_TARGETS,
+            "--cov-report=term-missing",
+            "--cov-fail-under=85",
+            "tests",
+        ]
+        if args.skip_dataset_tests:
+            pytest_command += ["-m", "not requires_dataset"]
+        run(pytest_command)
         run(["npm", "run", "lint"], cwd=FRONTEND_DIR)
         run(["npm", "run", "typecheck"], cwd=FRONTEND_DIR)
         if not args.skip_build:
