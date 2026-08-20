@@ -281,6 +281,9 @@ uv run python scripts/verify.py --skip-build
 
 ## 로컬 실행
 
+> 처음 이 리포를 clone했다면 (`.env`·데이터·의존성이 아직 없다면) 아래 요약보다
+> **[`docs/getting-started.md`](docs/getting-started.md)** 를 먼저 본다.
+
 사전 조건:
 
 1. 페르소나 parquet 존재 — 최소 `data/personas/kr/nemotron_personas.parquet` 또는 legacy `data/nemotron_korea_personas.parquet`  
@@ -479,6 +482,7 @@ campus_policy, campus_priority, open_survey
 
 | 문서 | 용도 |
 | --- | --- |
+| [`docs/getting-started.md`](docs/getting-started.md) | 최초 로컬 세팅 (클론 직후부터) |
 | [`docs/design/agentic-workflow-brief.md`](docs/design/agentic-workflow-brief.md) | Agentic 워크플로 **요약** |
 | [`docs/design/agentic-workflow-deep.md`](docs/design/agentic-workflow-deep.md) | Agentic 워크플로 **상세** |
 | `docs/design/llm-gateway-orchestration.md` | LLM / agent 경계 |
